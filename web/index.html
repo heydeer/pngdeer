@@ -550,8 +550,9 @@ const saving = (f) => Math.round(100 * (1 - f.out.byteLength / f.bytes.byteLengt
 // Threaded build (cross-origin isolated page): one worker, whose thread pool uses every core (a
 // second threaded instance on a page hangs). It must report ready, after compressing a test image,
 // within READY_MS (see worker.js for why it may not); otherwise, and on pages that aren't isolated,
-// single-threaded workers, one file each.
-const READY_MS = 5000;
+// single-threaded workers, one file each. READY_MS includes loading the build and starting a worker
+// per core, a few round trips each: 8 s over a slow link, where a hang never reports at all.
+const READY_MS = 15000;
 let threaded = self.crossOriginIsolated === true;
 let pool = [];
 const queue = [];
