@@ -110,7 +110,7 @@ const REFERENCE_OFFSET: f64 = 1.4;
 
 /// The variants tried at each palette size: half and no dithering, no dithering with neighbour
 /// smoothing (remap::prefer_neighbours, 2 levels), and Wu's palette undithered (opaque images
-/// only; it suits photos).
+/// only; it suits photos). "No dithering" still dithers smooth gradients (remap::SMOOTH_DITHER).
 pub const DEFAULT_VARIANTS: [Variant; 4] = [
     Variant { dither: 50, rdo: None, source: Source::Search },
     Variant { dither: 0, rdo: None, source: Source::Search },

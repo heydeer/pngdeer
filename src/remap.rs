@@ -1,5 +1,6 @@
-//! Pixels onto a palette: the nearest entry, or serpentine Floyd–Steinberg damped where the image
-//! already has edges or texture; and neighbour smoothing (--rdo) afterwards.
+//! Pixels onto a palette: serpentine Floyd–Steinberg damped where the image already has edges or
+//! texture, at least half strength in smooth gradients, or the nearest entry where a variant asks
+//! for no dithering; and neighbour smoothing (--rdo) afterwards.
 
 use std::collections::HashMap;
 
@@ -19,11 +20,38 @@ const DAMPED_DITHER: f32 = 0.35;
 /// Dithering runs in bands of this many rows, each starting with no error, so bands can run in
 /// parallel and the result doesn't depend on the number of threads.
 const BAND: usize = 64;
+/// A translucent pixel is dithered when its alpha is within this of each 4-neighbour's: inside a
+/// soft shadow or a cut-out whose "opaque" parts are 250-odd, not on an anti-aliased edge.
+const ALPHA_STEP: u8 = 16;
+/// The least dithering smooth gradients get, whatever the variant (smooth_map), and how far around
+/// a pixel smooth_map looks.
+const SMOOTH_DITHER: f32 = 0.5;
+const SMOOTH_RADIUS: usize = 2;
 
-/// How much dithering each pixel gets (1 = full): less where it differs strongly from a neighbour,
-/// at edges (where diffused error makes halos) and in texture (which hides banding anyway).
-fn dither_map(rgba: &[RGBA], pixels: &[Color], w: usize, h: usize) -> Vec<f32> {
-    let mut out = vec![1.0; pixels.len()];
+/// Which pixels take and pass on dithering error: opaque ones, and translucent ones where alpha
+/// changes gently (ALPHA_STEP). Error spread through anti-aliased edges into what they border cost
+/// up to 4 points on line art over transparency, so pixels on an alpha edge, and transparent ones,
+/// take the nearest entry instead.
+fn ditherable(pixels: &[RGBA], w: usize, h: usize) -> Vec<bool> {
+    let mut out = vec![true; pixels.len()];
+    par::fill(&mut out, par::CHUNK, |offset, chunk| {
+        for (i, v) in chunk.iter_mut().enumerate() {
+            let k = offset + i;
+            let a = pixels[k].a;
+            if a == 255 {
+                continue;
+            }
+            let (x, y) = (k % w, k / w);
+            let gentle = |nx: usize, ny: usize| nx >= w || ny >= h || pixels[ny * w + nx].a.abs_diff(a) <= ALPHA_STEP;
+            *v = a > 0 && gentle(x.wrapping_sub(1), y) && gentle(x + 1, y) && gentle(x, y.wrapping_sub(1)) && gentle(x, y + 1);
+        }
+    });
+    out
+}
+
+/// Each pixel's local contrast: the largest distance (as a square root) to a 4-neighbour.
+fn contrast_map(rgba: &[RGBA], pixels: &[Color], w: usize, h: usize) -> Vec<f32> {
+    let mut out = vec![0.0; pixels.len()];
     par::fill(&mut out, par::CHUNK, |offset, chunk| {
         for (i, v) in chunk.iter_mut().enumerate() {
             let k = offset + i;
@@ -35,24 +63,64 @@ fn dither_map(rgba: &[RGBA], pixels: &[Color], w: usize, h: usize) -> Vec<f32> {
                     most = most.max(distance(c, &pixels[ny * w + nx]));
                 }
             }
-            let contrast = most.sqrt();
-            let t = ((contrast - FADE_FROM) / (FADE_TO - FADE_FROM)).clamp(0.0, 1.0);
-            *v = 1.0 - t * (1.0 - DAMPED_DITHER);
+            *v = most.sqrt();
         }
     });
     out
 }
 
-/// Palette indices for `pixels`: the nearest entry, or with `dither` > 0 serpentine
-/// Floyd–Steinberg diffusing that share of each error (damped by dither_map, capped at MAX_ERROR).
-/// Only opaque pixels are dithered: error spread through anti-aliased edges into what they border
-/// cost up to 4 points on line art over transparency, so translucent pixels take the
-/// nearest entry and neither take nor pass on error.
+/// How much dithering a pixel of this contrast gets (1 = full): less where it differs strongly
+/// from a neighbour, at edges (where diffused error makes halos) and in texture (which hides
+/// banding anyway).
+fn damping(contrast: f32) -> f32 {
+    let t = ((contrast - FADE_FROM) / (FADE_TO - FADE_FROM)).clamp(0.0, 1.0);
+    1.0 - t * (1.0 - DAMPED_DITHER)
+}
+
+/// Pixels in smooth gradients (skin, sky, shading, soft shadows): some contrast within
+/// SMOOTH_RADIUS, none past FADE_FROM. Mapped to their nearest entries they posterize into flat
+/// patches with contours between them, which looks worse than dithering's grain although
+/// SSIMULACRA2 and butteraugli both score it higher, so every variant dithers them
+/// (SMOOTH_DITHER). Flat areas, edges and texture are left to the variant.
+fn smooth_map(contrast: &[f32], w: usize, h: usize) -> Vec<bool> {
+    let r = SMOOTH_RADIUS;
+    let mut rows = vec![0f32; contrast.len()];
+    par::fill(&mut rows, par::CHUNK, |offset, chunk| {
+        for (i, v) in chunk.iter_mut().enumerate() {
+            let (x, y) = ((offset + i) % w, (offset + i) / w);
+            *v = contrast[y * w + x.saturating_sub(r)..=y * w + (x + r).min(w - 1)].iter().fold(0f32, |m, &c| m.max(c));
+        }
+    });
+    let mut out = vec![false; contrast.len()];
+    par::fill(&mut out, par::CHUNK, |offset, chunk| {
+        for (i, v) in chunk.iter_mut().enumerate() {
+            let (x, y) = ((offset + i) % w, (offset + i) / w);
+            let most = (y.saturating_sub(r)..=(y + r).min(h - 1)).fold(0f32, |m, yy| m.max(rows[yy * w + x]));
+            *v = most > 0.0 && most <= FADE_FROM;
+        }
+    });
+    out
+}
+
+/// Palette indices for `pixels`: serpentine Floyd–Steinberg diffusing a share of each error
+/// (`dither`, at least SMOOTH_DITHER in smooth gradients; damped where contrast is high, capped at
+/// MAX_ERROR) among the pixels `ditherable` picks, or the nearest entry where that share is 0.
 pub fn remap(pixels: &[RGBA], w: usize, h: usize, palette: &[RGBA], dither: f32) -> Vec<u8> {
     let pal: Vec<Color> = palette.iter().map(|&c| to_color(c)).collect();
     let nearest = Nearest::new(&pal);
     let mut out = vec![0u8; pixels.len()];
-    if dither <= 0.0 {
+    // Colors repeat (runs, flat areas): convert each run once, and look up a pixel that takes no
+    // error by its color.
+    let mut src: Vec<Color> = vec![[0.0; DIM]; pixels.len()];
+    par::fill(&mut src, par::CHUNK, |offset, chunk| {
+        for i in 0..chunk.len() {
+            let k = offset + i;
+            chunk[i] = if i > 0 && pixels[k - 1] == pixels[k] { chunk[i - 1] } else { to_color(pixels[k]) };
+        }
+    });
+    let contrast = contrast_map(pixels, &src, w, h);
+    let smooth = smooth_map(&contrast, w, h);
+    if dither <= 0.0 && !smooth.contains(&true) {
         for (k, part) in par::chunked(pixels, |_, chunk| {
             let mut cache: HashMap<RGBA, u8> = HashMap::new();
             let mut last: Option<(RGBA, u8)> = None;
@@ -75,16 +143,7 @@ pub fn remap(pixels: &[RGBA], w: usize, h: usize, palette: &[RGBA], dither: f32)
         }
         return out;
     }
-    // Colors repeat (runs, flat areas): convert each run once, and look up a pixel that takes no
-    // error by its color.
-    let mut src: Vec<Color> = vec![[0.0; DIM]; pixels.len()];
-    par::fill(&mut src, par::CHUNK, |offset, chunk| {
-        for i in 0..chunk.len() {
-            let k = offset + i;
-            chunk[i] = if i > 0 && pixels[k - 1] == pixels[k] { chunk[i - 1] } else { to_color(pixels[k]) };
-        }
-    });
-    let damping = dither_map(pixels, &src, w, h);
+    let dithered = ditherable(pixels, w, h);
     let top = 255.0;
     par::fill(&mut out, BAND * w, |offset, band| {
         let y0 = offset / w;
@@ -99,7 +158,7 @@ pub fn remap(pixels: &[RGBA], w: usize, h: usize, palette: &[RGBA], dither: f32)
                 let x = if ltr { i } else { w - 1 - i };
                 let k = y * w + x;
                 let c = src[k];
-                if pixels[k].a < 255 {
+                if !dithered[k] {
                     band[k - offset] = nearest.find(&c, hint).0;
                     continue;
                 }
@@ -117,7 +176,7 @@ pub fn remap(pixels: &[RGBA], w: usize, h: usize, palette: &[RGBA], dither: f32)
                 if d < DEAD_ZONE * DEAD_ZONE {
                     continue;
                 }
-                let strength = dither * damping[k];
+                let strength = if smooth[k] { dither.max(SMOOTH_DITHER) } else { dither * damping(contrast[k]) };
                 let q: Color = std::array::from_fn(|ch| (want[ch] - pal[j as usize][ch]) * strength);
                 let (fwd, back): (isize, isize) = if ltr { (1, -1) } else { (-1, 1) };
                 let at = |dx: isize| (x as isize + 1 + dx) as usize;

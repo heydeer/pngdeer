@@ -335,7 +335,7 @@
       <h1 class="rise d1">Smaller PNGs.<br>Same <span class="px">picture.</span></h1>
     </div>
     <div class="rise d2">
-      <p class="lede">pngdeer finds the smallest palette PNG that still looks like your image: <strong>typically 70% smaller</strong>, and about <strong>15% smaller than TinyPNG</strong> at the same quality.</p>
+      <p class="lede">pngdeer finds the smallest palette PNG that still looks like your image: <strong>typically 70% smaller</strong>, and <strong>11–15% smaller than TinyPNG</strong> at the same quality.</p>
       <div class="facts mono"><span><i></i>Runs on this device</span><span><i></i>Nothing is uploaded</span><span><i></i>MIT or Apache-2.0</span></div>
     </div>
   </section>
@@ -431,7 +431,7 @@
     <div class="method reveal">
       <div><b>Held out</b>The parameters were tuned on 109 images. The other 71 were collected afterwards and never used for tuning; both sets agree.</div>
       <div><b>Generous to the others</b>Each open-source tool gets its best of ten settings per image, picked after the fact. pngdeer's results are searched at compression time, as you get them here.</div>
-      <div><b>A second opinion</b>Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 13–14% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026.</div>
+      <div><b>A second opinion</b>Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 10–13% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026.</div>
     </div>
   </section>
 
@@ -831,11 +831,11 @@ $("#all").onclick = () => files.filter((x) => x.status === "done").forEach((x, i
 // bench/bench.py, October 2026: pngdeer's pd70–pd95 runs and every other tool's ten settings, each
 // pooled into one size–quality curve per image (experiments/palette-feedback/tool_rank.py).
 const RESEARCH = {
-  holdout: { n: 71, smaller: 17, points: 1.8, reach: 67, tools: [
-    ["pngdeer", 1.8, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
+  holdout: { n: 71, smaller: 15, points: 1.7, reach: 67, tools: [
+    ["pngdeer", 1.7, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
     ["FFmpeg", -7.0, 16], ["quantette", -7.6, 18], ["ImageMagick", -11.3, 3], ["Pillow", -16.8, 4]] },
-  main: { n: 109, smaller: 15, points: 1.9, reach: 103, tools: [
-    ["pngdeer", 1.9, 103], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
+  main: { n: 109, smaller: 11, points: 1.9, reach: 105, tools: [
+    ["pngdeer", 1.9, 105], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
     ["quantette", -9.6, 21], ["NeuQuant", -9.8, 5], ["ImageMagick", -14.5, 8], ["Pillow", -19.5, 4]] },
 };
 const LO = -20;
