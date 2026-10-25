@@ -124,7 +124,11 @@
   .stage.ready { cursor: ew-resize; }
   .stage img { position: absolute; inset: 0; width: 100%; height: 100%; -webkit-user-drag: none; }
   .stage.px img { image-rendering: pixelated; }
+  /* each image only on its own side: the original showing through under the compressed one
+     would composite translucent pixels (soft shadows) twice there, and darken them */
+  .stage .before { clip-path: inset(0 calc(100% - var(--split)) 0 0); }
   .stage .after { clip-path: inset(0 0 0 var(--split)); }
+  .stage.busy .before { clip-path: none; }
   .divider { position: absolute; top: -12px; bottom: -12px; left: var(--split); width: 2px; margin-left: -1px; background: var(--sun); box-shadow: 0 0 0 1px #35201730; }
   .knob { position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 0; background: var(--sun); box-shadow: 0 0 0 1px #3520173d, 0 6px 18px #35201733; display: grid; place-items: center; cursor: ew-resize; color: var(--walnut); transition: transform .15s; }
   .knob:hover { transform: scale(1.06); }
@@ -374,7 +378,7 @@
         <div class="stagebox" id="stagebox">
           <div class="center">
             <div class="stage" id="stage" style="--split: 50%">
-              <img id="img-before" alt="Original">
+              <img id="img-before" class="before" alt="Original">
               <img id="img-after" class="after" alt="Compressed by pngdeer">
               <div class="divider"><button class="knob" id="knob" type="button" role="slider" aria-label="Compare original and compressed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-5 6 5 6M15 6l5 6-5 6"/></svg>
