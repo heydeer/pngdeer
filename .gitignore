@@ -6,6 +6,7 @@ __pycache__/
 /target-mt/
 web/pkg/
 web/pkg-mt/
+/dist/
 # Website screenshots: the sites' copyright, for internal benchmarking only (see bench/images/SOURCES.md).
 bench/images/ui/
 bench/images-holdout/ui/
