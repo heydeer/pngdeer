@@ -7,13 +7,19 @@ cd "$(dirname "$0")/.."
 
 # clang and llvm-ar that target wasm32, for oxipng's libdeflate
 dnf install -y -q clang llvm
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --target wasm32-unknown-unknown
-"$HOME/.cargo/bin/rustup" toolchain install nightly --profile minimal --component rust-src --target wasm32-unknown-unknown
-# wasm-bindgen-cli's release build, at the version web/wasm/Cargo.toml pins
+# The image has rustup in /rust, set to an older Rust: use current stable, as CI does.
+if ! command -v rustup >/dev/null; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal
+  PATH="$HOME/.cargo/bin:$PATH"
+fi
+rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+rustup default stable
+rustup toolchain install nightly --profile minimal --component rust-src --target wasm32-unknown-unknown
+# wasm-bindgen-cli's release build, at the version web/wasm/Cargo.toml pins, next to cargo
 version=$(sed -n 's/^wasm-bindgen = "=\(.*\)"$/\1/p' web/wasm/Cargo.toml)
 tmp=$(mktemp -d)
 curl --proto '=https' -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$version/wasm-bindgen-$version-x86_64-unknown-linux-musl.tar.gz" | tar -xz -C "$tmp"
-cp "$tmp"/*/wasm-bindgen "$HOME/.cargo/bin/"
+cp "$tmp"/*/wasm-bindgen "$(dirname "$(command -v cargo)")/"
 
 LLVM_BIN=/usr/bin sh web/build.sh
 
