@@ -1,0 +1,11 @@
+.env
+bench/results/
+bench/.cache/
+__pycache__/
+/target/
+/target-mt/
+web/pkg/
+web/pkg-mt/
+# Website screenshots: the sites' copyright, for internal benchmarking only (see bench/images/SOURCES.md).
+bench/images/ui/
+bench/images-holdout/ui/

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pngdeer blind test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@300;400;600;800&family=Instrument+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --chrome: #141518;
+    --chrome-2: #1b1d21;
+    --chrome-3: #24272c;
+    --line: #2e3137;
+    --text: #e2ddd3;
+    --muted: #8b877e;
+    --faint: #5c5a55;
+    --amber: #ff7a1a;
+    --amber-dim: #ff7a1a33;
+    --surround: #4a4a4a;
+    --neutral: #808080;
+    --mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: "Instrument Sans", "Helvetica Neue", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--chrome); color: var(--text); font-family: var(--sans); overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  kbd { font-family: var(--mono); font-size: 10px; padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; color: var(--muted); background: var(--chrome); }
+
+  .app { display: grid; grid-template-rows: 52px 1fr auto; height: 100vh; }
+
+  /* grain on the chrome only; the viewing area stays clean */
+  .chrome { position: relative; background: var(--chrome-2); }
+  .chrome::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .07; mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ---------- top bar ---------- */
+  header { display: flex; align-items: center; gap: 24px; padding: 0 20px; border-bottom: 1px solid var(--line); animation: drop .5s ease-out both; }
+  .mark { font-family: var(--mono); font-weight: 800; letter-spacing: .28em; font-size: 13px; }
+  .mark span { color: var(--amber); }
+  .tag { font-size: 12px; color: var(--muted); border: 1px solid var(--line); padding: 2px 8px; border-radius: 99px; }
+  .progress { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .count { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .count b { color: var(--text); font-weight: 600; }
+  .track { flex: 1; height: 2px; background: var(--line); position: relative; overflow: hidden; }
+  .track i { position: absolute; inset: 0 auto 0 0; background: var(--amber); transition: width .35s ease; box-shadow: 0 0 12px var(--amber); }
+  .tools { display: flex; align-items: center; gap: 6px; }
+  .tool { font-family: var(--mono); font-size: 11px; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--muted); }
+  .tool:hover { color: var(--text); border-color: var(--faint); }
+  .tool b { color: var(--text); font-weight: 600; }
+
+  /* ---------- viewer ---------- */
+  .view-wrap { position: relative; overflow: hidden; min-height: 0; }
+  .viewer { position: absolute; inset: 0; background: var(--surround); overflow: auto; cursor: grab; scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+  .viewer.dragging { cursor: grabbing; }
+  .canvas { position: relative; min-width: 100%; min-height: 100%; width: max-content; height: max-content; display: grid; place-items: center; padding: 24px; }
+  .stage { position: relative; background: var(--neutral); box-shadow: 0 0 0 1px #0003, 0 20px 60px #0005; }
+  .stage.checker { background: conic-gradient(#8f8f8f 25%, #747474 0 50%, #8f8f8f 0 75%, #747474 0) 0 0 / 16px 16px; }
+  .stage.white { background: #fff; } .stage.black { background: #000; } .stage.gray { background: var(--neutral); }
+  .stage img { position: absolute; inset: 0; width: 100%; height: 100%; visibility: hidden; user-select: none; -webkit-user-drag: none; }
+  .stage img.on { visibility: visible; }
+  .stage.px img { image-rendering: pixelated; }
+
+  .hud { position: absolute; z-index: 2; pointer-events: none; }
+  .which { top: 14px; left: 14px; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 10px;
+           background: #121316e6; border: 1px solid var(--line); border-radius: 10px; backdrop-filter: blur(6px); }
+  .which .letter { font-family: var(--mono); font-weight: 800; font-size: 34px; line-height: 1; width: 44px; text-align: center; }
+  .which .letter.o { font-family: var(--sans); font-size: 22px; font-weight: 700; }
+  .which small { display: block; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .which.flicker { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim), 0 0 24px var(--amber-dim); }
+  .meta { right: 14px; bottom: 14px; font-family: var(--mono); font-size: 11px; color: #e8e8e8; background: #121316cc; padding: 6px 10px; border-radius: 6px; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; color: var(--muted); pointer-events: none; }
+
+  /* ---------- dock ---------- */
+  .dock { border-top: 1px solid var(--line); padding: 14px 20px 12px; display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; animation: rise .5s .08s ease-out both; }
+  .views { display: flex; gap: 4px; background: var(--chrome); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+  .vbtn { background: transparent; border: 0; border-radius: 7px; padding: 8px 14px; cursor: pointer; font-family: var(--mono); font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .vbtn:hover { color: var(--text); }
+  .vbtn.on { background: var(--chrome-3); color: var(--text); box-shadow: inset 0 -2px 0 var(--amber); }
+  .vbtn .cn { font-family: var(--sans); font-size: 13px; }
+
+  .votes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; max-width: 760px; justify-self: end; width: 100%; }
+  .vote { background: var(--chrome-3); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; cursor: pointer; text-align: left;
+          display: flex; justify-content: space-between; align-items: center; transition: transform .12s ease, border-color .12s, background .12s; }
+  .vote:hover { border-color: var(--amber); background: #2a2520; }
+  .vote:active { transform: translateY(1px); }
+  .vote .t { font-size: 15px; font-weight: 500; }
+  .vote .t b { font-family: var(--mono); font-weight: 800; font-size: 17px; margin-right: 4px; }
+  .vote.pressed { border-color: var(--amber); background: #2e2318; }
+
+  .reveal { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; max-width: 900px; justify-self: end; width: 100%; align-items: stretch; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; background: var(--chrome); position: relative; animation: flipin .35s ease-out both; }
+  .card:nth-child(2) { animation-delay: .06s; }
+  .card.picked { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
+  .card .head { display: flex; align-items: baseline; gap: 10px; }
+  .card .ab { font-family: var(--mono); font-weight: 800; font-size: 18px; color: var(--muted); }
+  .card .who { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+  .card .pick { margin-left: auto; font-size: 11px; color: var(--amber); }
+  .card .nums { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 6px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .card .nums span, .card .who { white-space: nowrap; }
+  .card .nums b { color: var(--text); font-weight: 600; }
+  .bar { height: 3px; background: var(--line); margin-top: 8px; border-radius: 2px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--faint); }
+  .card.picked .bar i { background: var(--amber); }
+  .next { background: var(--amber); color: #1a1007; border: 0; border-radius: 12px; padding: 0 20px; font-weight: 700; cursor: pointer; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .next small { font-family: var(--mono); font-size: 10px; font-weight: 400; opacity: .7; }
+  .same-note { grid-column: 1 / 3; font-size: 12px; color: var(--amber); }
+
+  .hints { grid-column: 1 / -1; display: flex; gap: 18px; flex-wrap: wrap; font-size: 11px; color: var(--faint); margin-top: -2px; }
+  .hints span { display: flex; gap: 6px; align-items: center; }
+
+  /* ---------- summary ---------- */
+  .overlay { position: fixed; inset: 0; background: #0b0c0eb3; backdrop-filter: blur(8px); display: none; place-items: center; z-index: 10; }
+  .overlay.open { display: grid; }
+  .sheet { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: var(--chrome-2); border: 1px solid var(--line); border-radius: 16px; padding: 28px 32px; animation: rise .35s ease-out both; }
+  .sheet h2 { margin: 0 0 4px; font-size: 20px; }
+  .sheet .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  .tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .tally > div { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--chrome); }
+  .tally .n { font-family: var(--mono); font-size: 34px; font-weight: 800; line-height: 1.1; }
+  .tally .l { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .tally .win .n { color: var(--amber); }
+  .stack { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin: 16px 0 24px; }
+  .stack i:nth-child(1) { background: var(--amber); } .stack i:nth-child(2) { background: #6f6c66; } .stack i:nth-child(3) { background: #cfcac0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 6px; border-bottom: 1px solid #2a2d33; font-family: var(--mono); font-size: 12px; }
+  td:first-child { font-family: var(--sans); font-size: 13px; }
+  td .mini { display: flex; height: 6px; width: 140px; border-radius: 3px; overflow: hidden; background: var(--line); }
+  td .mini i:nth-child(1) { background: var(--amber); } td .mini i:nth-child(2) { background: #6f6c66; } td .mini i:nth-child(3) { background: #cfcac0; }
+  .facts { margin-top: 22px; display: grid; gap: 8px; font-size: 13px; color: var(--muted); }
+  .facts b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+  .sheet .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+  .sheet .actions button { border: 1px solid var(--line); background: var(--chrome); border-radius: 10px; padding: 10px 18px; cursor: pointer; }
+  .sheet .actions button.primary { background: var(--amber); color: #1a1007; border-color: var(--amber); font-weight: 700; }
+
+  @media (max-width: 1100px) {
+    .dock { grid-template-columns: 1fr; gap: 12px; }
+    .views { justify-self: start; }
+    .votes, .reveal { justify-self: stretch; max-width: none; }
+  }
+
+  @keyframes drop { from { transform: translateY(-8px); opacity: 0; } }
+  @keyframes rise { from { transform: translateY(10px); opacity: 0; } }
+  @keyframes flipin { from { transform: rotateX(-35deg); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="chrome">
+    <div class="mark">PNG<span>DEER</span></div>
+    <div class="tag" id="mode">Blind test</div>
+    <div class="progress">
+      <div class="count"><b id="done">0</b> / <span id="total">0</span> rated</div>
+      <div class="track"><i id="bar" style="width:0"></i></div>
+      <div class="count" id="pos"></div>
+    </div>
+    <div class="tools">
+      <button class="tool" id="prev" title="Previous ([)">‹</button>
+      <button class="tool" id="next" title="Next (])">›</button>
+      <button class="tool" id="zoom" title="Zoom (Z / + / -)">Zoom <b id="zoomv">Fit</b></button>
+      <button class="tool" id="bg" title="Background (G)">Background <b id="bgv">Auto</b></button>
+      <button class="tool" id="sum" title="Results (R)">Results</button>
+    </div>
+  </header>
+
+  <main class="view-wrap">
+    <div class="viewer" id="viewer">
+      <div class="canvas" id="canvas">
+        <div class="stage" id="stage">
+          <img id="img-a" alt="A" draggable="false">
+          <img id="img-b" alt="B" draggable="false">
+          <img id="img-o" alt="Original" draggable="false">
+        </div>
+      </div>
+    </div>
+    <div class="hud which" id="which"><div class="letter" id="letter">A</div><div><small id="whichNote">Press 1 / 2 to switch A and B</small><small>Hold Space for the original</small></div></div>
+    <div class="hud meta" id="meta"></div>
+    <div class="loading" id="loading">Loading…</div>
+  </main>
+
+  <footer class="chrome dock" id="dock">
+    <div class="views">
+      <button class="vbtn on" data-view="a"><span>A</span><kbd>1</kbd></button>
+      <button class="vbtn" data-view="b"><span>B</span><kbd>2</kbd></button>
+      <button class="vbtn" data-view="o"><span class="cn">Original</span><kbd>Space</kbd></button>
+      <button class="vbtn" id="flick"><span class="cn">Flicker</span><kbd>F</kbd></button>
+    </div>
+    <div id="action"></div>
+    <div class="hints">
+      <span><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Vote: A better / can't tell / B better</span>
+      <span><kbd>⏎</kbd> Next</span>
+      <span>Drag to pan · double-click for 200%</span>
+      <span><kbd>Z</kbd> Zoom <kbd>G</kbd> Background <kbd>R</kbd> Results</span>
+    </div>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const CAT = { icons: "Icons", "3d": "3D renders", ui: "UI screenshots", illustrations: "Illustrations", photos: "Photos", "photos-alpha": "Transparent photos" };
+const ZOOMS = ["fit", 1, 2, 4];
+const BGS = [["auto", "Auto"], ["gray", "Gray"], ["checker", "Checker"], ["white", "White"], ["black", "Black"]];
+const state = { pairs: [], i: 0, view: "a", zoom: "fit", bg: 0, flicker: null, holding: false, challenger: "pd", busy: false };
+const viewer = $("#viewer"), stage = $("#stage");
+const imgs = { a: $("#img-a"), b: $("#img-b"), o: $("#img-o") };
+
+const cur = () => state.pairs[state.i];
+const kb = (n) => (n / 1024).toFixed(n < 102400 ? 1 : 0) + " KB";
+const label = (s) => (s.pipeline === "tinypng" ? "TinyPNG" : s.pipeline);
+
+async function init() {
+  const s = await fetch("/api/session").then((r) => r.json());
+  state.pairs = s.pairs;
+  state.challenger = s.challenger;
+  $("#mode").textContent = `Blind test · ${s.challenger} vs TinyPNG · matched by ${s.match === "size" ? "file size" : "quality"}`;
+  $("#total").textContent = s.pairs.length;
+  const first = s.pairs.findIndex((p) => !p.reveal);
+  show(first === -1 ? 0 : first);
+  if (first === -1) openSummary();
+}
+
+function show(i) {
+  stopFlicker();
+  const n = state.pairs.length;
+  state.i = ((i % n) + n) % n;
+  const p = cur();
+  $("#loading").style.display = "grid";
+  let pending = 3;
+  for (const k of ["a", "b", "o"]) {
+    imgs[k].onload = () => { if (--pending === 0) $("#loading").style.display = "none"; };
+    imgs[k].src = `/img/${p.id}/${k}.png`;
+  }
+  state.view = "a";
+  layout(null, true);
+  renderView();
+  renderAction();
+  renderProgress();
+  $("#meta").textContent = `${CAT[p.category] || p.category} · ${p.width}×${p.height}`;
+  preload(state.i + 1);
+}
+
+function preload(i) {
+  const p = state.pairs[i % state.pairs.length];
+  if (p) for (const k of ["a", "b", "o"]) new Image().src = `/img/${p.id}/${k}.png`;
+}
+
+/* ---------- zoom & pan ---------- */
+function scale() {
+  const p = cur(), dpr = window.devicePixelRatio || 1;
+  if (state.zoom === "fit") {
+    const w = viewer.clientWidth - 48, h = viewer.clientHeight - 48;
+    return Math.min(w / p.width, h / p.height, 8 / dpr);
+  }
+  return state.zoom / dpr;
+}
+
+function layout(anchor, reset) {
+  const p = cur(), dpr = window.devicePixelRatio || 1;
+  const old = stage.getBoundingClientRect();
+  const vr = viewer.getBoundingClientRect();
+  const ax = anchor ? anchor.x : vr.left + vr.width / 2, ay = anchor ? anchor.y : vr.top + vr.height / 2;
+  const fx = old.width ? (ax - old.left) / old.width : 0.5, fy = old.height ? (ay - old.top) / old.height : 0.5;
+  const s = scale();
+  stage.style.width = Math.round(p.width * s) + "px";
+  stage.style.height = Math.round(p.height * s) + "px";
+  stage.classList.toggle("px", s * dpr > 1.01);
+  const bg = BGS[state.bg][0];
+  stage.className = stage.className.replace(/\b(gray|checker|white|black)\b/g, "").trim();
+  stage.classList.add(bg === "auto" ? (p.alpha ? "checker" : "gray") : bg);
+  $("#zoomv").textContent = state.zoom === "fit" ? "Fit" : state.zoom * 100 + "%";
+  $("#bgv").textContent = BGS[state.bg][1];
+  if (reset) { viewer.scrollLeft = (viewer.scrollWidth - viewer.clientWidth) / 2; viewer.scrollTop = (viewer.scrollHeight - viewer.clientHeight) / 2; return; }
+  const nr = stage.getBoundingClientRect();
+  viewer.scrollLeft += nr.left + fx * nr.width - ax;
+  viewer.scrollTop += nr.top + fy * nr.height - ay;
+}
+
+function setZoom(z, anchor) { state.zoom = z; layout(anchor); }
+function stepZoom(d) { const i = ZOOMS.indexOf(state.zoom); setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + d))]); }
+
+let drag = null;
+viewer.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  drag = { x: e.clientX, y: e.clientY, l: viewer.scrollLeft, t: viewer.scrollTop };
+  viewer.setPointerCapture(e.pointerId);
+  viewer.classList.add("dragging");
+});
+viewer.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  viewer.scrollLeft = drag.l - (e.clientX - drag.x);
+  viewer.scrollTop = drag.t - (e.clientY - drag.y);
+});
+const endDrag = () => { drag = null; viewer.classList.remove("dragging"); };
+viewer.addEventListener("pointerup", endDrag);
+viewer.addEventListener("pointercancel", endDrag);
+viewer.addEventListener("dblclick", (e) => setZoom(state.zoom === "fit" ? 2 : "fit", { x: e.clientX, y: e.clientY }));
+window.addEventListener("resize", () => layout());
+
+/* ---------- views ---------- */
+function shown() { return state.holding ? "o" : state.view; }
+function renderView() {
+  const v = shown();
+  for (const k in imgs) imgs[k].classList.toggle("on", k === v);
+  const L = $("#letter");
+  L.textContent = v === "o" ? "Orig" : v.toUpperCase();
+  L.classList.toggle("o", v === "o");
+  $("#which").classList.toggle("flicker", !!state.flicker);
+  $("#whichNote").textContent = state.flicker ? "Flickering · F to stop" : "Press 1 / 2 to switch A and B";
+  document.querySelectorAll(".vbtn[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
+  $("#flick").classList.toggle("on", !!state.flicker);
+}
+function setView(v) { stopFlicker(); state.view = v; renderView(); }
+function toggleFlicker() {
+  if (state.flicker) return stopFlicker();
+  state.flicker = setInterval(() => { state.view = state.view === "a" ? "b" : "a"; renderView(); }, 450);
+  renderView();
+}
+function stopFlicker() { if (state.flicker) { clearInterval(state.flicker); state.flicker = null; renderView(); } }
+
+/* ---------- voting ---------- */
+function renderProgress() {
+  const done = state.pairs.filter((p) => p.reveal).length;
+  $("#done").textContent = done;
+  $("#bar").style.width = (100 * done) / state.pairs.length + "%";
+  $("#pos").textContent = `#${state.i + 1}`;
+}
+
+function renderAction() {
+  const p = cur(), box = $("#action");
+  if (!p.reveal) {
+    box.innerHTML = `<div class="votes">
+      <button class="vote" data-c="a"><span class="t"><b>A</b> is better</span><kbd>←</kbd></button>
+      <button class="vote" data-c="same"><span class="t">Can't tell</span><kbd>↓</kbd></button>
+      <button class="vote" data-c="b"><span class="t"><b>B</b> is better</span><kbd>→</kbd></button></div>`;
+    box.querySelectorAll(".vote").forEach((b) => (b.onclick = () => vote(b.dataset.c)));
+    return;
+  }
+  const r = p.reveal, max = Math.max(r.a.bytes, r.b.bytes);
+  const mine = r.a.pipeline === "tinypng" ? r.b : r.a, tiny = r.a.pipeline === "tinypng" ? r.a : r.b;
+  const card = (k) => {
+    const s = r[k];
+    return `<div class="card ${r.choice === k ? "picked" : ""}">
+      <div class="head"><span class="ab">${k.toUpperCase()}</span><span class="who">${label(s)}</span>${r.choice === k ? '<span class="pick">Your pick</span>' : ""}</div>
+      <div class="nums"><span>Size <b>${kb(s.bytes)}</b></span><span>SSIMULACRA2 <b>${s.score.toFixed(1)}</b></span></div>
+      <div class="bar"><i style="width:${(100 * s.bytes) / max}%"></i></div></div>`;
+  };
+  const diff = ((mine.bytes / tiny.bytes - 1) * 100).toFixed(1);
+  box.innerHTML = `<div class="reveal">${card("a")}${card("b")}
+    <button class="next" id="go">Next<small>⏎ · ${label(mine)} size ${diff > 0 ? "+" : ""}${diff}%</small></button>
+    ${r.choice === "same" ? '<div class="same-note">You picked “can\'t tell”</div>' : ""}</div>`;
+  $("#go").onclick = nextUnvoted;
+}
+
+async function vote(choice) {
+  const p = cur();
+  if (p.reveal || state.busy) return;
+  state.busy = true;
+  document.querySelector(`.vote[data-c="${choice}"]`)?.classList.add("pressed");
+  try {
+    const r = await fetch("/api/vote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, choice }) });
+    if (!r.ok) throw new Error(await r.text());
+    p.reveal = await r.json();
+  } catch (e) {
+    alert("The vote wasn't saved: " + e.message);
+  } finally {
+    state.busy = false;
+  }
+  renderAction();
+  renderProgress();
+}
+
+function nextUnvoted() {
+  const n = state.pairs.length;
+  for (let k = 1; k <= n; k++) {
+    const j = (state.i + k) % n;
+    if (!state.pairs[j].reveal) return show(j);
+  }
+  openSummary();
+}
+
+/* ---------- summary ---------- */
+async function openSummary() {
+  stopFlicker();
+  const s = await fetch("/api/summary").then((r) => r.json());
+  const o = s.overall, name = s.challenger;
+  const pct = (a, n) => (n ? (100 * a) / n : 0);
+  const stack = (t, cls) => `<div class="${cls}"><i style="width:${pct(t.challenger, t.n)}%"></i><i style="width:${pct(t.same, t.n)}%"></i><i style="width:${pct(t.tinypng, t.n)}%"></i></div>`;
+  const rows = Object.entries(s.categories).map(([c, t]) =>
+    `<tr><td>${CAT[c] || c}</td><td>${t.n}</td><td>${t.challenger}</td><td>${t.same}</td><td>${t.tinypng}</td><td>${stack(t, "mini")}</td></tr>`).join("");
+  const ratio = (x) => (x == null ? "-" : (x * 100).toFixed(1) + "%");
+  const ag = s.metric_agreement;
+  $("#sheet").innerHTML = `<h2>Results</h2>
+    <div class="sub">Rated ${o.n} of ${s.total}. Votes are saved under bench/results/&lt;run&gt;/blind/, so you can pick up where you left off.</div>
+    <div class="tally">
+      <div class="win"><div class="n">${o.challenger}</div><div class="l">${name} better</div></div>
+      <div><div class="n">${o.same}</div><div class="l">Can't tell</div></div>
+      <div><div class="n">${o.tinypng}</div><div class="l">TinyPNG better</div></div>
+    </div>
+    ${stack(o, "stack")}
+    ${rows ? `<table><tr><th>Category</th><th>Rated</th><th>${name} better</th><th>Can't tell</th><th>TinyPNG better</th><th></th></tr>${rows}</table>` : ""}
+    <div class="facts">
+      <div>Across rated images, ${name} files are <b>${ratio(s.size_ratio_median)}</b> of TinyPNG's size (median), <b>${ratio(s.size_ratio_geomean)}</b> (geometric mean)</div>
+      <div>Of the <b>${ag.decided}</b> images where you picked a side and the scores differ, <b>${ag.agree}</b> agree with SSIMULACRA2</div>
+    </div>
+    <div class="actions"><button id="close">Close</button>${o.n < s.total ? '<button class="primary" id="cont">Keep rating</button>' : ""}</div>`;
+  $("#overlay").classList.add("open");
+  $("#close").onclick = closeSummary;
+  if ($("#cont")) $("#cont").onclick = () => { closeSummary(); if (cur().reveal) nextUnvoted(); };
+}
+function closeSummary() { $("#overlay").classList.remove("open"); }
+
+/* ---------- controls ---------- */
+document.querySelectorAll(".vbtn[data-view]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+$("#flick").onclick = toggleFlicker;
+$("#zoom").onclick = () => setZoom(ZOOMS[(ZOOMS.indexOf(state.zoom) + 1) % ZOOMS.length]);
+$("#bg").onclick = () => { state.bg = (state.bg + 1) % BGS.length; layout(); };
+$("#sum").onclick = openSummary;
+$("#prev").onclick = () => show(state.i - 1);
+$("#next").onclick = () => show(state.i + 1);
+$("#overlay").onclick = (e) => { if (e.target.id === "overlay") closeSummary(); };
+
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const open = $("#overlay").classList.contains("open");
+  if (open) { if (e.key === "Escape" || e.key === "r") closeSummary(); return; }
+  const p = cur();
+  switch (e.key) {
+    case "1": setView("a"); break;
+    case "2": setView("b"); break;
+    case " ": e.preventDefault(); if (!e.repeat) { state.holding = true; renderView(); } break;
+    case "f": case "F": toggleFlicker(); break;
+    case "z": case "Z": setZoom(ZOOMS[(ZOOMS.indexOf(state.zoom) + 1) % ZOOMS.length]); break;
+    case "+": case "=": stepZoom(1); break;
+    case "-": stepZoom(-1); break;
+    case "g": case "G": state.bg = (state.bg + 1) % BGS.length; layout(); break;
+    case "r": case "R": openSummary(); break;
+    case "[": show(state.i - 1); break;
+    case "]": show(state.i + 1); break;
+    case "ArrowLeft": e.preventDefault(); p.reveal ? show(state.i - 1) : vote("a"); break;
+    case "ArrowRight": e.preventDefault(); p.reveal ? nextUnvoted() : vote("b"); break;
+    case "ArrowDown": e.preventDefault(); if (!p.reveal) vote("same"); break;
+    case "Enter": if (p.reveal) nextUnvoted(); break;
+  }
+});
+document.addEventListener("keyup", (e) => { if (e.key === " ") { state.holding = false; renderView(); } });
+window.addEventListener("blur", () => { if (state.holding) { state.holding = false; renderView(); } });
+
+init();
+</script>
+</body>
+</html>
