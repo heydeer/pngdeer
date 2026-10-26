@@ -18,7 +18,8 @@ pub struct Bitmap {
     pub height: usize,
 }
 
-/// Any PNG as 8-bit RGBA. Color-space chunks (gAMA, iCCP, ...) are ignored, as the benchmark does.
+/// Any PNG as 8-bit RGBA. Color-space chunks (gAMA, iCCP, ...) are ignored, as the benchmark does:
+/// the pixel values are scored as they are, and `compress` gives its output the same chunks.
 pub fn decode(bytes: &[u8]) -> Result<Bitmap, Error> {
     let mut decoder = png::Decoder::new(Cursor::new(bytes));
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
@@ -91,12 +92,53 @@ pub fn encode_rgba(pixels: &[RGBA], w: usize, h: usize) -> Vec<u8> {
     png
 }
 
-/// oxipng -o 2 --strip safe on a PNG file, as bench.py finishes its outputs (unchanged without the
-/// `oxipng` feature).
+/// The chunks that say which color space the pixel values are in (the same ones bench.py strips).
+const COLOR_CHUNKS: [[u8; 4]; 7] = [*b"cICP", *b"iCCP", *b"sRGB", *b"gAMA", *b"cHRM", *b"mDCV", *b"cLLI"];
+
+/// The color chunks of a PNG file, verbatim (length, type, data and CRC), for its compressed
+/// versions: without them a viewer shows the pixels as sRGB, and a screenshot tagged with its
+/// display's profile comes out darker or lighter. None for an image tagged as sRGB, which looks the
+/// same untagged.
+pub fn color_chunks(png: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut srgb = false;
+    let mut pos = 8;
+    while pos + 8 <= png.len() {
+        let len = u32::from_be_bytes(png[pos..pos + 4].try_into().unwrap()) as usize;
+        let kind: [u8; 4] = png[pos + 4..pos + 8].try_into().unwrap();
+        let end = pos + 12 + len;
+        if end > png.len() || &kind == b"IDAT" {
+            break; // they all come before the image data
+        }
+        let data = &png[pos + 8..end - 4];
+        // cICP's sRGB: BT.709 primaries, the sRGB transfer function
+        srgb |= &kind == b"sRGB" || (&kind == b"cICP" && data.len() == 4 && data[..2] == [1, 13]);
+        if COLOR_CHUNKS.contains(&kind) {
+            out.extend_from_slice(&png[pos..end]);
+        }
+        pos = end;
+    }
+    if srgb {
+        out.clear();
+    }
+    out
+}
+
+/// A PNG file with `chunks` (from `color_chunks`) right after its header, ahead of PLTE and IDAT as
+/// color chunks must be.
+pub fn with_chunks(png: &[u8], chunks: &[u8]) -> Vec<u8> {
+    const IHDR_END: usize = 8 + 12 + 13;
+    [&png[..IHDR_END], chunks, &png[IHDR_END..]].concat()
+}
+
+/// oxipng -o 2 on a PNG file, keeping only what --strip safe keeps besides the color chunks: the
+/// pixel density and an animation's frames (the caller adds `color_chunks` back). On bench.py's
+/// inputs, which have no color chunks, that is its --strip safe. Unchanged without the `oxipng`
+/// feature.
 #[cfg(feature = "oxipng")]
 pub fn optimize(png: &[u8]) -> Result<Vec<u8>, Error> {
     let mut options = oxipng::Options::from_preset(2);
-    options.strip = oxipng::StripChunks::Safe;
+    options.strip = oxipng::StripChunks::Keep([*b"pHYs", *b"acTL", *b"fcTL", *b"fdAT"].into_iter().collect());
     Ok(oxipng::optimize_from_memory(png, &options)?)
 }
 

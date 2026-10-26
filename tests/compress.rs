@@ -64,6 +64,41 @@ fn few_colors_stay_lossless() {
     assert_eq!(codec::decode(&out.png).unwrap().pixels, pixels);
 }
 
+/// One PNG chunk: length, type, data and CRC.
+fn png_chunk(kind: &[u8; 4], data: &[u8]) -> Vec<u8> {
+    let mut crc = crc32fast::Hasher::new();
+    crc.update(kind);
+    crc.update(data);
+    [&(data.len() as u32).to_be_bytes()[..], kind, data, &crc.finalize().to_be_bytes()].concat()
+}
+
+/// The chunk types of a PNG file, in order.
+fn chunk_types(png: &[u8]) -> Vec<[u8; 4]> {
+    let mut types = Vec::new();
+    let mut pos = 8;
+    while pos + 8 <= png.len() {
+        types.push(png[pos + 4..pos + 8].try_into().unwrap());
+        pos += 12 + u32::from_be_bytes(png[pos..pos + 4].try_into().unwrap()) as usize;
+    }
+    types
+}
+
+#[test]
+fn keeps_the_color_space() {
+    let settings = Settings { target: Some(80.0), ..Default::default() };
+    // a display's gamma (1.96), as some screenshot tools tag it, and a comment, which goes
+    let gamma = png_chunk(b"gAMA", &51_020u32.to_be_bytes());
+    let input = codec::with_chunks(&sample(true), &[gamma.clone(), png_chunk(b"tEXt", b"Comment\0hello")].concat());
+    let out = compress(&input, &settings).unwrap();
+    assert_eq!(out.outcome, "hit");
+    assert_eq!(codec::color_chunks(&out.png), gamma);
+    assert_eq!(chunk_types(&out.png), [*b"IHDR", *b"gAMA", *b"PLTE", *b"tRNS", *b"IDAT", *b"IEND"]);
+    // tagged as sRGB, it looks the same untagged
+    let input = codec::with_chunks(&sample(true), &[png_chunk(b"sRGB", &[0]), gamma].concat());
+    let out = compress(&input, &settings).unwrap();
+    assert_eq!(chunk_types(&out.png), [*b"IHDR", *b"PLTE", *b"tRNS", *b"IDAT", *b"IEND"]);
+}
+
 #[test]
 fn variant_specs() {
     let parsed = search::parse_variants("50,0,0r2,w0,p100").unwrap();

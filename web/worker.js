@@ -30,9 +30,13 @@ self.onmessage = async ({ data }) => {
   const { id, bytes, target, preview } = data; // no target: automatic quality; no preview: pngdeer's default
   try {
     const input = new Uint8Array(bytes);
-    const pixels = new DataView(input.buffer).getUint32(16) * new DataView(input.buffer).getUint32(20); // IHDR
+    const ihdr = new DataView(input.buffer, 16, 8);
+    const [width, height] = [ihdr.getUint32(0), ihdr.getUint32(4)];
+    const pixels = width * height;
     if (pixels > MAX_PIXELS) {
-      throw new Error(`too large for the browser version (${(pixels / 1e6).toFixed(1)} MP, at most ${MAX_PIXELS / 1e6} MP): use the command line`);
+      // in pixels as well as megapixels: a well-compressed screenshot can be a few MB and still too big
+      const size = `${width} × ${height} pixels (${(pixels / 1e6).toFixed(1)} MP)`;
+      throw new Error(`too large for the browser version: ${size}, at most ${MAX_PIXELS / 1e6} MP; use the command line`);
     }
     const { compress } = await ready;
     const start = performance.now();

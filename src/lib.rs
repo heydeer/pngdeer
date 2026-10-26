@@ -75,11 +75,14 @@ pub fn compress(input: &[u8], settings: &Settings) -> Result<Compressed, Error> 
     let (searched, mut report) = search::run(&bitmap.pixels, w, h, settings)?;
     let tick = || settings.clock.map_or(0.0, |c| c());
     let start = tick();
-    let mut png = codec::optimize(&searched)?;
+    // every output gets the input's color chunks (the search scored the pixel values as they are, so
+    // the same color space applies), before any size comparison
+    let color = codec::color_chunks(input);
+    let mut png = codec::with_chunks(&codec::optimize(&searched)?, &color);
     let mut outcome = if report.miss { "miss" } else { "hit" };
     if png.len() > input.len() {
         // smooth gradients: the palette costs more than the source itself
-        png = codec::optimize(input)?;
+        png = codec::with_chunks(&codec::optimize(input)?, &color);
         outcome = "lossless";
     } else if let Some((palette, indices)) = palette::exact_palette(&bitmap.pixels) {
         let budget = png.len() as f64 * (1.0 + EXACT_SLACK);
@@ -87,7 +90,7 @@ pub fn compress(input: &[u8], settings: &Settings) -> Result<Compressed, Error> 
         // oxipng shrinks this writer's palette files by 14% at most on the benchmark (10% median),
         // so skip it where even 25% couldn't bring the lossless file within budget
         if exact.len() as f64 * 0.75 <= budget {
-            let exact = codec::optimize(&exact)?;
+            let exact = codec::with_chunks(&codec::optimize(&exact)?, &color);
             if exact.len() as f64 <= budget {
                 png = exact;
                 outcome = "exact";

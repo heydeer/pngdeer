@@ -791,9 +791,11 @@ function render() {
     </button>`;
   }).join("");
   const before = done.reduce((s, x) => s + x.bytes.byteLength, 0), after = done.reduce((s, x) => s + x.out.byteLength, 0);
+  const plural = files.length > 1 ? "s" : "";
   $("#sum").innerHTML = done.length
     ? `<b>−${Math.round(100 * (1 - after / before))}%</b>${size(before - after)} saved · ${done.length} of ${files.length} done`
-    : `<b>Working…</b>${files.length} file${files.length > 1 ? "s" : ""}`;
+    : files.every((x) => x.status === "error") ? `<b>Couldn't compress</b>${files.length} file${plural}`
+    : `<b>Working…</b>${files.length} file${plural}`;
   $("#all").disabled = !done.length;
   renderNote();
   window.__pngdeer = files.map((x) => ({ name: x.name, before: x.bytes.byteLength, after: x.out?.byteLength, ms: x.ms, report: x.report, status: x.status, error: x.error }));
