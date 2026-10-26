@@ -2,8 +2,9 @@
 
 Vendored from crates.io (BSD-2-Clause, https://github.com/imazen/fast-ssim2); every pngdeer build uses
 it (`[patch.crates-io]` in the root `Cargo.toml`). Examples, tests, benches and dev-dependencies
-are left out. Three changes, all in the scalar kernels that the wasm build runs; scores are unchanged
-(checked against the native build to 4 decimals on 5 MP screenshots):
+are left out. The first three changes are in the scalar kernels that the wasm build runs; scores are
+unchanged (checked against the native build to 4 decimals on 5 MP screenshots). The fourth cuts
+memory, with bit-identical scores:
 
 1. `pipeline/mod.rs` adds a `Fma` trait, and `gauss.rs`, `xyb.rs`, `maps.rs`, `simd.rs` call `.fma(`
    where they called `.mul_add(`. wasm32 has no scalar fused multiply-add, so `mul_add` compiled to a
@@ -15,3 +16,20 @@ are left out. Three changes, all in the scalar kernels that the wasm build runs;
 3. `pipeline/mod.rs` `planes_to_positive_xyb` reuses the previous pixel's XYB when the linear RGB
    is bit-identical, skipping three cube roots per pixel in flat areas (most of a screenshot, and
    every run in a palette image).
+4. Memory, so that wasm32's 4 GB holds large images (`precompute.rs`, `pipeline/precompute.rs`,
+   `pipeline/maps.rs`, `pipeline/simd.rs`):
+   - `Ssimulacra2Reference::new_lean_with_config` keeps only the encoded source. Each comparison
+     linearizes both images, walks their scales together and, per channel, runs the five blurs
+     one after another with one scratch plane, then that channel's maps (`compare_lean`,
+     `lean_scales`, `dist_scale_lean`). No reference pyramid is kept and at most five blurred
+     planes are alive instead of fifteen; comparisons take longer.
+   - The per-channel map code is split out of the fused functions (`maps_channel_stop`,
+     `maps_channel_simd_stop`, `channel_maps`), and the whole-image comparison calls it too, so
+     both paths run the same code.
+   - The threaded blurs move their outputs out instead of cloning them (which held a second copy
+     of every blurred plane), the non-threaded comparison no longer allocates three planes it
+     never uses, encoded images of at least 8×8 are no longer copied for padding, and an opaque
+     comparison frees its copy of the image once linearized.
+
+   pngdeer's outputs are byte-identical with and without this change, on its 180 benchmark images
+   at automatic and fixed quality, with the lean reference used for every image and for none.

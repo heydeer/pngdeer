@@ -1190,39 +1190,64 @@ pub(crate) fn maps_fused_simd_stop(
     stop: &dyn enough::Stop,
 ) -> Result<([f64; 6], [f64; 12]), enough::StopReason> {
     let stop = stop.may_stop().then_some(stop);
-    let one_per_pixels = 1.0 / (height * width) as f64;
     let (mut so, mut eo) = ([0f64; 6], [0f64; 12]);
-    let npix = width * height;
     for c in 0..3 {
-        let (mut sum0, mut sum1) = (0f64, 0f64);
-        let mut esums = [0f64; 4];
-        for off in (0..npix).step_by(MAPS_SIMD_STOP_STRIDE) {
-            let end = npix.min(off + MAPS_SIMD_STOP_STRIDE);
-            incant!(
-                maps_fused_inner(
-                    &m1[c][off..end],
-                    &m2[c][off..end],
-                    &s11[c][off..end],
-                    &s22[c][off..end],
-                    &s12[c][off..end],
-                    &img1[c][off..end],
-                    &img2[c][off..end],
-                    &mut sum0,
-                    &mut sum1,
-                    &mut esums
-                ),
-                [v3, neon, wasm128, scalar]
-            );
-            stop.check()?;
-        }
-        so[c * 2] = one_per_pixels * sum0;
-        so[c * 2 + 1] = (one_per_pixels * sum1).sqrt().sqrt();
-        eo[c * 4] = one_per_pixels * esums[0];
-        eo[c * 4 + 1] = (one_per_pixels * esums[1]).sqrt().sqrt();
-        eo[c * 4 + 2] = one_per_pixels * esums[2];
-        eo[c * 4 + 3] = (one_per_pixels * esums[3]).sqrt().sqrt();
+        let (ssim, edge) = maps_channel_simd_stop(
+            &m1[c], &m2[c], &s11[c], &s22[c], &s12[c], &img1[c], &img2[c], width, height, stop,
+        )?;
+        so[c * 2..c * 2 + 2].copy_from_slice(&ssim);
+        eo[c * 4..c * 4 + 4].copy_from_slice(&edge);
     }
     Ok((so, eo))
+}
+
+/// One channel of [`maps_fused_simd_stop`]. pngdeer patch: split out so the low-memory comparison,
+/// which scores channel by channel, runs this same code.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn maps_channel_simd_stop(
+    m1: &[f32],
+    m2: &[f32],
+    s11: &[f32],
+    s22: &[f32],
+    s12: &[f32],
+    img1: &[f32],
+    img2: &[f32],
+    width: usize,
+    height: usize,
+    stop: Option<&dyn enough::Stop>,
+) -> Result<([f64; 2], [f64; 4]), enough::StopReason> {
+    let one_per_pixels = 1.0 / (height * width) as f64;
+    let npix = width * height;
+    let (mut sum0, mut sum1) = (0f64, 0f64);
+    let mut esums = [0f64; 4];
+    for off in (0..npix).step_by(MAPS_SIMD_STOP_STRIDE) {
+        let end = npix.min(off + MAPS_SIMD_STOP_STRIDE);
+        incant!(
+            maps_fused_inner(
+                &m1[off..end],
+                &m2[off..end],
+                &s11[off..end],
+                &s22[off..end],
+                &s12[off..end],
+                &img1[off..end],
+                &img2[off..end],
+                &mut sum0,
+                &mut sum1,
+                &mut esums
+            ),
+            [v3, neon, wasm128, scalar]
+        );
+        stop.check()?;
+    }
+    Ok((
+        [one_per_pixels * sum0, (one_per_pixels * sum1).sqrt().sqrt()],
+        [
+            one_per_pixels * esums[0],
+            (one_per_pixels * esums[1]).sqrt().sqrt(),
+            one_per_pixels * esums[2],
+            (one_per_pixels * esums[3]).sqrt().sqrt(),
+        ],
+    ))
 }
 
 /// `edge_diff_map` via lanes — returns the same `[f64; 12]` aggregates.

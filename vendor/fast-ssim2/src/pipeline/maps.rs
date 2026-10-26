@@ -194,47 +194,72 @@ pub(crate) fn maps_fused_stop(
     stop: &dyn enough::Stop,
 ) -> Result<([f64; 6], [f64; 12]), enough::StopReason> {
     let stop = stop.may_stop().then_some(stop);
-    let one_per_pixels = 1.0 / (height * width) as f64;
     let (mut ssim_out, mut edge_out) = ([0f64; 6], [0f64; 12]);
-    let npix = width * height;
     for c in 0..3 {
         stop.check()?;
-        let (mut sum0, mut sum1) = (0f64, 0f64);
-        let mut esums = [0f64; 4];
-        for chunk_start in (0..npix).step_by(MAPS_STOP_STRIDE) {
-            for i in chunk_start..npix.min(chunk_start + MAPS_STOP_STRIDE) {
-                let mu1 = m1[c][i];
-                let mu2 = m2[c][i];
-                let mu11 = mu1 * mu1;
-                let mu22 = mu2 * mu2;
-                let mu12 = mu1 * mu2;
-                let dm = mu1 - mu2;
-                let num_m = (-dm).fma(dm, 1.0f32);
-                let num_s = 2.0f32 * (s12[c][i] - mu12) + K_C2;
-                let denom_s = (s11[c][i] - mu11) + (s22[c][i] - mu22) + K_C2;
-                let q = num_m * num_s / denom_s;
-                let d = (1.0f64 - q as f64).max(0.0);
-                sum0 += d;
-                sum1 += tothe4th(d);
-
-                let num = 1.0 + (img2[c][i] - mu2).abs() as f64;
-                let den = 1.0 + (img1[c][i] - mu1).abs() as f64;
-                let d1 = num / den - 1.0;
-                let artifact = d1.max(0.0);
-                esums[0] += artifact;
-                esums[1] += tothe4th(artifact);
-                let detail_lost = (-d1).max(0.0);
-                esums[2] += detail_lost;
-                esums[3] += tothe4th(detail_lost);
-            }
-            stop.check()?;
-        }
-        ssim_out[c * 2] = one_per_pixels * sum0;
-        ssim_out[c * 2 + 1] = (one_per_pixels * sum1).sqrt().sqrt();
-        edge_out[c * 4] = one_per_pixels * esums[0];
-        edge_out[c * 4 + 1] = (one_per_pixels * esums[1]).sqrt().sqrt();
-        edge_out[c * 4 + 2] = one_per_pixels * esums[2];
-        edge_out[c * 4 + 3] = (one_per_pixels * esums[3]).sqrt().sqrt();
+        let (ssim, edge) = maps_channel_stop(
+            &m1[c], &m2[c], &s11[c], &s22[c], &s12[c], &img1[c], &img2[c], width, height, stop,
+        )?;
+        ssim_out[c * 2..c * 2 + 2].copy_from_slice(&ssim);
+        edge_out[c * 4..c * 4 + 4].copy_from_slice(&edge);
     }
     Ok((ssim_out, edge_out))
+}
+
+/// One channel of [`maps_fused_stop`]: its `SSIMMap` pair and `EdgeDiffMap` quad. pngdeer patch:
+/// split out so the low-memory comparison, which scores channel by channel, runs this same code.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn maps_channel_stop(
+    m1: &[f32],
+    m2: &[f32],
+    s11: &[f32],
+    s22: &[f32],
+    s12: &[f32],
+    img1: &[f32],
+    img2: &[f32],
+    width: usize,
+    height: usize,
+    stop: Option<&dyn enough::Stop>,
+) -> Result<([f64; 2], [f64; 4]), enough::StopReason> {
+    let one_per_pixels = 1.0 / (height * width) as f64;
+    let npix = width * height;
+    let (mut sum0, mut sum1) = (0f64, 0f64);
+    let mut esums = [0f64; 4];
+    for chunk_start in (0..npix).step_by(MAPS_STOP_STRIDE) {
+        for i in chunk_start..npix.min(chunk_start + MAPS_STOP_STRIDE) {
+            let mu1 = m1[i];
+            let mu2 = m2[i];
+            let mu11 = mu1 * mu1;
+            let mu22 = mu2 * mu2;
+            let mu12 = mu1 * mu2;
+            let dm = mu1 - mu2;
+            let num_m = (-dm).fma(dm, 1.0f32);
+            let num_s = 2.0f32 * (s12[i] - mu12) + K_C2;
+            let denom_s = (s11[i] - mu11) + (s22[i] - mu22) + K_C2;
+            let q = num_m * num_s / denom_s;
+            let d = (1.0f64 - q as f64).max(0.0);
+            sum0 += d;
+            sum1 += tothe4th(d);
+
+            let num = 1.0 + (img2[i] - mu2).abs() as f64;
+            let den = 1.0 + (img1[i] - mu1).abs() as f64;
+            let d1 = num / den - 1.0;
+            let artifact = d1.max(0.0);
+            esums[0] += artifact;
+            esums[1] += tothe4th(artifact);
+            let detail_lost = (-d1).max(0.0);
+            esums[2] += detail_lost;
+            esums[3] += tothe4th(detail_lost);
+        }
+        stop.check()?;
+    }
+    Ok((
+        [one_per_pixels * sum0, (one_per_pixels * sum1).sqrt().sqrt()],
+        [
+            one_per_pixels * esums[0],
+            (one_per_pixels * esums[1]).sqrt().sqrt(),
+            one_per_pixels * esums[2],
+            (one_per_pixels * esums[3]).sqrt().sqrt(),
+        ],
+    ))
 }

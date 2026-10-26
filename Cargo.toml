@@ -29,14 +29,14 @@ miniz_oxide = "0.9.1"
 oxipng = { version = "10.2.1", default-features = false, optional = true }
 png = "0.18.1"
 rayon = { version = "1", optional = true }
-rgb = { version = "0.8.53", default-features = false }
+rgb = { version = "0.8.53", default-features = false, features = ["as-bytes"] }
 
 [workspace]
 members = [".", "web/wasm", "tools/quantlab"]
 default-members = ["."]
 resolver = "2"
 
-# fast-ssim2 with three speed patches (same scores), for every build: see vendor/fast-ssim2/PATCHES.md.
+# fast-ssim2 with speed and memory patches (same scores), for every build: see vendor/fast-ssim2/PATCHES.md.
 [patch.crates-io]
 fast-ssim2 = { path = "vendor/fast-ssim2" }
 

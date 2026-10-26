@@ -21,9 +21,11 @@
 //! dominates the cost, so this trades about 1.3% in file size for several times the speed where it
 //! matters most: big images in a single-threaded browser.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use fast_ssim2::{PixelDescriptor, PixelSlice, Ssimulacra2Config, Ssimulacra2Reference};
+use rgb::ComponentBytes;
 
 use crate::codec::{encode_palette, palette_size_hint};
 use crate::palette::{self, fits_palette, refine_palette, wu_palette};
@@ -52,6 +54,10 @@ const VERIFY_STEPS: u32 = 3;
 const PREVIEW_MARGIN: f64 = 2.0;
 /// Auto mode aims no higher than this: 90 is indistinguishable at 1:1.
 const AUTO_CAP: f64 = 90.0;
+/// Above this many scored pixels the reference keeps only the source between checks (fast-ssim2's
+/// lean reference): about half the memory at the peak, slower checks, the same scores. It is what
+/// lets wasm32's 4 GB hold images of 40 MP (web/worker.js).
+const LEAN_PIXELS: usize = 8_000_000;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Variant {
@@ -226,9 +232,23 @@ fn enlargement(w: usize, h: usize) -> usize {
 /// One-off score of `distorted` against `source` (pngdeer --score), with the same small-image rule.
 pub fn score(source: &[RGBA], distorted: &[RGBA], w: usize, h: usize) -> Result<f64, BoxError> {
     let factor = enlargement(w, h);
+    let (sw, sh) = (w * factor, h * factor);
     let (a, b) = (enlarged_bytes(source, w, h, factor), enlarged_bytes(distorted, w, h, factor));
-    let reference = Ssimulacra2Reference::new_with_config(&slice(&a, w * factor, h * factor)?, &ssim_config())?;
-    Ok(reference.compare_with_config(&slice(&b, w * factor, h * factor)?, &ssim_config())?)
+    let reference = new_reference(&slice(&a, sw, sh, is_opaque(source))?)?;
+    Ok(reference.compare_with_config(&slice(&b, sw, sh, is_opaque(distorted))?, &ssim_config())?)
+}
+
+fn is_opaque(pixels: &[RGBA]) -> bool {
+    pixels.iter().all(|p| p.a == 255)
+}
+
+fn new_reference(source: &PixelSlice<'_>) -> Result<Ssimulacra2Reference, BoxError> {
+    let pixels = source.width() as usize * source.rows() as usize;
+    Ok(if pixels > LEAN_PIXELS {
+        Ssimulacra2Reference::new_lean_with_config(source, &ssim_config())?
+    } else {
+        Ssimulacra2Reference::new_with_config(source, &ssim_config())?
+    })
 }
 
 pub fn run(pixels: &[RGBA], w: usize, h: usize, options: &Settings) -> Result<(Vec<u8>, Report), BoxError> {
@@ -413,6 +433,7 @@ struct Search<'p> {
     w: usize,
     h: usize,
     factor: usize,
+    opaque: bool,
     reference: Option<Ssimulacra2Reference>,
     /// Palettes by size and source.
     palettes: HashMap<(u32, Source), Vec<RGBA>>,
@@ -428,6 +449,7 @@ impl<'p> Search<'p> {
             w,
             h,
             factor: enlargement(w, h),
+            opaque: is_opaque(pixels),
             reference: None,
             palettes: HashMap::new(),
             evaluations: HashMap::new(),
@@ -668,11 +690,11 @@ impl<'p> Search<'p> {
 
     /// SSIMULACRA2 of a remapped image against the source.
     fn score_of(&mut self, palette: &[RGBA], indices: &[u8]) -> Result<f64, BoxError> {
+        let (w, h) = (self.w * self.factor, self.h * self.factor);
         if self.reference.is_none() {
             let t = self.tick();
             let source = enlarged_bytes(self.pixels, self.w, self.h, self.factor);
-            let source = slice(&source, self.w * self.factor, self.h * self.factor)?;
-            self.reference = Some(Ssimulacra2Reference::new_with_config(&source, &ssim_config())?);
+            self.reference = Some(new_reference(&slice(&source, w, h, self.opaque)?)?);
             self.profile.reference += self.tick() - t;
         }
         let t = self.tick();
@@ -681,7 +703,7 @@ impl<'p> Search<'p> {
         // Whole-image scoring (multi-threaded through fast-ssim2's rayon feature); its strip mode
         // is no faster here and drifts from libjxl's scores by up to 2.4 points.
         let reference = self.reference.as_ref().unwrap();
-        let score = reference.compare_with_config(&slice(&bytes, self.w * self.factor, self.h * self.factor)?, &ssim_config())?;
+        let score = reference.compare_with_config(&slice(&bytes, w, h, is_opaque(palette))?, &ssim_config())?;
         self.profile.score += self.tick() - t;
         Ok(score)
     }
@@ -760,7 +782,12 @@ impl<'p> Search<'p> {
     }
 }
 
-fn enlarged_bytes(pixels: &[RGBA], w: usize, h: usize, factor: usize) -> Vec<u8> {
+/// The pixels as bytes, enlarged `factor` times (borrowed at 1×: a copy of a big image is a lot of
+/// memory next to its scoring).
+fn enlarged_bytes(pixels: &[RGBA], w: usize, h: usize, factor: usize) -> Cow<'_, [u8]> {
+    if factor == 1 {
+        return Cow::Borrowed(pixels.as_bytes());
+    }
     let mut out = Vec::with_capacity(pixels.len() * factor * factor * 4);
     for y in 0..h * factor {
         let row = &pixels[(y / factor) * w..(y / factor + 1) * w];
@@ -769,7 +796,7 @@ fn enlarged_bytes(pixels: &[RGBA], w: usize, h: usize, factor: usize) -> Vec<u8>
             out.extend_from_slice(&[p.r, p.g, p.b, p.a]);
         }
     }
-    out
+    Cow::Owned(out)
 }
 
 /// fast-ssim2's wasm SIMD kernels measured slower than its scalar ones (Chrome/V8), so wasm builds
@@ -782,6 +809,9 @@ fn ssim_config() -> Ssimulacra2Config<'static> {
     }
 }
 
-fn slice(bytes: &[u8], w: usize, h: usize) -> Result<PixelSlice<'_>, BoxError> {
-    Ok(PixelSlice::new(bytes, w as u32, h as u32, w * 4, PixelDescriptor::RGBA8_SRGB)?)
+/// RGBA bytes for fast-ssim2. Opaque ones are described as RGBX: with an alpha channel it scores
+/// twice, over two backgrounds, which for opaque pixels is the same computation (same bits).
+fn slice(bytes: &[u8], w: usize, h: usize, opaque: bool) -> Result<PixelSlice<'_>, BoxError> {
+    let format = if opaque { PixelDescriptor::RGBX8_SRGB } else { PixelDescriptor::RGBA8_SRGB };
+    Ok(PixelSlice::new(bytes, w as u32, h as u32, w * 4, format)?)
 }

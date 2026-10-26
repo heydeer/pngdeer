@@ -345,12 +345,39 @@ After round 15, a user saw that the gradient on the 3D rocket in the samples (fl
 - Compared with round 15 (109 images / 71 images): size at equal SSIMULACRA2 quality 88.8% / 83.2% → 92.2% / 84.8%, 84.5% / 79.7% → 88.0% / 81.1%; can't reach TinyPNG quality 4 → 3 images, 4 → 4 images; butteraugli (3-norm) 90.3% / 84.2% → 93.8% / 86.3%, 87.3% / 80.4% → 91.0% / 83.3%; automatic quality total size 90.0% → 92.6%, 84.4% → 87.2%, median score +0.7 and +0.8 above TinyPNG. By category: 3D renders +7.3% / +9.8%, illustrations +4.4%, photos with transparency +3.0% / +1.7%, UI +3.0% / +7.4%, photos and icons about unchanged. Against other open-source tools: +2.0 / +1.7 points at TinyPNG's size, reaching TinyPNG quality on 106/109 and 67/71 images. `bench/results/smooth50nodz-main-20261025-222913`, `smooth50nodz-holdout-20261025-222913` (strength 0.75 is `smooth75-*-20261025-221831`).
 - The browser version and the command line still give the same size on the 6 sample images.
 
+## Round 17: large images in the browser
+
+A user's 35.9 MP PNG was refused: the browser version took at most 16 MP (12 MP threaded), because scoring peaked at about 260 bytes a pixel and wasm32 has 4 GB.
+
+- **Where the memory went** (dhat, 4 MP, one thread, 893 MB at the peak): fast-ssim2's cached reference 68 bytes a pixel, each comparison's planes 110, copies of the image 26. Two things doubled it: an opaque image went in as RGBA, so the reference and every comparison were made twice, over two backgrounds that give opaque pixels the same values; and the threaded blurs cloned their outputs, so every blurred plane existed twice.
+- **Tiles and strips don't work**: SSIMULACRA2 is dominated by the worst regions, so averaging independent tiles scores up to 24 points too high and the worst tile up to 20 too low (16–21 MP images, 1024–4096 px tiles). fast-ssim2's strips drift +0.05 to +1.6 points (256 rows, 96 of overlap) and still +0.004 to +0.42 (2048 rows, 512): its blur is recursive, so no overlap makes them exact.
+- **What changed**, with scores identical to the bit:
+  - Opaque images go to fast-ssim2 as RGBX: one reference stack and one comparison instead of two.
+  - fast-ssim2 no longer clones the blurred planes, allocates planes it doesn't use, or copies the image for padding (`vendor/fast-ssim2/PATCHES.md`, change 4).
+  - Above 8 MP scored (`LEAN_PIXELS`), a lean reference keeps only the source. Each check linearizes both images, walks their scales together and, per channel, runs the five blurs one after another, then that channel's maps: at most five blurred planes are alive, and no pyramid is kept.
+- **Memory and time** (single-threaded WebAssembly in Node, the same V8 as Chrome; memory is how far WebAssembly memory grew, which never shrinks):
+
+  | Image | Before | After |
+  |---|---|---|
+  | kodim01 (0.4 MP) | 3.1 s, 91 MB | 2.6 s, 56 MB |
+  | stripe@2x (5.2 MP) | 16.6 s, 1075 MB | 13.1 s, 643 MB |
+  | sun poster at 4 MP | 13.4 s, 831 MB | 10.7 s, 497 MB |
+  | sun poster at 16 MP | refused | 37 s, 1.22 GB |
+  | 4 screenshots, 21 MP | refused | 41 s, 1.58 GB |
+  | cut-out with alpha, 24 MP | refused | 97 s, 2.07 GB |
+  | 6 screenshots, 36 MP | refused | 73 s, 2.75 GB |
+  | cut-out with alpha, 40 MP | refused | 164 s, 3.45 GB |
+
+  Large images take about 80 bytes a pixel, 86 with transparency; the threaded build about the same (36 MP 2.78 GB, 40 MP with alpha 3.48 GB). The browser now takes up to 40 MP in either build. Opaque images up to 8 MP are also 16–21% faster, scored once instead of twice.
+- **Checked**: on all 180 benchmark images, at automatic quality and at target 85, the files and reports are byte-identical to before, both as shipped and with the lean reference forced on for every image. The browser builds and the command line give the same bytes on the 4–40 MP test images.
+- A lean check runs its blurs on one thread even in the threaded build (in parallel each blur needs its own scratch plane, 16 bytes a pixel more), so above 8 MP scoring is no faster threaded.
+
 ## Still unsolved
 
 - **Educational line drawings on transparent backgrounds**: the category furthest from TinyPNG since round 13. bicycle-diagram, even at 256 colors, can't reach TinyPNG's 90.0; mouse-mechanism, renal-corpuscle, college-of-arms and fortepian are 1–2 points lower under automatic quality. Anti-aliased semi-transparent edges are not dithered (since round 15, semi-transparent pixels with smooth alpha are dithered), and there may still be room in palette allocation for flat patches and thin lines. (The former worst case, `linear@2x`: size at equal quality 116% → 107% (round 12) → 93%; react-dev@2x 123% → 100%; both solved in round 13.)
 - **3D / illustrations at the high-quality end**: rounds 8 and 9 added three 256-color candidates: full dithering, plain palette and refined palette (round 12 also added the quantette palette for opaque images), and the mean gap on the hard images shrank from −1.27 to −0.69; for what remains, see the last item of round 9 (those are libimagequant-version numbers).
 - **Neither metric sees banding**: round 15 works around it with the "always dither smooth gradients" rule, but the search still has no signal that quantifies banding and contour lines (such as Netflix's CAMBI). What counts as "smooth" is a threshold; calibrating it with a blind test would be more reliable.
-- **Search on large images**: since round 2 the native version is no slower than TinyPNG, and since round 5 the browser version handles 5MP in under 10 s; the bottleneck is still SSIMULACRA2, and the coarse search on a downscaled image costs 1.5% in size. The native version can also use `--preview-pixels`, but bench does not enable it.
+- **Search on large images**: since round 2 the native version is no slower than TinyPNG, and since round 5 the browser version handles 5MP in under 10 s; the bottleneck is still SSIMULACRA2, and the coarse search on a downscaled image costs 1.5% in size. The native version can also use `--preview-pixels`, but bench does not enable it. Above 8 MP the browser's checks score on one thread (round 17); splitting each blur's rows and column blocks across threads would need no extra memory.
 
 ## Reproducing
 

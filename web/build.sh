@@ -22,7 +22,7 @@ cargo build --release --target wasm32-unknown-unknown -p pngdeer-wasm
 wasm-bindgen --target web --no-typescript --out-dir web/pkg target/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
 
 # Threads: shared memory needs atomics in std (rebuilt with build-std, hence nightly) and in the C
-# code, an imported shared memory (wasm32's 4 GiB ceiling: a 5 MP screenshot peaks at 1.3 GB), and
+# code, an imported shared memory (wasm32's 4 GiB ceiling, which MAX_PIXELS in worker.js keeps to), and
 # the TLS exports wasm-bindgen's thread start-up uses.
 LINK="--shared-memory --import-memory --max-memory=4294967296 --export=__wasm_init_tls --export=__tls_size --export=__tls_align --export=__tls_base"
 RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals $(for a in $LINK; do printf -- '-C link-arg=%s ' "$a"; done)" \

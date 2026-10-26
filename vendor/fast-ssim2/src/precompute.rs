@@ -51,6 +51,26 @@ impl Ssimulacra2Reference {
         source: &PixelSlice<'_>,
         config: &Ssimulacra2Config<'_>,
     ) -> Result<Self, Ssimulacra2Error> {
+        Self::build(source, config, false)
+    }
+
+    /// [`Self::new_with_config`] keeping only the source: each comparison converts both images scale
+    /// by scale and scores one channel at a time, so it needs well under half the memory and takes
+    /// longer. Scores are bit-identical. Only encoded (8- or 16-bit, sRGB) images: a linear source
+    /// gets a full reference, and a lean one rejects strips and linear images to compare. pngdeer
+    /// patch.
+    pub fn new_lean_with_config(
+        source: &PixelSlice<'_>,
+        config: &Ssimulacra2Config<'_>,
+    ) -> Result<Self, Ssimulacra2Error> {
+        Self::build(source, config, true)
+    }
+
+    fn build(
+        source: &PixelSlice<'_>,
+        config: &Ssimulacra2Config<'_>,
+        lean: bool,
+    ) -> Result<Self, Ssimulacra2Error> {
         config.check_stop()?;
         if config.strip.is_some() {
             return Err(Ssimulacra2Error::InvalidConfiguration(
@@ -64,14 +84,19 @@ impl Ssimulacra2Reference {
             PreparedInput::Encoded(e) => {
                 let ow = e.width;
                 let oh = e.height;
-                let padded = e.reflect_padded(8);
+                let padded = padded_to_8(e);
                 if padded.width * padded.height > MAX_IMAGE_PIXELS {
                     return Err(Ssimulacra2Error::ImageTooLarge {
                         actual: padded.width * padded.height,
                     });
                 }
+                let cache = if lean {
+                    ReferenceCache::new_lean(padded)?
+                } else {
+                    ReferenceCache::new_with_options(&padded, kernel, stop)?
+                };
                 Ok(Self {
-                    cache: ReferenceCache::new_with_options(&padded, kernel, stop)?,
+                    cache,
                     original_width: ow,
                     original_height: oh,
                 })
@@ -150,6 +175,11 @@ impl Ssimulacra2Reference {
     ) -> Result<f64, Ssimulacra2Error> {
         config.check_stop()?;
         if config.strip.is_some() {
+            if self.cache.is_lean() {
+                return Err(Ssimulacra2Error::InvalidConfiguration(
+                    "strip comparisons need a full reference (new_with_config)",
+                ));
+            }
             return self.compare_strip_inner(distorted, config);
         }
         use crate::source::PreparedInput;
@@ -160,14 +190,18 @@ impl Ssimulacra2Reference {
         }
         match p {
             PreparedInput::Encoded(e) => {
-                let padded = e.reflect_padded(8);
-                self.cache.compare_stop_kernel(
-                    &padded,
+                self.cache.compare_owned_stop_kernel(
+                    padded_to_8(e),
                     stop,
                     crate::pipeline::Kernel::from_impl(config.impl_type),
                 )
             }
             p @ PreparedInput::Linear { .. } => {
+                if self.cache.is_lean() {
+                    return Err(Ssimulacra2Error::InvalidConfiguration(
+                        "a lean reference compares encoded images only",
+                    ));
+                }
                 let (w, h) = (self.cache.width(), self.cache.height());
                 // Evaluate dist against each ref stack; the stack's bg
                 // (0.1/0.9 for alpha caches, 0.5 otherwise) drives the
@@ -222,6 +256,16 @@ impl Ssimulacra2Reference {
     /// The underlying pipeline cache — shared with the strip module.
     pub(crate) fn cache(&self) -> &ReferenceCache {
         &self.cache
+    }
+}
+
+/// The encoded image reflect-padded to the 8px pyramid floor, or itself when it is already that big
+/// (pngdeer patch: `reflect_padded` copies it then, a whole extra image at the peak).
+fn padded_to_8(e: crate::pipeline::EncodedSrgb) -> crate::pipeline::EncodedSrgb {
+    if e.width >= 8 && e.height >= 8 {
+        e
+    } else {
+        e.reflect_padded(8)
     }
 }
 

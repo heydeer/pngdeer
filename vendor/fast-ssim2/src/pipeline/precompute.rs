@@ -60,6 +60,25 @@ pub struct ReferenceCache {
     height: usize,
     /// `true` when the source carries alpha (compare uses min-score).
     has_alpha: bool,
+    /// pngdeer patch: a lean cache keeps only the source (`stacks` stays empty). Each comparison
+    /// converts both images scale by scale and scores one channel at a time (`lean_scales`), so
+    /// large images fit in wasm32's 4 GB. Same scores, slower comparisons.
+    lean_source: Option<LeanSource>,
+}
+
+/// The source a lean cache keeps (`EncodedSrgb` itself is neither `Clone` nor `Debug`).
+struct LeanSource(EncodedSrgb);
+
+impl Clone for LeanSource {
+    fn clone(&self) -> Self {
+        LeanSource(self.0.clone_shallow())
+    }
+}
+
+impl std::fmt::Debug for LeanSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LeanSource({}x{})", self.0.width, self.0.height)
+    }
 }
 
 /// Run the official scale walk on the reference side only, storing the
@@ -120,12 +139,11 @@ fn ref_scales(
                     o
                 })
                 .collect();
-            let t3 = |f: &[Vec<f32>], i: usize| {
-                [f[2 * i].clone(), f[2 * i + 1].clone(), f[2 * i + 2].clone()]
-            };
-            let _ = t3;
-            mu1 = [flat[0].clone(), flat[2].clone(), flat[4].clone()];
-            sigma1_sq = [flat[1].clone(), flat[3].clone(), flat[5].clone()];
+            // pngdeer patch: moved out rather than cloned, which held a second copy of all six
+            // planes at the peak.
+            let [m0, s0, m1, s1, m2, s2]: [Vec<f32>; 6] = flat.try_into().unwrap();
+            mu1 = [m0, m1, m2];
+            sigma1_sq = [s0, s1, s2];
         }
         #[cfg(not(feature = "rayon"))]
         {
@@ -217,6 +235,22 @@ impl ReferenceCache {
             width: w,
             height: h,
             has_alpha: source.alpha.is_some(),
+            lean_source: None,
+        })
+    }
+
+    /// A lean cache for `source` (see `lean_source`).
+    pub(crate) fn new_lean(source: EncodedSrgb) -> Result<Self, Ssimulacra2Error> {
+        let (w, h) = (source.width, source.height);
+        if w < 8 || h < 8 {
+            return Err(Ssimulacra2Error::InvalidImageSize);
+        }
+        Ok(Self {
+            stacks: Vec::new(),
+            width: w,
+            height: h,
+            has_alpha: source.alpha.is_some(),
+            lean_source: Some(LeanSource(source)),
         })
     }
 
@@ -262,7 +296,14 @@ impl ReferenceCache {
             width,
             height,
             has_alpha,
+            lean_source: None,
         })
+    }
+
+    /// Whether this is a lean cache, which compares encoded images only (no strips, no linear
+    /// planes: those need the stored scales).
+    pub(crate) fn is_lean(&self) -> bool {
+        self.lean_source.is_some()
     }
 
     /// Compare already-linear planes against stack `si` — same
@@ -304,7 +345,11 @@ impl ReferenceCache {
     /// Number of cached scales (the lagging-gate scale count from
     /// `ref_scales` — matches what `compute_opts` produces).
     pub(crate) fn num_scales(&self) -> usize {
-        self.stacks[0].len()
+        if self.is_lean() {
+            scale_count(self.width, self.height)
+        } else {
+            self.stacks[0].len()
+        }
     }
 
     /// Source height in pixels.
@@ -332,6 +377,40 @@ impl ReferenceCache {
     ) -> Result<f64, Ssimulacra2Error> {
         self.compare_stop_kernel(distorted, stop, Kernel::Simd)
     }
+    /// [`Self::compare_stop_kernel`] taking the image. With neither side carrying alpha it frees
+    /// the image once linearized (pngdeer patch: otherwise it stays alive through the comparison's
+    /// peak); the steps and the result are the same.
+    pub(crate) fn compare_owned_stop_kernel(
+        &self,
+        distorted: EncodedSrgb,
+        stop: &dyn enough::Stop,
+        kernel: Kernel,
+    ) -> Result<f64, Ssimulacra2Error> {
+        if distorted.width != self.width || distorted.height != self.height {
+            return Err(Ssimulacra2Error::NonMatchingImageDimensions);
+        }
+        if self.is_lean() {
+            return self.compare_lean(distorted, stop, kernel);
+        }
+        if self.has_alpha || distorted.alpha.is_some() {
+            return self.compare_stop_kernel(&distorted, stop, kernel);
+        }
+        stop.check().map_err(Ssimulacra2Error::Cancelled)?;
+        let rg = create_recursive_gaussian(1.5);
+        let lin2 = linearize(&distorted, 0.5);
+        drop(distorted);
+        let scales = dist_scales(
+            &rg,
+            &self.stacks[0],
+            lin2,
+            self.width,
+            self.height,
+            stop,
+            kernel,
+        )?;
+        Ok([final_score(&scales)].into_iter().fold(f64::INFINITY, f64::min))
+    }
+
     pub(crate) fn compare_stop_kernel(
         &self,
         distorted: &EncodedSrgb,
@@ -340,6 +419,9 @@ impl ReferenceCache {
     ) -> Result<f64, Ssimulacra2Error> {
         if distorted.width != self.width || distorted.height != self.height {
             return Err(Ssimulacra2Error::NonMatchingImageDimensions);
+        }
+        if self.is_lean() {
+            return self.compare_lean(distorted.clone_shallow(), stop, kernel);
         }
         stop.check().map_err(Ssimulacra2Error::Cancelled)?;
         let rg = create_recursive_gaussian(1.5);
@@ -391,7 +473,6 @@ fn dist_scales(
                 flavor: super::XybFlavor::CubeRoot,
             },
         );
-
         // Three independent blurs: σ2 = blur(xyb2·xyb2),
         // σ12 = blur(xyb1·xyb2), μ2 = blur(xyb2).
         let (sigma2_sq, sigma12, mu2);
@@ -424,15 +505,16 @@ fn dist_scales(
                     o
                 })
                 .collect();
-            let take3 =
-                |f: &[Vec<f32>], i: usize| [f[i].clone(), f[i + 1].clone(), f[i + 2].clone()];
-            sigma2_sq = take3(&flat, 0);
-            sigma12 = take3(&flat, 3);
-            mu2 = take3(&flat, 6);
+            // pngdeer patch: moved out rather than cloned, which held a second copy of all nine
+            // planes at the peak.
+            let [a0, a1, a2, b0, b1, b2, c0, c1, c2]: [Vec<f32>; 9] = flat.try_into().unwrap();
+            sigma2_sq = [a0, a1, a2];
+            sigma12 = [b0, b1, b2];
+            mu2 = [c0, c1, c2];
         }
         #[cfg(not(feature = "rayon"))]
         {
-            let mut mul = [vec![0f32; npix], vec![0f32; npix], vec![0f32; npix]];
+            // pngdeer patch: dropped three planes allocated here and never used.
             let mut tmp = vec![0f32; npix];
             let mut run = |a: &[f32], b: Option<&[f32]>| -> Vec<f32> {
                 let mut o = vec![0f32; npix];
@@ -454,7 +536,6 @@ fn dist_scales(
                 run(&xyb2[1], None),
                 run(&xyb2[2], None),
             ];
-            let _ = &mut mul;
         }
 
         let (avg_ssim, avg_edgediff) = if kernel == Kernel::Scalar {
@@ -473,52 +554,27 @@ fn dist_scales(
             #[cfg(feature = "rayon")]
             {
                 use rayon::prelude::*;
-                let n = w * h;
-                let opp = 1.0 / n as f64;
-                let parts: Vec<(f64, f64, [f64; 4])> = (0..3)
+                let parts: Vec<([f64; 2], [f64; 4])> = (0..3)
                     .into_par_iter()
                     .map(|c| {
-                        let (mut s0, mut s1) = (0f64, 0f64);
-                        incant!(
-                            simd::ssim_map_inner(
-                                &rs.mu1[c],
-                                &mu2[c],
-                                &rs.sigma1_sq[c],
-                                &sigma2_sq[c],
-                                &sigma12[c],
-                                &mut s0,
-                                &mut s1
-                            ),
-                            [v3, neon, wasm128, scalar]
-                        );
-                        let mut e = [0f64; 4];
-                        simd::edge_sums_fast(
-                            0,
-                            h,
-                            w,
-                            &rs.xyb1[c],
+                        channel_maps(
+                            kernel,
                             &rs.mu1[c],
-                            &xyb2[c],
                             &mu2[c],
-                            &mut e,
-                        );
-                        (
-                            opp * s0,
-                            (opp * s1).sqrt().sqrt(),
-                            [
-                                opp * e[0],
-                                (opp * e[1]).sqrt().sqrt(),
-                                opp * e[2],
-                                (opp * e[3]).sqrt().sqrt(),
-                            ],
+                            &rs.sigma1_sq[c],
+                            &sigma2_sq[c],
+                            &sigma12[c],
+                            &rs.xyb1[c],
+                            &xyb2[c],
+                            w,
+                            h,
                         )
                     })
                     .collect();
                 let (mut so, mut eo) = ([0f64; 6], [0f64; 12]);
                 for c in 0..3 {
-                    so[c * 2] = parts[c].0;
-                    so[c * 2 + 1] = parts[c].1;
-                    eo[c * 4..c * 4 + 4].copy_from_slice(&parts[c].2);
+                    so[c * 2..c * 2 + 2].copy_from_slice(&parts[c].0);
+                    eo[c * 4..c * 4 + 4].copy_from_slice(&parts[c].1);
                 }
                 (so, eo)
             }
@@ -546,6 +602,175 @@ fn dist_scales(
         h = rs.height.div_ceil(2);
     }
     Ok(scales)
+}
+
+/// One channel's `SSIMMap` pair and `EdgeDiffMap` quad, with the kernels the whole-image
+/// comparison uses for that channel in this build. pngdeer patch: shared with the lean path, which
+/// scores channel by channel, so both give the same bits.
+#[allow(clippy::too_many_arguments)]
+fn channel_maps(
+    kernel: Kernel,
+    mu1: &[f32],
+    mu2: &[f32],
+    s11: &[f32],
+    s22: &[f32],
+    s12: &[f32],
+    img1: &[f32],
+    img2: &[f32],
+    w: usize,
+    h: usize,
+) -> ([f64; 2], [f64; 4]) {
+    let unstoppable: Option<&dyn enough::Stop> = None;
+    if kernel == Kernel::Scalar {
+        return super::maps::maps_channel_stop(mu1, mu2, s11, s22, s12, img1, img2, w, h, unstoppable)
+            .unwrap_or_else(|_| unreachable!());
+    }
+    #[cfg(feature = "rayon")]
+    {
+        let opp = 1.0 / (w * h) as f64;
+        let (mut s0, mut s1) = (0f64, 0f64);
+        incant!(
+            simd::ssim_map_inner(mu1, mu2, s11, s22, s12, &mut s0, &mut s1),
+            [v3, neon, wasm128, scalar]
+        );
+        let mut e = [0f64; 4];
+        simd::edge_sums_fast(0, h, w, img1, mu1, img2, mu2, &mut e);
+        (
+            [opp * s0, (opp * s1).sqrt().sqrt()],
+            [
+                opp * e[0],
+                (opp * e[1]).sqrt().sqrt(),
+                opp * e[2],
+                (opp * e[3]).sqrt().sqrt(),
+            ],
+        )
+    }
+    #[cfg(not(feature = "rayon"))]
+    {
+        let _ = unstoppable;
+        simd::maps_channel_simd_stop(mu1, mu2, s11, s22, s12, img1, img2, w, h, unstoppable)
+            .unwrap_or_else(|_| unreachable!())
+    }
+}
+
+/// One scale of a lean comparison: per channel, the reference's two blurs (which a full cache
+/// stores) and the distorted side's three, one after another with one scratch plane, then that
+/// channel's maps. At most five blurred planes are alive instead of fifteen, in every build (in
+/// parallel they would each need a scratch plane). Each blur and map is the call the full path makes.
+fn dist_scale_lean(
+    rg: &super::gauss::RecursiveGaussian,
+    xyb1: &[Vec<f32>; 3],
+    xyb2: &[Vec<f32>; 3],
+    w: usize,
+    h: usize,
+    kernel: Kernel,
+) -> ScaleAggregates {
+    let npix = w * h;
+    let mut tmp = vec![0f32; npix];
+    let (mut avg_ssim, mut avg_edgediff) = ([0f64; 6], [0f64; 12]);
+    for c in 0..3 {
+        let (x1, x2) = (&xyb1[c][..], &xyb2[c][..]);
+        let mut blur = |a: &[f32], b: Option<&[f32]>| {
+            let mut o = vec![0f32; npix];
+            blur_channel(kernel, rg, a, b, w, h, &mut o, &mut tmp);
+            o
+        };
+        let (mu1, s11) = (blur(x1, None), blur(x1, Some(x1)));
+        let (s22, s12, mu2) = (blur(x2, Some(x2)), blur(x1, Some(x2)), blur(x2, None));
+        let (ssim, edge) = channel_maps(kernel, &mu1, &mu2, &s11, &s22, &s12, x1, x2, w, h);
+        avg_ssim[c * 2..c * 2 + 2].copy_from_slice(&ssim);
+        avg_edgediff[c * 4..c * 4 + 4].copy_from_slice(&edge);
+    }
+    ScaleAggregates {
+        avg_ssim,
+        avg_edgediff,
+    }
+}
+
+/// The scale walk of a lean comparison: both sides as `ref_scales` and `dist_scales` take them,
+/// with the same scale gate, each scale's reference planes made here instead of cached.
+fn lean_scales(
+    rg: &super::gauss::RecursiveGaussian,
+    mut lin1: [Vec<f32>; 3],
+    mut lin2: [Vec<f32>; 3],
+    mut w: usize,
+    mut h: usize,
+    stop: &dyn enough::Stop,
+    kernel: Kernel,
+) -> Result<Vec<ScaleAggregates>, Ssimulacra2Error> {
+    let opts = super::Opts {
+        kernel,
+        flavor: super::XybFlavor::CubeRoot,
+    };
+    let mut scales = Vec::with_capacity(NUM_SCALES);
+    let (mut gw, mut gh) = (w, h);
+    for _scale in 0..NUM_SCALES {
+        stop.check().map_err(Ssimulacra2Error::Cancelled)?;
+        if gw < 8 || gh < 8 {
+            break;
+        }
+        let (lin1_next, nw, nh) = downsample_planes(&lin1, w, h);
+        let (lin2_next, _, _) = downsample_planes(&lin2, w, h);
+        let (mut xyb1, mut xyb2) = (lin1, lin2);
+        super::xyb_convert(&mut xyb1, w * h, opts);
+        super::xyb_convert(&mut xyb2, w * h, opts);
+        scales.push(dist_scale_lean(rg, &xyb1, &xyb2, w, h, kernel));
+        (lin1, lin2) = (lin1_next, lin2_next);
+        (gw, gh) = (w, h);
+        (w, h) = (nw, nh);
+    }
+    Ok(scales)
+}
+
+/// How many scales `ref_scales` makes for a `w`×`h` image.
+fn scale_count(mut w: usize, mut h: usize) -> usize {
+    let (mut gw, mut gh) = (w, h);
+    let mut n = 0;
+    while n < NUM_SCALES && gw >= 8 && gh >= 8 {
+        n += 1;
+        (gw, gh) = (w, h);
+        (w, h) = (w.div_ceil(2), h.div_ceil(2));
+    }
+    n
+}
+
+impl ReferenceCache {
+    /// A lean cache's comparison: per stack (one per background), the reference and `distorted`
+    /// linearized as the full path linearizes them, then walked together. `distorted` is freed
+    /// once linearized for the last time.
+    fn compare_lean(
+        &self,
+        distorted: EncodedSrgb,
+        stop: &dyn enough::Stop,
+        kernel: Kernel,
+    ) -> Result<f64, Ssimulacra2Error> {
+        stop.check().map_err(Ssimulacra2Error::Cancelled)?;
+        let source = &self.lean_source.as_ref().unwrap().0;
+        let rg = create_recursive_gaussian(1.5);
+        let count = if self.has_alpha || distorted.alpha.is_some() {
+            2
+        } else {
+            1
+        };
+        let mut distorted = Some(distorted);
+        let mut scores = Vec::with_capacity(count);
+        for si in 0..count {
+            let bg = if count == 2 {
+                if si == 0 { 0.1 } else { 0.9 }
+            } else {
+                0.5
+            };
+            // the stack the full cache would use: its own background, or the single 0.5 one
+            let lin1 = linearize(source, if self.has_alpha { bg } else { 0.5 });
+            let lin2 = linearize(distorted.as_ref().unwrap(), bg);
+            if si + 1 == count {
+                distorted = None;
+            }
+            let scales = lean_scales(&rg, lin1, lin2, self.width, self.height, stop, kernel)?;
+            scores.push(final_score(&scales));
+        }
+        Ok(scores.into_iter().fold(f64::INFINITY, f64::min))
+    }
 }
 
 impl ReferenceCache {
