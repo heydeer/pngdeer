@@ -1,0 +1,17 @@
+[package]
+name = "quantlab"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Runs other open-source palette quantizers for the benchmark's comparison (bench/bench.py)."
+
+[dependencies]
+pngdeer = { path = "../..", default-features = false }
+exoquant = "0.2.0"
+# quantette's threads change its output; keep runs reproducible.
+quantette = { version = "0.6.0", default-features = false, features = ["kmeans"] }
+color_quant = "2.0.0"
+quantizr = "1.4.3"
+palette = { version = "0.7", default-features = false }
+

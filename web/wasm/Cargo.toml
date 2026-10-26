@@ -1,0 +1,21 @@
+[package]
+name = "pngdeer-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pngdeer = { path = "../..", default-features = false, features = ["oxipng", "freestanding"] }
+# Exactly the wasm-bindgen-cli version build.sh runs (see README).
+wasm-bindgen = "=0.2.129"
+js-sys = "0.3"
+wasm-bindgen-rayon = { version = "1.3.0", features = ["no-bundler"], optional = true }
+
+[features]
+# Multi-threaded build (web/pkg-mt): rayon on Web Workers for palettes, remapping, scoring and oxipng.
+# Needs nightly Rust and shared memory; see build.sh.
+threads = ["dep:wasm-bindgen-rayon", "pngdeer/parallel"]

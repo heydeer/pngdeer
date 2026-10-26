@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pngdeer · Open-source PNG compressor · HeyDeer</title>
+<meta name="description" content="pngdeer finds the smallest palette PNG that still looks like your image. Open source, runs in your browser, nothing is uploaded. By HeyDeer.">
+<link rel="canonical" href="https://heydeer.ai/open-source/pngdeer">
+<script>
+  // heydeer.ai serves this page at /open-source/pngdeer, without the trailing slash Next.js strips,
+  // so the page's relative URLs (icons, worker, WebAssembly, samples) need a base under it.
+  if (/\/[^./]+$/.test(location.pathname)) document.write(`<base href="${location.pathname}/">`);
+</script>
+<link rel="icon" href="brand/heydeer-sun-icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" crossorigin href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --sun: #ffcf33; --sun-soft: #fff3c4; --sun-deep: #e8b10a;
+    --ink: #292824; --walnut: #352017;
+    --text: #23211d; --muted: #6d6a62; --faint: #a19c90;
+    --paper: #fbfaf6; --paper-2: #f4f1e9; --line: #e7e2d6; --line-2: #d9d2c2;
+    --white: #fff;
+    --display: "DM Sans", "Avenir Next", system-ui, sans-serif;
+    --body: "Geist", "Avenir Next", system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --wrap: 1160px; --gutter: 24px; --radius: 28px;
+    --checker: conic-gradient(var(--paper-2) 25%, var(--paper) 0 50%, var(--paper-2) 0 75%, var(--paper) 0);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--white); color: var(--text); font: 400 16px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  button { font: inherit; color: inherit; }
+  img { display: block; }
+  .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
+  .mono { font-family: var(--mono); font-size: 12px; letter-spacing: .02em; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  /* ---------- buttons ---------- */
+  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid transparent; font-weight: 500; font-size: 15px; text-decoration: none; cursor: pointer; transition: transform .15s ease, background .15s ease, border-color .15s ease; white-space: nowrap; }
+  .pill:active { transform: translateY(1px); }
+  .pill.sun { background: var(--sun); color: var(--ink); box-shadow: inset 0 -2px 0 #0000001a; }
+  .pill.sun:hover { background: #ffd84f; }
+  .pill.ghost { background: var(--white); border-color: var(--line-2); }
+  .pill.ghost:hover { border-color: var(--ink); }
+  .pill.dark { background: var(--ink); color: var(--white); }
+  .pill.dark:hover { background: #3a3832; }
+  .pill.small { height: 34px; padding: 0 14px; font-size: 13.5px; }
+  .pill[disabled] { opacity: .45; cursor: default; }
+  .pill svg { width: 16px; height: 16px; }
+
+  /* ---------- header ---------- */
+  .top { position: sticky; top: 0; z-index: 20; background: #ffffffe6; backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid transparent; transition: border-color .2s; }
+  .top.scrolled { border-bottom-color: var(--line); }
+  .top .wrap { height: 68px; display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .brand img { height: 26px; width: auto; }
+  .brand .slash { width: 1.5px; height: 22px; background: var(--line-2); transform: skewX(-18deg); }
+  .brand .product { font: 600 19px/1 var(--display); letter-spacing: -.03em; color: var(--ink); }
+  .top nav { display: flex; gap: 22px; margin-left: 22px; }
+  .top nav a { text-decoration: none; color: var(--muted); font-size: 15px; }
+  .top nav a:hover { color: var(--ink); }
+  .top .end { margin-left: auto; }
+  /* GitHub's own star button: mark and label, then the count once the repository has stars */
+  .gh { display: inline-flex; height: 32px; border: 1px solid #d1d9e0; border-radius: 6px; overflow: hidden; color: #25292e; font: 500 13.5px/1 var(--body); text-decoration: none; }
+  .gh > span { display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; background: #f6f8fa; transition: background .15s; }
+  .gh:hover > span { background: #eff2f5; }
+  .gh svg { width: 16px; height: 16px; fill: currentColor; }
+  .gh .count { gap: 0; padding: 0 10px; border-left: 1px solid #d1d9e0; background: var(--white); font-weight: 600; }
+  .gh .count[hidden] { display: none; }
+
+  /* ---------- hero ---------- */
+  /* centred over the drop box, whose own text is centred too */
+  .hero { padding: 64px 0 40px; display: grid; justify-items: center; text-align: center; gap: 18px; }
+  h1 { font: 600 clamp(40px, 6.4vw, 80px)/1 var(--display); letter-spacing: -.05em; margin: 0; color: var(--ink); text-wrap: balance; }
+  /* the highlight drawn the way a palette would: in four flat steps */
+  .px { position: relative; white-space: nowrap; isolation: isolate; }
+  .px::after { content: ""; position: absolute; left: -.03em; right: -.02em; bottom: .03em; height: .2em; z-index: -1;
+    background: repeating-linear-gradient(90deg, var(--sun) 0 .34em, #ffdb63 .34em .68em, #ffe794 .68em 1.02em, #ffdb63 1.02em 1.36em);
+    transform-origin: left; animation: steps-in 1.1s steps(7, end) .35s both; }
+  @keyframes steps-in { from { transform: scaleX(0); } }
+  .lede { font-size: 18px; line-height: 1.6; color: var(--muted); margin: 0; max-width: 36em; text-wrap: balance; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  .lede a { text-decoration-color: var(--line-2); text-underline-offset: 3px; white-space: nowrap; }
+  .lede a:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+  /* ---------- the light table ---------- */
+  .table { position: relative; border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; background: var(--checker) 0 0 / 22px 22px;
+    min-height: clamp(440px, 62vh, 640px); display: grid; transition: border-color .2s, box-shadow .2s; }
+  .table:not(.loaded) { min-height: clamp(300px, 40vh, 400px); }
+  .table::before { content: ""; position: absolute; inset: 16px; border-radius: 18px; border: 1.5px dashed #35201733; pointer-events: none; transition: border-color .2s, inset .25s; }
+  .table.over { border-color: var(--sun-deep); box-shadow: 0 0 0 6px #ffcf3340; }
+  .table.over::before { border-color: var(--sun-deep); inset: 10px; }
+  .table.loaded::before { display: none; }
+  .marks { position: absolute; inset: 0; pointer-events: none; }
+  .marks i { position: absolute; width: 14px; height: 14px; border-color: var(--walnut); border-style: solid; opacity: .45; }
+  .marks i:nth-child(1) { top: 30px; left: 30px; border-width: 1.5px 0 0 1.5px; }
+  .marks i:nth-child(2) { top: 30px; right: 30px; border-width: 1.5px 1.5px 0 0; }
+  .marks i:nth-child(3) { bottom: 30px; left: 30px; border-width: 0 0 1.5px 1.5px; }
+  .marks i:nth-child(4) { bottom: 30px; right: 30px; border-width: 0 1.5px 1.5px 0; }
+  .table.loaded .marks { display: none; }
+
+  .empty { place-self: center; text-align: center; padding: 36px 24px; }
+  .empty h2 { font: 600 clamp(28px, 3.4vw, 38px)/1.1 var(--display); letter-spacing: -.035em; margin: 0 0 10px; color: var(--ink); }
+  .empty p { margin: 0 0 26px; color: var(--muted); }
+  .empty .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .release { position: absolute; inset: 0; display: grid; place-items: center; font: 600 34px var(--display); letter-spacing: -.03em; color: var(--walnut); background: #fff8dccc; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 5; }
+  .table.over .release { opacity: 1; }
+
+  /* viewer */
+  .viewer { display: none; grid-template-rows: auto 1fr auto; min-height: 0; min-width: 0; }
+  .table.loaded .viewer { display: grid; }
+  .table.loaded .empty { display: none; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 20px; background: #ffffffe0; backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .bar .name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34ch; }
+  .bar .dim { color: var(--faint); }
+  .bar .spacer { flex: 1; }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; padding: 3px; background: var(--white); }
+  .seg button { border: 0; background: none; height: 26px; padding: 0 11px; border-radius: 999px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
+  .stagewrap { position: relative; min-width: 0; }
+  .stagebox { overflow: auto; height: clamp(360px, 56vh, 600px); }
+  .stagebox.white { background: var(--white); }
+  .stagebox.ink { background: #1c1b18; }
+  .center { min-width: 100%; min-height: 100%; width: max-content; display: grid; place-items: center; padding: 28px; }
+  .stage { position: relative; touch-action: none; user-select: none; }
+  .stage.ready { cursor: ew-resize; }
+  .stage img { position: absolute; inset: 0; width: 100%; height: 100%; -webkit-user-drag: none; }
+  .stage.pixelated img { image-rendering: pixelated; }
+  /* each image only on its own side: the original showing through under the compressed one
+     would composite translucent pixels (soft shadows) twice there, and darken them */
+  .stage .before { clip-path: inset(0 calc(100% - var(--split)) 0 0); }
+  .stage .after { clip-path: inset(0 0 0 var(--split)); }
+  .stage.busy .before { clip-path: none; }
+  .divider { position: absolute; top: -12px; bottom: -12px; left: var(--split); width: 2px; margin-left: -1px; background: var(--sun); box-shadow: 0 0 0 1px #35201730; }
+  .knob { position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 0; background: var(--sun); box-shadow: 0 0 0 1px #3520173d, 0 6px 18px #35201733; display: grid; place-items: center; cursor: ew-resize; color: var(--walnut); transition: transform .15s; }
+  .knob:hover { transform: scale(1.06); }
+  .knob svg { width: 22px; height: 22px; }
+  .tag { position: absolute; top: 14px; z-index: 2; display: flex; gap: 8px; align-items: baseline; padding: 7px 12px; border-radius: 12px; background: #ffffffeb; box-shadow: 0 0 0 1px var(--line), 0 2px 6px #29282412; pointer-events: none; font-size: 13.5px; }
+  .tag.left { left: 14px; } .tag.right { right: 14px; }
+  .tag b { font-weight: 600; color: var(--ink); }
+  .tag .save { background: var(--sun); color: var(--walnut); font-weight: 600; padding: 1px 7px; border-radius: 999px; font-size: 12px; }
+  .scan { position: absolute; inset: 0; pointer-events: none; display: none; overflow: hidden; }
+  .stage.busy .scan { display: block; }
+  .scan::after { content: ""; position: absolute; top: 0; bottom: 0; width: 22%; left: -22%; background: linear-gradient(90deg, transparent, #ffcf3366 60%, var(--sun) 61%, transparent 62%); animation: scan 1.6s cubic-bezier(.5, 0, .5, 1) infinite; }
+  @keyframes scan { to { left: 100%; } }
+  .stage.busy .divider, .stage.busy .after { display: none; }
+  .foot { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 14px 12px 20px; background: #ffffffe0; backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
+  .palette { display: flex; height: 22px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 0 1px #0000000f; min-width: 0; background: var(--checker) 0 0 / 8px 8px; }
+  .palette i { flex: 1 1 0; min-width: 0; }
+  .palette.wait { background: repeating-linear-gradient(90deg, var(--paper-2) 0 10px, var(--line) 10px 12px); background-size: 48px 100%; animation: drift 1s linear infinite; }
+  @keyframes drift { to { background-position: 48px 0; } }
+  .foot .label { color: var(--muted); white-space: nowrap; font-size: 14px; }
+  .foot .label b { color: var(--ink); font-weight: 600; }
+
+  /* tray */
+  .tray { display: none; margin-top: 14px; gap: 14px; align-items: center; }
+  .tray.on { display: flex; }
+  .cards { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; flex: 1; scrollbar-width: thin; }
+  .card { flex: 0 0 auto; width: 236px; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 12px 10px 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--white); cursor: pointer; text-align: left; transition: border-color .15s, box-shadow .15s; }
+  .card:hover { border-color: var(--line-2); }
+  .card[aria-current="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  .card .thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: var(--checker) 0 0 / 10px 10px; }
+  .card .t { font-weight: 500; font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .s { color: var(--muted); font-size: 12.5px; }
+  .card .s b { color: var(--walnut); background: var(--sun-soft); font-weight: 600; padding: 0 6px; border-radius: 999px; }
+  .card .s.err { color: #b4351d; }
+  .card .meter { height: 3px; border-radius: 3px; background: var(--paper-2); margin-top: 6px; overflow: hidden; position: relative; }
+  .card .meter::after { content: ""; position: absolute; inset: 0; width: 40%; background: var(--sun); animation: meter 1.2s ease-in-out infinite alternate; }
+  @keyframes meter { from { transform: translateX(-60%); } to { transform: translateX(210%); } }
+  .tally { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+  .tally .sum { text-align: right; color: var(--muted); font-size: 13px; line-height: 1.35; }
+  .tally .sum b { display: block; font: 600 22px/1.15 var(--display); letter-spacing: -.03em; color: var(--ink); }
+
+  .note { color: var(--faint); font-size: 12.5px; margin-top: 10px; min-height: 1em; }
+
+  /* ---------- sections ---------- */
+  section.block { padding: 112px 0 0; }
+  .kicker { display: inline-flex; align-items: center; gap: 8px; color: var(--walnut); font-weight: 600; font-size: 14px; margin-bottom: 18px; }
+  .kicker i { width: 10px; height: 10px; background: var(--sun); display: inline-block; }
+  h2.big { font: 600 clamp(36px, 4.8vw, 58px)/1.02 var(--display); letter-spacing: -.045em; margin: 0 0 18px; color: var(--ink); max-width: 15ch; }
+  .intro { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0; }
+
+  /* research */
+  .lab { margin-top: 40px; border-radius: var(--radius); background: var(--paper-2); padding: 36px; display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 40px; }
+  .switch { display: inline-flex; border-radius: 999px; background: var(--white); padding: 4px; border: 1px solid var(--line); margin-bottom: 28px; }
+  .switch button { border: 0; background: none; padding: 7px 14px; border-radius: 999px; font-size: 13.5px; cursor: pointer; color: var(--muted); }
+  .switch button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
+  .stat { padding: 18px 0; border-top: 1px solid var(--line-2); }
+  .stat:first-child { border-top: 0; padding-top: 0; }
+  .stat b { display: block; font: 600 54px/1 var(--display); letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat b em { font-style: normal; color: var(--faint); font-size: .5em; letter-spacing: -.02em; }
+  .stat span { display: block; margin-top: 8px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
+  .chart { background: var(--white); border-radius: 20px; padding: 26px 26px 18px; border: 1px solid var(--line); min-width: 0; }
+  .chart h3 { font: 600 19px/1.3 var(--display); letter-spacing: -.02em; margin: 0 0 4px; color: var(--ink); }
+  .chart .sub { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+  .rows { display: grid; grid-template-columns: 104px minmax(0, 1fr) 60px; row-gap: 9px; column-gap: 14px; align-items: center; }
+  .rows .hd { color: var(--faint); font-size: 12px; padding-bottom: 4px; }
+  .rows .tool { font-size: 14.5px; color: var(--text); }
+  .rows .tool.us { font-weight: 600; color: var(--ink); }
+  .track { position: relative; height: 26px; }
+  .track .zero { position: absolute; top: -6px; bottom: -6px; width: 1.5px; background: var(--ink); left: var(--zero); }
+  .track .fill { position: absolute; top: 4px; height: 18px; border-radius: 4px; background: #dcd5c5; transition: width .9s cubic-bezier(.2, .8, .2, 1), left .9s cubic-bezier(.2, .8, .2, 1); }
+  .track .fill.us { background: var(--sun); box-shadow: inset 0 0 0 1px #e8b10a80; }
+  .track .val { position: absolute; top: 4px; font: 500 12px/18px var(--mono); color: var(--muted); white-space: nowrap; transition: left .9s cubic-bezier(.2, .8, .2, 1); }
+  .track .val.us { color: var(--ink); }
+  .rows .reach { font: 500 12.5px var(--mono); color: var(--muted); text-align: right; }
+  .rows .reach.us { color: var(--ink); }
+  .axis { display: grid; grid-template-columns: 104px minmax(0, 1fr) 60px; column-gap: 14px; margin-top: 10px; color: var(--faint); font: 500 11.5px var(--mono); }
+  .axis .labels { position: relative; height: 16px; }
+  .axis .labels span { position: absolute; transform: translateX(-50%); }
+  .method { margin-top: 26px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 28px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+  .method b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 4px; font-size: 14.5px; }
+
+  /* how */
+  .steps { margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .step { border: 1px solid var(--line); border-radius: 22px; padding: 26px; background: var(--white); display: flex; flex-direction: column; gap: 14px; }
+  .step .n { font: 500 12px var(--mono); color: var(--faint); }
+  .step h3 { font: 600 22px/1.2 var(--display); letter-spacing: -.03em; margin: 0; color: var(--ink); }
+  .step p { margin: 0; color: var(--muted); font-size: 15px; }
+  .viz { height: 108px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); position: relative; overflow: hidden; display: grid; place-items: center; padding: 14px 18px; }
+  .sizes { display: grid; gap: 6px; width: 100%; }
+  .sizes div { display: flex; height: 12px; border-radius: 3px; overflow: hidden; opacity: .55; }
+  .sizes div i { flex: 1; }
+  .sizes .hit { opacity: 1; outline: 2px solid var(--ink); outline-offset: 2px; }
+  .gauge { width: 100%; position: relative; padding-top: 22px; }
+  .gauge .flag { position: absolute; top: 0; right: 10%; font: 500 11.5px var(--mono); color: var(--walnut); background: var(--sun-soft); padding: 0 6px; border-radius: 4px; }
+  .gauge .line { position: relative; height: 10px; border-radius: 10px; background: linear-gradient(90deg, #ece6d8, #d9d2c2 62%, var(--sun)); }
+  .gauge .tick { position: absolute; top: -8px; bottom: -8px; width: 2px; background: var(--ink); left: 90%; }
+  .gauge .row { position: relative; height: 16px; margin-top: 12px; font: 500 11.5px var(--mono); color: var(--muted); }
+  .gauge .row span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .gauge .row span:first-child { transform: none; }
+  .device { width: 156px; height: 76px; border-radius: 10px; border: 1.5px solid var(--ink); position: relative; background: var(--white); display: grid; place-items: center; }
+  .device::before { content: ""; position: absolute; top: 9px; left: 10px; width: 26px; height: 5px; border-radius: 4px; background: var(--line-2); }
+  .device .cores { display: grid; grid-template-columns: repeat(8, 9px); gap: 3px; margin-top: 10px; }
+  .device .cores i { height: 9px; border-radius: 2px; background: var(--sun); animation: core 1.4s infinite; }
+  @keyframes core { 50% { opacity: .3; } }
+
+  /* cli */
+  .cli { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 48px; align-items: center; }
+  .cli p { color: var(--muted); font-size: 16.5px; margin: 0 0 14px; max-width: 460px; }
+  .cli p .mono { font-size: 13.5px; color: var(--ink); background: var(--paper-2); padding: 2px 6px; border-radius: 6px; }
+  .term { background: var(--ink); color: #ece8dd; border-radius: 22px; padding: 22px 24px; font: 400 13.5px/1.75 var(--mono); overflow-x: auto; white-space: pre; box-shadow: 0 30px 60px -30px #29282466; }
+  .term .dots { display: flex; gap: 7px; margin-bottom: 14px; }
+  .term .dots i { width: 11px; height: 11px; border-radius: 50%; background: #4a4842; }
+  .term .p { color: var(--sun); }
+  .term .c { color: #8f8a7d; }
+  .term .k { color: #fff; }
+
+  /* closing */
+  .closing { margin: 112px 0 0; border-radius: var(--radius); background: var(--ink); color: var(--white); padding: 56px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; position: relative; overflow: hidden; }
+  .closing h2 { font: 600 clamp(32px, 4vw, 48px)/1.04 var(--display); letter-spacing: -.045em; margin: 0; max-width: 16ch; position: relative; }
+  .closing p { color: #bdb7aa; margin: 12px 0 0; position: relative; }
+  .closing .px::after { background: repeating-linear-gradient(90deg, var(--sun) 0 .34em, #e8b10a .34em .68em); height: .12em; bottom: -.08em; z-index: 0; }
+  .closing .pixels { position: absolute; right: -16px; top: -16px; display: grid; grid-template-columns: repeat(6, 22px); gap: 6px; opacity: .13; transform: rotate(-8deg); }
+  .closing .pixels i { height: 22px; border-radius: 4px; background: var(--sun); }
+  .closing .pixels i:nth-child(5n) { opacity: .3; } .closing .pixels i:nth-child(7n) { opacity: 0; }
+
+  /* footer */
+  footer { margin-top: 96px; border-top: 1px solid var(--line); padding: 56px 0 40px; color: var(--muted); font-size: 14.5px; }
+  footer .cols { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
+  footer .about img { height: 26px; width: auto; margin-bottom: 16px; }
+  footer .about p { margin: 0 0 10px; max-width: 300px; }
+  footer h4 { font: 600 14px var(--body); color: var(--ink); margin: 0 0 12px; }
+  footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  footer a { text-decoration: none; }
+  footer a:hover { color: var(--ink); }
+  footer .legal { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 13px; color: var(--faint); }
+
+  /* load-in */
+  .rise { animation: rise .8s cubic-bezier(.2, .8, .2, 1) both; }
+  .d1 { animation-delay: .06s; } .d2 { animation-delay: .14s; } .d3 { animation-delay: .22s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  .reveal { opacity: 1; transform: none; transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .2, 1); }
+  .reveal.pending { opacity: 0; transform: translateY(18px); }
+
+  @media (max-width: 900px) {
+    .lab { grid-template-columns: 1fr; padding: 22px; gap: 24px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .stat, .stat:first-child { border-top: 0; padding: 0; }
+    .stat b { font-size: 36px; }
+    .method, .steps { grid-template-columns: 1fr; }
+    .cli { grid-template-columns: 1fr; gap: 28px; }
+    footer .cols { grid-template-columns: 1fr 1fr; }
+    .closing { grid-template-columns: 1fr; padding: 36px 28px; }
+  }
+  @media (max-width: 640px) {
+    :root { --gutter: 16px; --radius: 22px; }
+    .top nav { margin-left: 8px; }
+    .top nav a:not(.keep) { display: none; }
+    .top .end { display: none; }
+    .hero { padding: 36px 0 28px; gap: 14px; }
+    .lede { font-size: 16px; }
+    .bar { padding-left: 14px; }
+    .bar .name { max-width: 20ch; }
+    .bar .dim { display: none; }
+    .stagebox { height: 52vh; }
+    .center { padding: 60px 16px 16px; }
+    .foot { grid-template-columns: auto minmax(0, 1fr); padding-left: 14px; }
+    .foot .dl { grid-column: 1 / -1; }
+    .foot .dl .pill { width: 100%; }
+    .tag { font-size: 12px; padding: 5px 9px; top: 10px; }
+    .tag.left { left: 10px; } .tag.right { right: 10px; }
+    .tray.on { flex-direction: column; align-items: stretch; }
+    .tally { justify-content: space-between; }
+    .tally .sum { text-align: left; }
+    .stats { grid-template-columns: 1fr; gap: 18px; }
+    .stat b { font-size: 42px; }
+    .rows, .axis { grid-template-columns: 80px minmax(0, 1fr) 48px; column-gap: 10px; }
+    .rows .tool { font-size: 13px; }
+    .chart { padding: 18px 14px 14px; }
+    section.block { padding-top: 84px; }
+    footer .cols { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal.pending { opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="brand" href="https://heydeer.ai/"><img src="brand/heydeer-logo.svg" alt="HeyDeer" width="111" height="26"></a>
+    <a class="brand" href="#"><span class="slash" aria-hidden="true"></span><span class="product">pngdeer</span></a>
+    <nav>
+      <a class="keep" href="#research">Research</a>
+      <a href="#how">How it works</a>
+      <a href="#cli">Command line</a>
+    </nav>
+    <div class="end">
+      <a class="gh" href="https://github.com/heydeer/pngdeer" aria-label="Star heydeer/pngdeer on GitHub">
+        <span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>Star</span><span class="count" id="gh-stars" hidden></span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1 class="rise d1">Smaller PNGs. <span class="px">Same picture.</span></h1>
+    <p class="lede rise d2"><a href="#research"><strong>8–12% smaller than even TinyPNG</strong></a> at the same quality. Free and open source.</p>
+  </section>
+
+  <div class="table rise d3" id="drop">
+    <div class="marks" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="empty">
+      <h2>Drop PNGs here</h2>
+      <p>Nothing is uploaded. Images are compressed locally.</p>
+      <div class="actions">
+        <button class="pill sun" type="button" data-pick>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
+          Choose files
+        </button>
+        <button class="pill ghost" id="samples" type="button">Try sample images</button>
+      </div>
+    </div>
+    <div class="viewer" id="viewer">
+      <div class="bar">
+        <span class="name" id="v-name"></span><span class="dim mono" id="v-dim"></span>
+        <span class="spacer"></span>
+        <div class="seg" role="group" aria-label="Zoom" id="zoom">
+          <button type="button" data-zoom="fit" aria-pressed="true">Fit</button><button type="button" data-zoom="1" aria-pressed="false">1:1</button><button type="button" data-zoom="2" aria-pressed="false">2×</button>
+        </div>
+        <div class="seg" role="group" aria-label="Background" id="bg">
+          <button type="button" data-bg="" aria-pressed="true">Grid</button><button type="button" data-bg="white" aria-pressed="false">White</button><button type="button" data-bg="ink" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+      <div class="stagewrap">
+        <div class="tag left"><b>Original</b><span class="mono" id="t-before"></span></div>
+        <div class="tag right"><b>pngdeer</b><span class="mono" id="t-after"></span><span class="save" id="t-save"></span></div>
+        <div class="stagebox" id="stagebox">
+          <div class="center">
+            <div class="stage" id="stage" style="--split: 50%">
+              <img id="img-before" class="before" alt="Original">
+              <img id="img-after" class="after" alt="Compressed by pngdeer">
+              <div class="divider"><button class="knob" id="knob" type="button" role="slider" aria-label="Compare original and compressed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-5 6 5 6M15 6l5 6-5 6"/></svg>
+              </button></div>
+              <div class="scan"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="label" id="p-label"></span>
+        <div class="palette" id="palette" title="The palette pngdeer chose for this image, lightest first"></div>
+        <div class="dl"><button class="pill sun small" id="dl-one" type="button">Download</button></div>
+      </div>
+    </div>
+    <div class="release" aria-hidden="true">Release to compress</div>
+    <input type="file" id="file" accept="image/png" multiple hidden>
+  </div>
+
+  <div class="tray" id="tray">
+    <div class="cards" id="cards"></div>
+    <div class="tally">
+      <div class="sum" id="sum"></div>
+      <button class="pill ghost small" type="button" data-pick>Add files</button>
+      <button class="pill dark small" id="all" type="button" disabled>Download all</button>
+    </div>
+  </div>
+  <div class="note" id="note"></div>
+
+  <section class="block" id="research">
+    <div class="reveal">
+      <div class="kicker"><i></i>Research</div>
+      <h2 class="big">The best open-source PNG compressor we've measured.</h2>
+      <p class="intro">We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
+    </div>
+    <div class="lab reveal">
+      <div>
+        <div class="switch" role="group" aria-label="Image set">
+          <button type="button" data-set="holdout" aria-pressed="true">Held-out · 71</button><button type="button" data-set="main" aria-pressed="false">Tuning set · 109</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="r-smaller"></b><span>smaller than TinyPNG at the same quality (median image)</span></div>
+          <div class="stat"><b id="r-points"></b><span>SSIMULACRA2 points above TinyPNG at TinyPNG's file size</span></div>
+          <div class="stat"><b id="r-reach"></b><span>images where pngdeer reaches TinyPNG's quality at all</span></div>
+        </div>
+      </div>
+      <div class="chart">
+        <h3>Quality at TinyPNG's file size</h3>
+        <p class="sub">Median SSIMULACRA2 points above or below TinyPNG when each tool's output is as big as TinyPNG's, and how many images each can bring up to TinyPNG's quality.</p>
+        <div class="rows" id="rows"></div>
+        <div class="axis"><span></span><div class="labels" id="axis"></div><span></span></div>
+      </div>
+    </div>
+    <div class="method reveal">
+      <div><b>Held out</b>The parameters were tuned on 109 images. The other 71 were collected afterwards and never used for tuning; both sets agree.</div>
+      <div><b>Generous to the others</b>Each open-source tool gets its best of ten settings per image, picked after the fact. pngdeer's results are searched at compression time, as you get them here.</div>
+      <div><b>A second opinion</b>Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026.</div>
+    </div>
+  </section>
+
+  <section class="block" id="how">
+    <div class="reveal">
+      <div class="kicker"><i></i>How it works</div>
+      <h2 class="big">Every palette size, judged like an eye would.</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="viz" aria-hidden="true"><div class="sizes" id="sizes"></div></div>
+        <div class="n">01</div>
+        <h3>Searches the palette</h3>
+        <p>pngdeer tries palette sizes from 2 to 256 colors, with and without dithering, and keeps the smallest file that still reaches the quality.</p>
+      </div>
+      <div class="step reveal">
+        <div class="viz" aria-hidden="true"><div class="gauge"><div class="flag">indistinguishable</div><div class="line"><div class="tick"></div></div><div class="row"><span style="left:0">0</span><span style="left:50%">50</span><span style="left:90%">90</span></div></div></div>
+        <div class="n">02</div>
+        <h3>Scores what you'd see</h3>
+        <p>Quality is SSIMULACRA2, measured in-process. Colors are matched in Oklab, and transparent pixels are judged over light and dark backgrounds.</p>
+      </div>
+      <div class="step reveal">
+        <div class="viz" aria-hidden="true"><div class="device"><div class="cores" id="cores"></div></div></div>
+        <div class="n">03</div>
+        <h3>Stays on your device</h3>
+        <p>The compressor is WebAssembly, using every core. Your images never leave the browser, and the command line writes the same bytes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="cli">
+    <div class="cli">
+      <div class="reveal">
+        <div class="kicker"><i></i>Command line</div>
+        <h2 class="big">Same bytes in your build.</h2>
+        <p>The browser and the command line run the same Rust code, down to the math library, so a file compressed here and in your pipeline comes out identical.</p>
+        <p>Pass <span class="mono">--target 85</span> for a fixed quality instead of the automatic one.</p>
+      </div>
+      <div class="term reveal" role="img" aria-label="Terminal: installing pngdeer with Homebrew and compressing a photo"><div class="dots"><i></i><i></i><i></i></div><span class="p">$</span> <span class="k">brew install heydeer/tap/pngdeer</span>
+<span class="p">$</span> <span class="k">pngdeer kodim01.png -o kodim01.min.png</span>
+<span class="c">{"target": 86.26, "colors": 212, "variant": "d50",
+ "score": 87.271, …, "outcome": "hit", "bytes": 254373}</span></div>
+    </div>
+  </section>
+
+  <section class="closing reveal">
+    <div class="pixels" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div>
+      <h2>Try it on your own <span class="px">pictures.</span></h2>
+      <p>Free, open source, and nothing to install.</p>
+    </div>
+    <a class="pill sun" href="#drop">Compress a PNG</a>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div class="about">
+        <img src="brand/heydeer-logo.svg" alt="HeyDeer" width="111" height="26">
+        <p>pngdeer is an open-source project by HeyDeer.</p>
+        <a href="mailto:hey@heydeer.ai">hey@heydeer.ai</a>
+      </div>
+      <div>
+        <h4>pngdeer</h4>
+        <ul>
+          <li><a href="#drop">Compress</a></li>
+          <li><a href="#research">Research</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#cli">Command line</a></li>
+          <li><a href="https://github.com/heydeer/pngdeer">Source code</a></li>
+          <li><a href="THIRD_PARTY_LICENSES.txt">Third-party licenses</a></li>
+          <li><a href="samples/SOURCES.md">Sample image credits</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="https://heydeer.ai/">HeyDeer</a></li>
+          <li><a href="https://heydeer.ai/about">About</a></li>
+          <li><a href="https://heydeer.ai/careers">Careers</a></li>
+          <li><a href="https://heydeer.ai/brand">Brand</a></li>
+          <li><a href="https://heydeer.ai/contact">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="https://heydeer.ai/terms">Terms of Service</a></li>
+          <li><a href="https://heydeer.ai/privacy">Privacy Policy</a></li>
+          <li><a href="https://heydeer.ai/security">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <span>© 2026 ETOILEE PTE. LTD.</span>
+      <span>pngdeer is licensed under MIT.</span>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const SAMPLES = ["sun-poster", "kodim01", "pngdeer@2x", "cup-of-tea", "openmoji-1f431"];
+const CORES = navigator.hardwareConcurrency || 4;
+const files = []; // {id, name, bytes, width, height, url, status, out, outUrl, report, ms, palette}
+let nextId = 0, active = null;
+
+const size = (n) => (n < 1024 * 1024 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : (n / 1048576).toFixed(2) + " MB");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const saving = (f) => Math.round(100 * (1 - f.out.byteLength / f.bytes.byteLength));
+
+/* ---------- worker pool ---------- */
+// Threaded build (cross-origin isolated page): one worker, whose thread pool uses every core (a
+// second threaded instance on a page hangs). It must report ready, after compressing a test image,
+// within READY_MS (see worker.js for why it may not); otherwise, and on pages that aren't isolated,
+// single-threaded workers, one file each. READY_MS includes loading the build and starting a worker
+// per core, a few round trips each: 8 s over a slow link, where a hang never reports at all.
+const READY_MS = 15000;
+let threaded = self.crossOriginIsolated === true;
+let pool = [];
+let poolError = null;
+const queue = [];
+const pending = new Map();
+function startPool() {
+  const n = threaded ? 1 : Math.max(1, Math.min(4, CORES - 1));
+  pool = Array.from({ length: n }, () => {
+    const slot = { worker: new Worker(threaded ? "worker.js" : "worker.js?single", { type: "module" }), busy: true };
+    slot.worker.onmessage = ({ data }) => {
+      if (data.type === "ready") {
+        clearTimeout(slot.timer);
+        slot.busy = false;
+        return pump();
+      }
+      slot.busy = false;
+      const resolve = pending.get(data.id);
+      pending.delete(data.id);
+      resolve(data);
+      pump();
+    };
+    if (threaded) {
+      slot.timer = setTimeout(() => {
+        slot.worker.terminate();
+        threaded = false;
+        startPool();
+        renderNote();
+      }, READY_MS);
+    }
+    return slot;
+  });
+}
+function pump() {
+  for (const slot of pool) {
+    if (slot.busy || !queue.length) continue;
+    const job = queue.shift();
+    slot.busy = true;
+    pending.set(job.key, job.resolve);
+    job.started();
+    slot.worker.postMessage({ id: job.key, bytes: job.bytes });
+  }
+}
+const run = (key, bytes, started) => new Promise((resolve) => {
+  if (poolError) return resolve({ error: poolError });
+  queue.push({ key, bytes: bytes.slice(0), resolve, started });
+  pump();
+});
+
+/* ---------- files ---------- */
+async function add(name, bytes) {
+  const blob = new Blob([bytes], { type: "image/png" });
+  const url = URL.createObjectURL(blob);
+  const dims = await createImageBitmap(blob).then((b) => [b.width, b.height]).catch(() => [0, 0]);
+  const f = { id: nextId++, name, bytes, width: dims[0], height: dims[1], url, status: "queued" };
+  files.push(f);
+  if (!active || active.status === "done" || active.status === "error") show(f); else render();
+  compress(f);
+}
+
+async function compress(f) {
+  const data = await run(String(f.id), f.bytes, () => {
+    f.status = "busy";
+    render();
+  });
+  if (data.error) {
+    f.status = "error";
+    f.error = data.error;
+  } else {
+    f.status = "done";
+    f.out = data.png;
+    f.outUrl = URL.createObjectURL(new Blob([data.png], { type: "image/png" }));
+    f.report = data.report;
+    f.ms = data.ms;
+    f.palette = paletteOf(data.png);
+  }
+  if (f === active) show(f, true); else render();
+}
+
+/** The PLTE (and tRNS) entries of a palette PNG, lightest first; [] for any other PNG. */
+function paletteOf(png) {
+  const v = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  let pos = 8, rgb = null, alpha = null;
+  while (pos + 8 <= png.length) {
+    const len = v.getUint32(pos), type = String.fromCharCode(...png.subarray(pos + 4, pos + 8));
+    if (type === "PLTE") rgb = png.subarray(pos + 8, pos + 8 + len);
+    if (type === "tRNS") alpha = png.subarray(pos + 8, pos + 8 + len);
+    pos += 12 + len;
+  }
+  if (!rgb) return [];
+  const out = [];
+  for (let i = 0; i < rgb.length / 3; i++) {
+    const [r, g, b] = rgb.subarray(i * 3, i * 3 + 3), a = alpha && i < alpha.length ? alpha[i] : 255;
+    if (a > 0) out.push({ r, g, b, a, l: 0.2126 * r + 0.7152 * g + 0.0722 * b });
+  }
+  return out.sort((x, y) => y.l - x.l);
+}
+
+/* ---------- viewer ---------- */
+const table = $("#drop"), stage = $("#stage"), box = $("#stagebox");
+let zoom = "fit", split = 50, dragging = false;
+
+function show(f, intro = false) {
+  active = f;
+  table.classList.add("loaded");
+  $("#img-before").src = f.url;
+  $("#img-after").src = f.outUrl || f.url;
+  $("#v-name").textContent = f.name;
+  $("#v-dim").textContent = f.width ? `${f.width}×${f.height}` : "";
+  setSplit(50);
+  layout();
+  render();
+  if (intro && f.status === "done") sweep();
+}
+
+function layout() {
+  const f = active;
+  if (!f || !f.width) return;
+  const dpr = window.devicePixelRatio || 1;
+  const narrow = innerWidth <= 640, pad = narrow ? 32 : 56;
+  if (narrow) {
+    // on a phone the box takes the image's shape (plus room for the size labels), up to 70% of the screen
+    const w = Math.min((box.clientWidth - pad) / f.width, 4 / dpr) * f.width;
+    box.style.height = Math.round(Math.min(Math.max((w * f.height) / f.width + pad + 44, 240), innerHeight * 0.7)) + "px";
+  } else {
+    box.style.height = "";
+  }
+  const fit = Math.min((box.clientWidth - pad) / f.width, (box.clientHeight - pad - (narrow ? 44 : 0)) / f.height, 4 / dpr);
+  // Enlarged pixels are drawn square (nearest neighbour) only at whole multiples of the screen's
+  // pixels: at 1.3× some rows double and others don't, so text looks shifted and reshaped from one
+  // side of the divider to the other. Fit snaps down to a whole multiple from 2× up, and scales
+  // smoothly below that.
+  const scale = zoom !== "fit" ? Number(zoom) / dpr : fit * dpr >= 2 ? Math.floor(fit * dpr) / dpr : fit;
+  stage.style.width = Math.max(1, Math.round(f.width * scale)) + "px";
+  stage.style.height = Math.max(1, Math.round(f.height * scale)) + "px";
+  const k = scale * dpr;
+  stage.classList.toggle("pixelated", k > 1.99 && Math.abs(k - Math.round(k)) < 0.01);
+}
+
+function setSplit(pct) {
+  split = Math.min(100, Math.max(0, pct));
+  stage.style.setProperty("--split", split + "%");
+  $("#knob").setAttribute("aria-valuenow", Math.round(split));
+}
+
+/** A short look left and right when a result arrives, so the handle explains itself. */
+function sweep() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const keys = [[0, 50], [420, 30], [900, 66], [1300, 50]];
+  const t0 = performance.now();
+  const step = (t) => {
+    if (dragging) return;
+    // a frame's timestamp can be a little earlier than t0
+    const e = Math.max(0, t - t0), i = keys.findIndex(([k]) => k > e);
+    if (i < 0) return setSplit(50);
+    const [ta, va] = keys[i - 1], [tb, vb] = keys[i];
+    const u = (e - ta) / (tb - ta);
+    setSplit(va + (vb - va) * u * u * (3 - 2 * u));
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+stage.addEventListener("pointerdown", (e) => {
+  if (active?.status !== "done") return;
+  dragging = true;
+  stage.setPointerCapture(e.pointerId);
+  move(e);
+});
+stage.addEventListener("pointermove", (e) => dragging && move(e));
+stage.addEventListener("pointerup", () => (dragging = false));
+stage.addEventListener("pointercancel", () => (dragging = false));
+function move(e) {
+  const r = stage.getBoundingClientRect();
+  setSplit(((e.clientX - r.left) / r.width) * 100);
+}
+$("#knob").addEventListener("keydown", (e) => {
+  const d = { ArrowLeft: -4, ArrowRight: 4, Home: -100, End: 100 }[e.key];
+  if (d !== undefined) { e.preventDefault(); setSplit(split + d); }
+});
+$("#zoom").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  zoom = b.dataset.zoom;
+  for (const x of $("#zoom").children) x.setAttribute("aria-pressed", x === b);
+  layout();
+};
+$("#bg").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  box.className = "stagebox " + b.dataset.bg;
+  for (const x of $("#bg").children) x.setAttribute("aria-pressed", x === b);
+};
+addEventListener("resize", layout);
+
+/* ---------- rendering ---------- */
+function outcome(f) {
+  const r = f.report;
+  if (r.outcome === "exact" || r.outcome === "lossless") return "Lossless";
+  if (r.outcome === "original") return "Already optimal";
+  return `${r.colors} colors`;
+}
+
+function render() {
+  const f = active;
+  if (f) {
+    const done = f.status === "done";
+    stage.classList.toggle("busy", !done);
+    stage.classList.toggle("ready", done);
+    $("#t-before").textContent = size(f.bytes.byteLength);
+    $("#t-after").textContent = done ? size(f.out.byteLength) : f.status === "error" ? "failed" : "working…";
+    $("#t-save").textContent = done ? `−${saving(f)}%` : "";
+    $("#t-save").hidden = !done;
+    const pal = $("#palette");
+    pal.classList.toggle("wait", !done);
+    pal.innerHTML = done ? f.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
+    $("#p-label").innerHTML = done
+      ? `<b>${outcome(f)}</b> · SSIMULACRA2 ${f.report.score.toFixed(1)}`
+      : f.status === "error" ? `Couldn't compress: ${esc(f.error)}` : f.status === "busy" ? "Finding the smallest palette…" : "Waiting for the files before it…";
+    $("#dl-one").disabled = !done;
+  }
+  const done = files.filter((x) => x.status === "done");
+  $("#tray").classList.toggle("on", files.length > 0);
+  $("#cards").innerHTML = files.map((x) => {
+    const ok = x.status === "done";
+    const sub = ok ? `${size(x.bytes.byteLength)} → ${size(x.out.byteLength)} <b>−${saving(x)}%</b>`
+      : x.status === "error" ? "Couldn't compress" : x.status === "busy" ? "Compressing…" : "Waiting";
+    return `<button class="card" type="button" data-id="${x.id}" aria-current="${x === active}">
+      <img class="thumb" src="${x.outUrl || x.url}" alt="">
+      <span><div class="t" title="${esc(x.name)}">${esc(x.name)}</div><div class="s ${x.status === "error" ? "err" : ""}">${sub}</div>${ok || x.status === "error" ? "" : '<div class="meter"></div>'}</span>
+    </button>`;
+  }).join("");
+  const before = done.reduce((s, x) => s + x.bytes.byteLength, 0), after = done.reduce((s, x) => s + x.out.byteLength, 0);
+  $("#sum").innerHTML = done.length
+    ? `<b>−${Math.round(100 * (1 - after / before))}%</b>${size(before - after)} saved · ${done.length} of ${files.length} done`
+    : `<b>Working…</b>${files.length} file${files.length > 1 ? "s" : ""}`;
+  $("#all").disabled = !done.length;
+  renderNote();
+  window.__pngdeer = files.map((x) => ({ name: x.name, before: x.bytes.byteLength, after: x.out?.byteLength, ms: x.ms, report: x.report, status: x.status, error: x.error }));
+}
+
+function renderNote() {
+  $("#note").textContent = files.length
+    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG would give it, at most 90.`
+    : "";
+}
+
+function download(f) {
+  const a = document.createElement("a");
+  a.href = f.outUrl;
+  a.download = f.name.replace(/\.png$/i, "") + ".min.png";
+  a.click();
+}
+
+/* ---------- input ---------- */
+let depth = 0;
+addEventListener("dragenter", (e) => { if (e.dataTransfer?.types?.includes("Files")) { depth++; table.classList.add("over"); } });
+addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; table.classList.remove("over"); } });
+addEventListener("dragover", (e) => e.preventDefault());
+addEventListener("drop", (e) => {
+  e.preventDefault();
+  depth = 0;
+  table.classList.remove("over");
+  if (e.dataTransfer?.files?.length) {
+    table.scrollIntoView({ behavior: "smooth", block: "center" });
+    readFiles(e.dataTransfer.files);
+  }
+});
+document.querySelectorAll("[data-pick]").forEach((b) => (b.onclick = () => $("#file").click()));
+$("#file").addEventListener("change", (e) => { readFiles(e.target.files); });
+async function readFiles(list) {
+  for (const file of [...list]) if (file.type === "image/png" || file.name.toLowerCase().endsWith(".png")) add(file.name, await file.arrayBuffer());
+  $("#file").value = "";
+}
+$("#samples").onclick = async () => {
+  $("#samples").disabled = true;
+  for (const s of SAMPLES) add(s + ".png", await fetch(`samples/${s}.png`).then((r) => r.arrayBuffer()));
+};
+$("#cards").onclick = (e) => {
+  const c = e.target.closest(".card");
+  if (c) show(files.find((x) => x.id == c.dataset.id));
+};
+$("#dl-one").onclick = () => active?.status === "done" && download(active);
+$("#all").onclick = () => files.filter((x) => x.status === "done").forEach((x, i) => setTimeout(() => download(x), i * 250));
+
+/* ---------- research ---------- */
+// bench/bench.py, October 2026: pngdeer's pd70–pd95 runs and every other tool's ten settings, each
+// pooled into one size–quality curve per image (experiments/palette-feedback/tool_rank.py).
+const RESEARCH = {
+  holdout: { n: 71, smaller: 12, points: 1.7, reach: 67, tools: [
+    ["pngdeer", 1.7, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
+    ["FFmpeg", -7.0, 16], ["quantette", -7.6, 18], ["ImageMagick", -11.3, 3], ["Pillow", -16.8, 4]] },
+  main: { n: 109, smaller: 8, points: 2.0, reach: 106, tools: [
+    ["pngdeer", 2.0, 106], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
+    ["quantette", -9.6, 21], ["NeuQuant", -9.8, 5], ["ImageMagick", -14.5, 8], ["Pillow", -19.5, 4]] },
+};
+const LO = -20;
+let HI = 4; // research() widens it where the best gain's label needs the room
+const at = (v) => ((v - LO) / (HI - LO)) * 100;
+const rows = $("#rows");
+rows.innerHTML = `<span class="hd">Tool</span><span class="hd">Points vs TinyPNG</span><span class="hd" style="text-align:right">Reaches</span>` +
+  RESEARCH.holdout.tools.map(([name]) => {
+    const us = name === "pngdeer" ? "us" : "";
+    return `<span class="tool ${us}" data-row="${name}">${name}</span>
+      <div class="track" data-row="${name}"><span class="zero"></span><span class="fill ${us}" style="width:0"></span><span class="val ${us}"></span></div>
+      <span class="reach ${us}" data-row="${name}"></span>`;
+  }).join("");
+
+function research(which) {
+  const d = RESEARCH[which];
+  const [best, gain] = d.tools.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const label = rows.querySelector(`.track[data-row="${best}"] .val`);
+  label.textContent = "+" + gain.toFixed(1);
+  const span = label.parentElement.clientWidth, narrow = span < 200;
+  HI = Math.max(4, LO + (gain - LO) / (0.985 - (label.offsetWidth + 2) / span));
+  $("#r-smaller").textContent = `−${d.smaller}%`;
+  $("#r-points").textContent = `+${d.points.toFixed(1)}`;
+  $("#r-reach").innerHTML = `${d.reach}<em>/${d.n}</em>`;
+  $("#axis").innerHTML = (narrow ? [-20, -10, 0] : [-20, -15, -10, -5, 0]).map((v) => `<span style="left:${at(v)}%">${v === 0 ? "TinyPNG" : v}</span>`).join("");
+  for (const [name, v, reach] of d.tools) {
+    const [tool, track, count] = rows.querySelectorAll(`[data-row="${name}"]`);
+    rows.append(tool, track, count); // this set's ranking
+    track.style.setProperty("--zero", at(0) + "%");
+    const fill = track.querySelector(".fill"), val = track.querySelector(".val");
+    const from = Math.min(at(0), at(v)), width = Math.abs(at(v) - at(0));
+    fill.style.left = from + "%";
+    fill.style.width = Math.max(width, 0.5) + "%";
+    val.textContent = (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(1);
+    // past zero to the right of a gain; to the left of a small loss, or inside a long one
+    const inside = v < 0 && (width / 100) * span > val.offsetWidth + 8;
+    val.style.left = v > 0 ? `${at(v) + 1.2}%` : inside ? `calc(${from}% + 6px)` : `${from - 1.2}%`;
+    val.style.transform = v > 0 || inside ? "none" : "translateX(-100%)";
+    count.textContent = `${reach}/${d.n}`;
+  }
+}
+let researchSet = "holdout";
+$(".switch").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  researchSet = b.dataset.set;
+  for (const x of $(".switch").children) x.setAttribute("aria-pressed", x === b);
+  research(researchSet);
+};
+
+/* ---------- decoration and reveals ---------- */
+// one row per palette size tried; the outlined one is where the search stops
+const tones = ["#2b2a26", "#5b4a3a", "#8c6b4a", "#b98d58", "#e2b96a", "#ffcf33", "#ffe08a", "#f4ecd8", "#cfd8d6", "#7e9b9a", "#4b6b72", "#2f4a57"];
+$("#sizes").innerHTML = [3, 5, 8, 12].map((n, k) => `<div class="${k === 2 ? "hit" : ""}">${Array.from({ length: n }, (_, i) => `<i style="background:${tones[Math.round((i * (tones.length - 1)) / (n - 1))]}"></i>`).join("")}</div>`).join("");
+$("#cores").innerHTML = Array.from({ length: 8 }, (_, i) => `<i style="animation-delay:${i * 0.17}s"></i>`).join("");
+
+let researchShown = false;
+if ("IntersectionObserver" in window) {
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.remove("pending");
+      io.unobserve(e.target);
+      if (e.target.classList.contains("lab") && !researchShown) { researchShown = true; setTimeout(() => research(researchSet), 150); }
+    }
+  }, { threshold: 0.15 });
+  document.querySelectorAll(".reveal").forEach((el) => {
+    io.observe(el);
+    el.classList.add("pending");
+  });
+} else {
+  researchShown = true;
+  research(researchSet);
+}
+$("#r-smaller").textContent = `−${RESEARCH.holdout.smaller}%`;
+$("#r-points").textContent = `+${RESEARCH.holdout.points.toFixed(1)}`;
+$("#r-reach").innerHTML = `${RESEARCH.holdout.reach}<em>/${RESEARCH.holdout.n}</em>`;
+addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 8), { passive: true });
+addEventListener("resize", () => researchShown && research(researchSet));
+
+// Under the <base> set in the head, "#id" links would resolve against it and reload the page.
+if (document.querySelector("base")) {
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    const id = a.getAttribute("href").slice(1);
+    (id ? document.getElementById(id) : document.body)?.scrollIntoView();
+    history.replaceState(null, "", location.pathname + location.search + (id ? `#${id}` : ""));
+  });
+}
+
+// The star count, once GitHub shows one (a private repository answers 404, and none stays hidden).
+fetch("https://api.github.com/repos/heydeer/pngdeer")
+  .then((r) => (r.ok ? r.json() : null))
+  .then((repo) => {
+    const n = repo?.stargazers_count;
+    if (!n) return;
+    $("#gh-stars").textContent = n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
+    $("#gh-stars").hidden = false;
+  })
+  .catch(() => {});
+
+// A file:// preview cannot start workers; keep the page and its research usable independently.
+try {
+  startPool();
+} catch (error) {
+  poolError = location.protocol === "file:"
+    ? "Compression needs a web server. Open pngdeer over HTTP or HTTPS."
+    : `Couldn't start compression: ${String(error)}`;
+}
+</script>
+</body>
+</html>

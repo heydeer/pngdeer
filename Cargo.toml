@@ -1,0 +1,46 @@
+[package]
+name = "pngdeer"
+version = "0.1.1"
+edition = "2021"
+license = "MIT"
+description = "Lossy PNG compression: per image, the smallest palette PNG that keeps a SSIMULACRA2 quality. The same code runs on the command line and in the browser (web/)."
+readme = "README.md"
+repository = "https://github.com/heydeer/pngdeer"
+# The library, the command line and their tests; not bench/'s images, web/ or the other tools.
+include = ["/src", "/tests", "/README.md", "/LICENSE"]
+
+[features]
+default = ["parallel", "oxipng"]
+# Threads for palettes, remapping, scoring and oxipng (web/'s threaded build turns it on too).
+# Results don't depend on the number of threads.
+parallel = ["dep:rayon", "fast-ssim2/rayon", "oxipng?/parallel"]
+# compress() recompresses its final file with oxipng -o 2.
+oxipng = ["dep:oxipng"]
+# For wasm32: oxipng's libdeflate built without libc (needs a clang that targets wasm32, see web/build.sh).
+freestanding = ["oxipng?/freestanding"]
+
+[dependencies]
+crc32fast = "1.5.3"
+fast-ssim2 = "0.9.0"
+# Math functions that give the same bits on every platform (std's come from the system libm on
+# native targets), so the browser build's output matches the command line's.
+libm = "0.2.16"
+miniz_oxide = "0.9.1"
+oxipng = { version = "10.2.1", default-features = false, optional = true }
+png = "0.18.1"
+rayon = { version = "1", optional = true }
+rgb = { version = "0.8.53", default-features = false }
+
+[workspace]
+members = [".", "web/wasm", "tools/quantlab"]
+default-members = ["."]
+resolver = "2"
+
+# fast-ssim2 with three speed patches (same scores), for every build: see vendor/fast-ssim2/PATCHES.md.
+[patch.crates-io]
+fast-ssim2 = { path = "vendor/fast-ssim2" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
