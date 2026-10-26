@@ -93,10 +93,16 @@ fn keeps_the_color_space() {
     assert_eq!(out.outcome, "hit");
     assert_eq!(codec::color_chunks(&out.png), gamma);
     assert_eq!(chunk_types(&out.png), [*b"IHDR", *b"gAMA", *b"PLTE", *b"tRNS", *b"IDAT", *b"IEND"]);
-    // tagged as sRGB, it looks the same untagged
-    let input = codec::with_chunks(&sample(true), &[png_chunk(b"sRGB", &[0]), gamma].concat());
-    let out = compress(&input, &settings).unwrap();
-    assert_eq!(chunk_types(&out.png), [*b"IHDR", *b"PLTE", *b"tRNS", *b"IDAT", *b"IEND"]);
+    // in sRGB, tagged so or with chunks that only restate it, it looks the same untagged
+    let srgb_primaries: Vec<u8> = [31270u32, 32900, 64000, 33000, 30000, 60000, 15000, 6000].iter().flat_map(|v| v.to_be_bytes()).collect();
+    let chrm = png_chunk(b"cHRM", &srgb_primaries);
+    for chunks in [[png_chunk(b"sRGB", &[0]), gamma.clone()].concat(), [png_chunk(b"gAMA", &45_455u32.to_be_bytes()), chrm.clone()].concat(), chrm.clone()] {
+        let out = compress(&codec::with_chunks(&sample(true), &chunks), &settings).unwrap();
+        assert_eq!(chunk_types(&out.png), [*b"IHDR", *b"PLTE", *b"tRNS", *b"IDAT", *b"IEND"]);
+    }
+    // sRGB's primaries with another gamma are not sRGB
+    let out = compress(&codec::with_chunks(&sample(true), &[gamma.clone(), chrm].concat()), &settings).unwrap();
+    assert_eq!(chunk_types(&out.png), [*b"IHDR", *b"gAMA", *b"cHRM", *b"PLTE", *b"tRNS", *b"IDAT", *b"IEND"]);
 }
 
 #[test]

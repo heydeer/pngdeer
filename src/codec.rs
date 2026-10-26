@@ -97,11 +97,12 @@ const COLOR_CHUNKS: [[u8; 4]; 7] = [*b"cICP", *b"iCCP", *b"sRGB", *b"gAMA", *b"c
 
 /// The color chunks of a PNG file, verbatim (length, type, data and CRC), for its compressed
 /// versions: without them a viewer shows the pixels as sRGB, and a screenshot tagged with its
-/// display's profile comes out darker or lighter. None for an image tagged as sRGB, which looks the
-/// same untagged.
+/// display's profile comes out darker or lighter. None for an image in sRGB, which looks the same
+/// untagged: tagged so (sRGB, or cICP's sRGB), or with cHRM and gAMA that only restate it.
 pub fn color_chunks(png: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
-    let mut srgb = false;
+    let (mut tagged_srgb, mut other) = (false, false);
+    let (mut chrm, mut gama) = (None, None);
     let mut pos = 8;
     while pos + 8 <= png.len() {
         let len = u32::from_be_bytes(png[pos..pos + 4].try_into().unwrap()) as usize;
@@ -111,17 +112,36 @@ pub fn color_chunks(png: &[u8]) -> Vec<u8> {
             break; // they all come before the image data
         }
         let data = &png[pos + 8..end - 4];
-        // cICP's sRGB: BT.709 primaries, the sRGB transfer function
-        srgb |= &kind == b"sRGB" || (&kind == b"cICP" && data.len() == 4 && data[..2] == [1, 13]);
+        match &kind {
+            b"sRGB" => tagged_srgb = true,
+            // cICP's sRGB: BT.709 primaries, the sRGB transfer function
+            b"cICP" if data.len() == 4 && data[..2] == [1, 13] => tagged_srgb = true,
+            b"cICP" | b"iCCP" => other = true,
+            b"cHRM" => chrm = Some(data),
+            b"gAMA" => gama = Some(data),
+            _ => {}
+        }
         if COLOR_CHUNKS.contains(&kind) {
             out.extend_from_slice(&png[pos..end]);
         }
         pos = end;
     }
-    if srgb {
+    // without cHRM the primaries are sRGB's, and without gAMA so is the transfer function
+    if tagged_srgb || (!other && chrm.is_none_or(srgb_primaries) && gama.is_none_or(srgb_gamma)) {
         out.clear();
     }
     out
+}
+
+/// cHRM with the sRGB primaries and D65 white point, give or take its encoder's rounding (0.001).
+fn srgb_primaries(chrm: &[u8]) -> bool {
+    const SRGB: [u32; 8] = [31270, 32900, 64000, 33000, 30000, 60000, 15000, 6000];
+    chrm.len() == 32 && chrm.chunks_exact(4).zip(SRGB).all(|(v, s)| u32::from_be_bytes(v.try_into().unwrap()).abs_diff(s) <= 100)
+}
+
+/// gAMA of about 1/2.2 (gamma 2.17 to 2.22), the usual stand-in for sRGB's transfer function.
+fn srgb_gamma(gama: &[u8]) -> bool {
+    gama.len() == 4 && (45_000..=46_000).contains(&u32::from_be_bytes(gama.try_into().unwrap()))
 }
 
 /// A PNG file with `chunks` (from `color_chunks`) right after its header, ahead of PLTE and IDAT as
