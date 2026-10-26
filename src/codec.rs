@@ -136,7 +136,7 @@ pub fn color_chunks(png: &[u8]) -> Vec<u8> {
 /// cHRM with the sRGB primaries and D65 white point, give or take its encoder's rounding (0.001).
 fn srgb_primaries(chrm: &[u8]) -> bool {
     const SRGB: [u32; 8] = [31270, 32900, 64000, 33000, 30000, 60000, 15000, 6000];
-    chrm.len() == 32 && chrm.chunks_exact(4).zip(SRGB).all(|(v, s)| u32::from_be_bytes(v.try_into().unwrap()).abs_diff(s) <= 100)
+    chrm.len() == 32 && chrm.as_chunks::<4>().0.iter().zip(SRGB).all(|(&v, s)| u32::from_be_bytes(v).abs_diff(s) <= 100)
 }
 
 /// gAMA of about 1/2.2 (gamma 2.17 to 2.22), the usual stand-in for sRGB's transfer function.
