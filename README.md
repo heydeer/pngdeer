@@ -2,9 +2,9 @@
 
 **Smaller PNGs. Same picture.** pngdeer is a lossy PNG compressor with no quality slider: for each image it searches palette sizes from 2 to 256 colors, with and without dithering, scores each result with a perceptual metric, and keeps the smallest file that still looks right. At the same quality, the median image comes out **8–12% smaller than with TinyPNG**, the best result of any open-source compressor we've measured.
 
-**[Try it in your browser →](https://heydeer.ai/open-source/pngdeer)** Nothing is uploaded: images are compressed on your device.
+**[Try it in your browser →](https://heydeer.ai/open-source/pngdeer/)** Nothing is uploaded: images are compressed on your device.
 
-[![pngdeer in the browser](.github/pngdeer.png)](https://heydeer.ai/open-source/pngdeer)
+[![pngdeer in the browser](.github/pngdeer.png)](https://heydeer.ai/open-source/pngdeer/)
 
 ```bash
 brew install heydeer/tap/pngdeer

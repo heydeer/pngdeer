@@ -5,12 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>pngdeer · Open-source PNG compressor · HeyDeer</title>
 <meta name="description" content="pngdeer finds the smallest palette PNG that still looks like your image. Open source, runs in your browser, nothing is uploaded. By HeyDeer.">
-<link rel="canonical" href="https://heydeer.ai/open-source/pngdeer">
-<script>
-  // heydeer.ai serves this page at /open-source/pngdeer, without the trailing slash Next.js strips,
-  // so the page's relative URLs (icons, worker, WebAssembly, samples) need a base under it.
-  if (/\/[^./]+$/.test(location.pathname)) document.write(`<base href="${location.pathname}/">`);
-</script>
+<link rel="canonical" href="https://heydeer.ai/open-source/pngdeer/">
 <link rel="icon" href="brand/heydeer-sun-icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1035,18 +1030,6 @@ $("#r-points").textContent = `+${RESEARCH.holdout.points.toFixed(1)}`;
 $("#r-reach").innerHTML = `${RESEARCH.holdout.reach}<em>/${RESEARCH.holdout.n}</em>`;
 addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 8), { passive: true });
 addEventListener("resize", () => researchShown && research(researchSet));
-
-// Under the <base> set in the head, "#id" links would resolve against it and reload the page.
-if (document.querySelector("base")) {
-  document.addEventListener("click", (e) => {
-    const a = e.target.closest('a[href^="#"]');
-    if (!a) return;
-    e.preventDefault();
-    const id = a.getAttribute("href").slice(1);
-    (id ? document.getElementById(id) : document.body)?.scrollIntoView();
-    history.replaceState(null, "", location.pathname + location.search + (id ? `#${id}` : ""));
-  });
-}
 
 // The star count, once GitHub shows one (a private repository answers 404, and none stays hidden).
 fetch("https://api.github.com/repos/heydeer/pngdeer")
