@@ -60,7 +60,7 @@
   .brand .slash { width: 1.5px; height: 22px; background: var(--line-2); transform: skewX(-18deg); }
   .brand .product { font: 600 19px/1 var(--display); letter-spacing: -.03em; color: var(--ink); }
   .top nav { display: flex; gap: 22px; margin-left: 22px; }
-  .top nav a { text-decoration: none; color: var(--muted); font-size: 15px; white-space: nowrap; }
+  .top nav a { text-decoration: none; color: var(--muted); font-size: 15px; }
   .top nav a:hover { color: var(--ink); }
   .top .end { margin-left: auto; display: flex; align-items: center; gap: 12px; }
   .promo { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 5px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--ink); font: 500 13.5px/1 var(--body); text-decoration: none; white-space: nowrap; transition: border-color .15s; }
@@ -347,6 +347,7 @@
   @media (max-width: 640px) {
     :root { --gutter: 16px; --radius: 22px; }
     .top nav { margin-left: 8px; }
+    .top nav a:not(.keep) { display: none; }
     .hero { padding: 36px 0 28px; gap: 14px; }
     .lede { font-size: 16px; }
     .bar { padding-left: 14px; }
@@ -373,10 +374,6 @@
   }
   @media (max-width: 1080px) {
     .promo { display: none; }
-  }
-  /* no room for How it works and Command line beside the star button and its count */
-  @media (max-width: 760px) {
-    .top nav a:not(.keep) { display: none; }
   }
   /* no room for Research and the full star button: the lede links Research, the button keeps its mark and count */
   @media (max-width: 480px) {
