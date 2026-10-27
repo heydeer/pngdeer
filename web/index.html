@@ -120,7 +120,7 @@
   .table.loaded .marks { display: none; }
 
   .empty { place-self: center; text-align: center; padding: 36px 24px; }
-  .empty h2 { font: 600 clamp(28px, 3.4vw, 38px)/1.1 var(--display); letter-spacing: -.035em; margin: 0 0 10px; color: var(--ink); }
+  .empty h2 { font: 600 clamp(28px, 3.4vw, 38px)/1.1 var(--display); letter-spacing: -.035em; margin: 0 0 10px; color: var(--ink); text-wrap: balance; }
   .empty p { margin: 0 0 26px; color: var(--muted); }
   .empty .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .release { position: absolute; inset: 0; display: grid; place-items: center; font: 600 34px var(--display); letter-spacing: -.03em; color: var(--walnut); background: #fff8dccc; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 5; }
@@ -150,7 +150,7 @@
      would composite translucent pixels (soft shadows) twice there, and darken them */
   .stage .before { clip-path: inset(0 calc(100% - var(--split)) 0 0); }
   .stage .after { clip-path: inset(0 0 0 var(--split)); }
-  .stage.busy .before { clip-path: none; }
+  .stage.busy .before, .stage.failed .before { clip-path: none; }
   .divider { position: absolute; top: -12px; bottom: -12px; left: var(--split); width: 2px; margin-left: -1px; background: var(--sun); box-shadow: 0 0 0 1px #35201730; }
   .knob { position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 0; background: var(--sun); box-shadow: 0 0 0 1px #3520173d, 0 6px 18px #35201733; display: grid; place-items: center; cursor: ew-resize; color: var(--walnut); transition: transform .15s; }
   .knob:hover { transform: scale(1.06); }
@@ -163,7 +163,7 @@
   .stage.busy .scan { display: block; }
   .scan::after { content: ""; position: absolute; top: 0; bottom: 0; width: 22%; left: -22%; background: linear-gradient(90deg, transparent, #ffcf3366 60%, var(--sun) 61%, transparent 62%); animation: scan 1.6s cubic-bezier(.5, 0, .5, 1) infinite; }
   @keyframes scan { to { left: 100%; } }
-  .stage.busy .divider, .stage.busy .after { display: none; }
+  .stage.busy .divider, .stage.busy .after, .stage.failed .divider, .stage.failed .after { display: none; }
   .foot { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 14px 12px 20px; background: #ffffffe0; backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
   .palette { display: flex; height: 22px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 0 1px #0000000f; min-width: 0; background: var(--checker) 0 0 / 8px 8px; }
   .palette i { flex: 1 1 0; min-width: 0; }
@@ -192,6 +192,7 @@
   .tally .sum b { display: block; font: 600 22px/1.15 var(--display); letter-spacing: -.03em; color: var(--ink); }
 
   .note { color: var(--faint); font-size: 12.5px; margin-top: 10px; min-height: 1em; }
+  .note .err { color: #b4351d; }
 
   /* ---------- sections ---------- */
   section.block { padding: 112px 0 0; }
@@ -425,7 +426,7 @@
   <div class="table rise d3" id="drop">
     <div class="marks" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <div class="empty">
-      <h2>Drop PNGs here</h2>
+      <h2>Drop PNGs or folders here</h2>
       <p>Nothing is uploaded. Images are compressed locally.</p>
       <div class="actions">
         <button class="pill sun" type="button" data-pick>
@@ -650,12 +651,13 @@
 const $ = (s) => document.querySelector(s);
 const SAMPLES = ["sun-poster", "kodim01", "pngdeer@2x", "cup-of-tea", "openmoji-1f431"];
 const CORES = navigator.hardwareConcurrency || 4;
-const files = []; // {id, name, bytes, width, height, url, status, out, outUrl, report, ms, palette}
+const files = []; // {id, name, bytes, size, width, height, url, status, error, notPng, out, outUrl, report, ms, palette}
 let nextId = 0, active = null;
+let skipped = ""; // what the last dropped folders held besides PNGs
 
 const size = (n) => (n < 1024 * 1024 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : (n / 1048576).toFixed(2) + " MB");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const saving = (f) => Math.round(100 * (1 - f.out.byteLength / f.bytes.byteLength));
+const saving = (f) => Math.round(100 * (1 - f.out.byteLength / f.size));
 
 /* ---------- worker pool ---------- */
 // Threaded build (cross-origin isolated page): one worker, whose thread pool uses every core (a
@@ -713,14 +715,26 @@ const run = (key, bytes, started) => new Promise((resolve) => {
 });
 
 /* ---------- files ---------- */
+const dimensions = (blob) => createImageBitmap(blob).then((b) => [b.width, b.height]).catch(() => [0, 0]);
+
 async function add(name, bytes) {
   const blob = new Blob([bytes], { type: "image/png" });
   const url = URL.createObjectURL(blob);
-  const dims = await createImageBitmap(blob).then((b) => [b.width, b.height]).catch(() => [0, 0]);
-  const f = { id: nextId++, name, bytes, width: dims[0], height: dims[1], url, status: "queued" };
+  const [width, height] = await dimensions(blob);
+  const f = { id: nextId++, name, bytes, size: bytes.byteLength, width, height, url, status: "queued" };
+  enter(f);
+  compress(f);
+}
+
+/** A file that isn't a PNG: an error card, showing the file itself when the browser can draw it. */
+async function refuse(file) {
+  const [width, height] = await dimensions(file);
+  enter({ id: nextId++, name: file.name, size: file.size, width, height, url: URL.createObjectURL(file), status: "error", error: "not a PNG file", notPng: true });
+}
+
+function enter(f) {
   files.push(f);
   if (!active || active.status === "done" || active.status === "error") show(f); else render();
-  compress(f);
 }
 
 async function compress(f) {
@@ -772,6 +786,7 @@ function show(f, intro = false) {
   $("#img-after").src = f.outUrl || f.url;
   $("#v-name").textContent = f.name;
   $("#v-dim").textContent = f.width ? `${f.width}×${f.height}` : "";
+  stage.hidden = !f.width;
   setSplit(50);
   layout();
   render();
@@ -869,15 +884,16 @@ function outcome(f) {
 function render() {
   const f = active;
   if (f) {
-    const done = f.status === "done";
-    stage.classList.toggle("busy", !done);
+    const done = f.status === "done", waiting = f.status === "queued" || f.status === "busy";
+    stage.classList.toggle("busy", waiting);
+    stage.classList.toggle("failed", f.status === "error");
     stage.classList.toggle("ready", done);
-    $("#t-before").textContent = size(f.bytes.byteLength);
+    $("#t-before").textContent = size(f.size);
     $("#t-after").textContent = done ? size(f.out.byteLength) : f.status === "error" ? "failed" : "working…";
     $("#t-save").textContent = done ? `−${saving(f)}%` : "";
     $("#t-save").hidden = !done;
     const pal = $("#palette");
-    pal.classList.toggle("wait", !done);
+    pal.classList.toggle("wait", waiting);
     pal.innerHTML = done ? f.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
     $("#p-label").innerHTML = done
       ? `<b>${outcome(f)}</b> · SSIMULACRA2 ${f.report.score.toFixed(1)}`
@@ -888,14 +904,14 @@ function render() {
   $("#tray").classList.toggle("on", files.length > 0);
   $("#cards").innerHTML = files.map((x) => {
     const ok = x.status === "done";
-    const sub = ok ? `${size(x.bytes.byteLength)} → ${size(x.out.byteLength)} <b>−${saving(x)}%</b>`
-      : x.status === "error" ? "Couldn't compress" : x.status === "busy" ? "Compressing…" : "Waiting";
+    const sub = ok ? `${size(x.size)} → ${size(x.out.byteLength)} <b>−${saving(x)}%</b>`
+      : x.status === "error" ? (x.notPng ? "Not a PNG" : "Couldn't compress") : x.status === "busy" ? "Compressing…" : "Waiting";
     return `<button class="card" type="button" data-id="${x.id}" aria-current="${x === active}">
-      <img class="thumb" src="${x.outUrl || x.url}" alt="">
+      ${x.width ? `<img class="thumb" src="${x.outUrl || x.url}" alt="">` : '<span class="thumb"></span>'}
       <span><div class="t" title="${esc(x.name)}">${esc(x.name)}</div><div class="s ${x.status === "error" ? "err" : ""}">${sub}</div>${ok || x.status === "error" ? "" : '<div class="meter"></div>'}</span>
     </button>`;
   }).join("");
-  const before = done.reduce((s, x) => s + x.bytes.byteLength, 0), after = done.reduce((s, x) => s + x.out.byteLength, 0);
+  const before = done.reduce((s, x) => s + x.size, 0), after = done.reduce((s, x) => s + x.out.byteLength, 0);
   const plural = files.length > 1 ? "s" : "";
   $("#sum").innerHTML = done.length
     ? `<b>−${Math.round(100 * (1 - after / before))}%</b>${size(before - after)} saved · ${done.length} of ${files.length} done`
@@ -903,13 +919,14 @@ function render() {
     : `<b>Working…</b>${files.length} file${plural}`;
   $("#all").disabled = !done.length;
   renderNote();
-  window.__pngdeer = files.map((x) => ({ name: x.name, before: x.bytes.byteLength, after: x.out?.byteLength, ms: x.ms, report: x.report, status: x.status, error: x.error }));
+  window.__pngdeer = files.map((x) => ({ name: x.name, before: x.size, after: x.out?.byteLength, ms: x.ms, report: x.report, status: x.status, error: x.error }));
 }
 
 function renderNote() {
-  $("#note").textContent = files.length
+  const status = files.length
     ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG would give it, at most 90.`
     : "";
+  $("#note").innerHTML = (skipped ? `<span class="err">${esc(skipped)}</span> ` : "") + esc(status);
 }
 
 function download(f) {
@@ -928,16 +945,81 @@ addEventListener("drop", (e) => {
   e.preventDefault();
   depth = 0;
   table.classList.remove("over");
-  if (e.dataTransfer?.files?.length) {
+  // A folder only comes as an entry, which must be taken before the event returns (a file dragged
+  // out of another page may have no entry, only the file).
+  const items = [...(e.dataTransfer?.items || [])].filter((i) => i.kind === "file").map((i) => i.webkitGetAsEntry?.() || i.getAsFile()).filter(Boolean);
+  if (items.length) {
     table.scrollIntoView({ behavior: "smooth", block: "center" });
-    readFiles(e.dataTransfer.files);
+    readDropped(items);
   }
 });
 document.querySelectorAll("[data-pick]").forEach((b) => (b.onclick = () => $("#file").click()));
 $("#file").addEventListener("change", (e) => { readFiles(e.target.files); });
+
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+async function isPng(file) {
+  const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  return head.length === 8 && head.every((b, i) => b === PNG_SIGNATURE[i]);
+}
+/** A file the user picked or dropped by itself: compressed if it's a PNG, an error card otherwise. */
+async function readFile(file) {
+  if (await isPng(file)) await add(file.name, await file.arrayBuffer());
+  else await refuse(file);
+}
 async function readFiles(list) {
-  for (const file of [...list]) if (file.type === "image/png" || file.name.toLowerCase().endsWith(".png")) add(file.name, await file.arrayBuffer());
+  skipped = "";
+  for (const file of [...list]) await readFile(file);
   $("#file").value = "";
+}
+
+const fileOf = (entry) => new Promise((resolve, reject) => entry.file(resolve, reject));
+/** A folder's entries; a reader hands them out a batch at a time (100 in Chrome) until an empty one. */
+function entriesOf(folder) {
+  const reader = folder.createReader(), all = [];
+  return new Promise((resolve, reject) => {
+    const next = () => reader.readEntries((batch) => (batch.length ? (all.push(...batch), next()) : resolve(all)), reject);
+    next();
+  });
+}
+/** The files in a folder and its subfolders, in name order; hidden ones (.DS_Store, .git) left out. */
+async function folderFiles(folder) {
+  const entries = (await entriesOf(folder)).filter((e) => !e.name.startsWith("."));
+  entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const out = [];
+  for (const e of entries) out.push(...(e.isDirectory ? await folderFiles(e) : [await fileOf(e)]));
+  return out;
+}
+const some = (names) => names.slice(0, 3).join(", ") + (names.length > 3 ? ` and ${names.length - 3} more` : "");
+/** Dropped files and folders. A folder's PNGs are compressed and its other files only counted in
+ * one line, so that a folder of assets doesn't fill the tray with errors. */
+async function readDropped(items) {
+  skipped = "";
+  const notes = [];
+  for (const item of items) {
+    if (!item.isDirectory) {
+      await readFile(item.isFile ? await fileOf(item) : item);
+      continue;
+    }
+    const others = [];
+    let pngs = 0;
+    try {
+      for (const file of await folderFiles(item)) {
+        if (!(await isPng(file))) {
+          others.push(file.name);
+          continue;
+        }
+        pngs++;
+        await add(file.name, await file.arrayBuffer());
+      }
+    } catch (error) {
+      notes.push(`Couldn't read “${item.name}”: ${error.message || error}.`);
+      continue;
+    }
+    if (!pngs) notes.push(`No PNGs in “${item.name}”${others.length ? ` (${some(others)})` : ""}.`);
+    else if (others.length) notes.push(`Skipped ${others.length === 1 ? "1 file" : `${others.length} files`} in “${item.name}” that ${others.length === 1 ? "isn't a PNG" : "aren't PNGs"}: ${some(others)}.`);
+  }
+  skipped = notes.join(" ");
+  renderNote();
 }
 $("#samples").onclick = async () => {
   $("#samples").disabled = true;
