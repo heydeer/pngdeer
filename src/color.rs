@@ -125,6 +125,24 @@ fn key(c: &Color) -> f32 {
     c.iter().sum::<f32>() * 0.5
 }
 
+/// `distance(p, q)` if it is below `limit`: the same sum in the same order, abandoned halfway (one
+/// background's three coordinates) when that part alone reaches the limit. The terms are never
+/// negative, so the partial sum only grows.
+fn distance_below(p: &Color, q: &Color, limit: f32) -> Option<f32> {
+    let mut d = 0.0;
+    for k in 0..3 {
+        d += (p[k] - q[k]) * (p[k] - q[k]);
+    }
+    if d * 0.5 >= limit {
+        return None;
+    }
+    for k in 3..DIM {
+        d += (p[k] - q[k]) * (p[k] - q[k]);
+    }
+    let d = d * 0.5;
+    (d < limit).then_some(d)
+}
+
 /// Exact nearest palette entry, searched outward from the closest key.
 pub struct Nearest {
     colors: Vec<Color>,
@@ -132,6 +150,9 @@ pub struct Nearest {
     order: Vec<u8>,
     /// position in `colors` of each palette index
     position: Vec<usize>,
+    /// By position: within this distance of the entry, no other entry is as close (half the gap to
+    /// its nearest neighbour, less a margin far wider than f32 rounding).
+    alone: Vec<f32>,
 }
 
 impl Nearest {
@@ -143,16 +164,35 @@ impl Nearest {
         for (p, &i) in order.iter().enumerate() {
             position[i as usize] = p;
         }
-        Nearest { keys: colors.iter().map(key).collect(), colors, order, position }
+        // squared gaps in f64, from the f32 coordinates exactly
+        let gap = |p: &Color, q: &Color| (0..DIM).map(|k| (p[k] as f64 - q[k] as f64).powi(2)).sum::<f64>();
+        let alone = (0..colors.len())
+            .map(|p| {
+                let nearest = (0..colors.len()).filter(|&q| q != p).map(|q| gap(&colors[p], &colors[q])).fold(f64::MAX, f64::min);
+                // a color c with |c - entry| <= |gap| / 2 · (1 - 1e-3) is at least that much further
+                // from every other entry (triangle inequality), in distance's half-squared units
+                if nearest == f64::MAX {
+                    0.0
+                } else {
+                    (nearest / 8.0 * (1.0 - 1e-3)) as f32
+                }
+            })
+            .collect();
+        Nearest { keys: colors.iter().map(key).collect(), colors, order, position, alone }
     }
 
     /// Palette index and distance; `hint` (a likely answer, e.g. the neighbour's) only speeds it up.
+    /// On a tie the hint wins, then the entry the outward search reaches first.
     pub fn find(&self, c: &Color, hint: Option<u8>) -> (u8, f32) {
         let k = key(c);
         let (mut best, mut dist) = match hint {
             Some(i) => {
                 let p = self.position[i as usize];
-                (p, distance(c, &self.colors[p]))
+                let d = distance(c, &self.colors[p]);
+                if d <= self.alone[p] {
+                    return (i, d); // nothing else is as close, let alone closer
+                }
+                (p, d)
             }
             None => (0, f32::MAX),
         };
@@ -165,8 +205,7 @@ impl Nearest {
                 break;
             }
             for p in [below.then(|| lo - 1), above.then_some(hi)].into_iter().flatten() {
-                let d = distance(c, &self.colors[p]);
-                if d < dist {
+                if let Some(d) = distance_below(c, &self.colors[p], dist) {
                     (best, dist) = (p, d);
                 }
             }
@@ -200,6 +239,62 @@ mod tests {
                         assert!(p.a.abs_diff(q.a) <= 1, "{p:?} -> {q:?}");
                         assert!(err <= tol, "{p:?} -> {q:?}");
                     }
+                }
+            }
+        }
+    }
+
+    /// The search before its shortcuts (the hint's alone radius, abandoned distances): every
+    /// distance in full, so its answers, ties included, are the ones `find` must keep giving.
+    fn plain_find(n: &Nearest, c: &Color, hint: Option<u8>) -> (u8, f32) {
+        let k = key(c);
+        let (mut best, mut dist) = hint.map_or((0, f32::MAX), |i| (n.position[i as usize], distance(c, &n.colors[n.position[i as usize]])));
+        let start = n.keys.partition_point(|&e| e < k);
+        let (mut lo, mut hi) = (start, start);
+        loop {
+            let below = lo > 0 && (k - n.keys[lo - 1]).powi(2) < 3.0 * dist;
+            let above = hi < n.keys.len() && (n.keys[hi] - k).powi(2) < 3.0 * dist;
+            if !below && !above {
+                break;
+            }
+            for p in [below.then(|| lo - 1), above.then_some(hi)].into_iter().flatten() {
+                let d = distance(c, &n.colors[p]);
+                if d < dist {
+                    (best, dist) = (p, d);
+                }
+            }
+            lo -= below as usize;
+            hi += above as usize;
+        }
+        (n.order[best], dist)
+    }
+
+    #[test]
+    fn shortcuts_keep_the_answers() {
+        let mut seed = 1u32;
+        let mut next = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 24) as u8
+        };
+        for size in [1, 2, 3, 16, 64, 256] {
+            // coarse values, so some entries repeat and colors land exactly between entries
+            let mut palette: Vec<Color> =
+                (0..size).map(|_| to_color(RGBA::new(next() & 0xf0, next() & 0xf0, next() & 0xe0, [255, 255, 128][next() as usize % 3]))).collect();
+            if size > 2 {
+                palette[1] = palette[0]; // a duplicate entry: a tie wherever entry 0 is nearest
+            }
+            let nearest = Nearest::new(&palette);
+            for _ in 0..4000 {
+                let c = to_color(RGBA::new(next(), next(), next(), [255, 255, 200, 90][next() as usize % 4]));
+                for hint in [None, Some(0), Some((size - 1) as u8), Some((next() as usize % size) as u8)] {
+                    let (got, want) = (nearest.find(&c, hint), plain_find(&nearest, &c, hint));
+                    assert_eq!((got.0, got.1.to_bits()), (want.0, want.1.to_bits()), "{c:?} {hint:?}");
+                }
+                // the palette entries themselves, with their own and their duplicate's hint
+                let entry = palette[next() as usize % size];
+                for hint in [Some(0), Some((size - 1) as u8)] {
+                    let (got, want) = (nearest.find(&entry, hint), plain_find(&nearest, &entry, hint));
+                    assert_eq!((got.0, got.1.to_bits()), (want.0, want.1.to_bits()));
                 }
             }
         }
