@@ -922,15 +922,66 @@ fn blur_channel(
     if kernel == Kernel::Simd {
         simd::fast_gaussian_simd(rg, a, b, w, h, out, tmp);
     } else {
-        let product;
-        let input = if let Some(b) = b {
-            product = a.iter().zip(b).map(|(&a, &b)| a * b).collect::<Vec<_>>();
-            &product[..]
-        } else {
-            a
-        };
-        for y in 0..h {
-            rg.fast_gaussian_1d(&input[y * w..(y + 1) * w], &mut tmp[y * w..(y + 1) * w]);
+        scalar_blur(rg, a, b, w, h, out, tmp);
+    }
+}
+
+/// The scalar kernel's blur (the one wasm builds run). pngdeer patch: a product is formed a row at a
+/// time in `out`, which the vertical pass overwrites anyway, rather than in a plane of its own, and
+/// with rayon the rows, then column ranges, run in parallel. Each row and each column goes through
+/// the same arithmetic, so results are bit-identical.
+fn scalar_blur(
+    rg: &super::gauss::RecursiveGaussian,
+    a: &[f32],
+    b: Option<&[f32]>,
+    w: usize,
+    h: usize,
+    out: &mut [f32],
+    tmp: &mut [f32],
+) {
+    let horizontal = |y: usize, row_out: &mut [f32], product: &mut [f32]| {
+        let row = &a[y * w..(y + 1) * w];
+        match b {
+            Some(b) => {
+                for ((p, &a), &b) in product.iter_mut().zip(row).zip(&b[y * w..(y + 1) * w]) {
+                    *p = a * b;
+                }
+                rg.fast_gaussian_1d(product, row_out);
+            }
+            None => rg.fast_gaussian_1d(row, row_out),
+        }
+    };
+    #[cfg(feature = "rayon")]
+    {
+        use rayon::prelude::*;
+        tmp[..w * h]
+            .par_chunks_mut(w)
+            .zip(out[..w * h].par_chunks_mut(w))
+            .enumerate()
+            .for_each(|(y, (row_out, product))| horizontal(y, row_out, product));
+        // Each task owns a range of columns: its piece of every output row, borrowed apart.
+        const COLUMNS: usize = 256;
+        let ranges: Vec<(usize, usize)> = (0..w).step_by(COLUMNS).map(|x0| (x0, (x0 + COLUMNS).min(w))).collect();
+        let mut pieces: Vec<Vec<&mut [f32]>> = ranges.iter().map(|_| Vec::with_capacity(h)).collect();
+        for row in out[..w * h].chunks_mut(w) {
+            let mut rest = row;
+            for (piece, &(x0, x1)) in pieces.iter_mut().zip(&ranges) {
+                let (here, after) = rest.split_at_mut(x1 - x0);
+                piece.push(here);
+                rest = after;
+            }
+        }
+        let tmp = &*tmp;
+        pieces.into_par_iter().zip(ranges).for_each(|(mut rows, (x0, x1))| {
+            rg.fast_gaussian_vertical_columns(x0, x1, h, |y, x| tmp[y * w + x], &mut |y, x, value| {
+                rows[y][x - x0] = value
+            });
+        });
+    }
+    #[cfg(not(feature = "rayon"))]
+    {
+        for (y, (row_out, product)) in tmp[..w * h].chunks_mut(w).zip(out[..w * h].chunks_mut(w)).enumerate() {
+            horizontal(y, row_out, product);
         }
         rg.fast_gaussian_vertical_1d(w, h, |y, x| tmp[y * w + x], &mut |y, x, value| {
             out[y * w + x] = value

@@ -260,14 +260,27 @@ impl RecursiveGaussian {
         get: impl Fn(usize, usize) -> f32,
         put: &mut impl FnMut(usize, usize, f32),
     ) {
+        self.fast_gaussian_vertical_columns(0, width, height, get, put);
+    }
+
+    /// [`Self::fast_gaussian_vertical_1d`] for the columns `start..end` only: each column's
+    /// recursion is its own, so column ranges can run on separate threads (pngdeer patch).
+    pub fn fast_gaussian_vertical_columns(
+        &self,
+        start: usize,
+        end: usize,
+        height: usize,
+        get: impl Fn(usize, usize) -> f32,
+        put: &mut impl FnMut(usize, usize, f32),
+    ) {
         let n_rad = self.radius as i64;
         // pngdeer patch: columns in blocks, walked row by row, instead of one whole column at a
         // time (a stride-`width` walk per column that thrashes the cache: ~40% of all scoring time
         // in wasm). The arithmetic per column is unchanged, so results are bit-identical.
         const BLOCK: usize = 64;
-        let mut x0 = 0;
-        while x0 < width {
-            let x1 = (x0 + BLOCK).min(width);
+        let mut x0 = start;
+        while x0 < end {
+            let x1 = (x0 + BLOCK).min(end);
             // Ring buffer of last two outputs per term (kMod=4 in C++,
             // semantically a 3-slot history), per column of the block.
             let mut y1_hist = [[0f32; 4]; BLOCK];

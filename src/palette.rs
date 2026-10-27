@@ -16,6 +16,8 @@ const WU_BINS: [usize; 3] = [32, 16, 16];
 const WU_RANGES: [(f32, f32); 3] = [(0.0, 255.0), (-0.2339 * 255.0, 0.2763 * 255.0), (-0.3116 * 255.0, 0.1986 * 255.0)];
 /// Pixels sampled by online k-means: past this, more barely move the centers.
 const ONLINE_SAMPLES: usize = 1 << 18;
+/// Colors per parallel task when k-means picks their nearest centers.
+const PICK_SLICE: usize = 1 << 10;
 
 /// How a palette is built: k-means rounds, and the error-feedback gain (None: a single pass). With
 /// feedback the palette is built twice: the first one, remapped without dithering, measures how far
@@ -55,6 +57,26 @@ impl Quantizer {
 
 /// Distinct colors (fully transparent ones as one) with their total weight.
 fn histogram(pixels: &[RGBA], weights: Option<&[u8]>) -> Vec<(RGBA, f32)> {
+    // Plain counts are whole numbers, which f32 holds exactly below 2^24: with fewer pixels than
+    // that the order they add up in can't change them, so parts of the image are counted in
+    // parallel and merged. Weighted counts keep their one pass, in pixel order, as do builds
+    // without threads.
+    let counts = if cfg!(feature = "parallel") && weights.is_none() && pixels.len() < 1 << 24 {
+        let mut counts: HashMap<RGBA, f32> = HashMap::new();
+        for part in par::split(pixels, 16, |part| counted(part, None)) {
+            for (c, n) in part {
+                *counts.entry(c).or_default() += n;
+            }
+        }
+        counts
+    } else {
+        counted(pixels, weights)
+    };
+    counts.into_iter().filter(|&(_, n)| n > 0.0).collect()
+}
+
+/// `histogram`'s counting: runs of one color add up first, then go into the map.
+fn counted(pixels: &[RGBA], weights: Option<&[u8]>) -> HashMap<RGBA, f32> {
     let mut counts: HashMap<RGBA, f32> = HashMap::new();
     let mut run: Option<(RGBA, f32)> = None;
     for (k, &p) in pixels.iter().enumerate() {
@@ -72,7 +94,7 @@ fn histogram(pixels: &[RGBA], weights: Option<&[u8]>) -> Vec<(RGBA, f32)> {
     if let Some((c, n)) = run {
         *counts.entry(c).or_default() += n;
     }
-    counts.into_iter().filter(|&(_, n)| n > 0.0).collect()
+    counts
 }
 
 /// The color with `shift` low bits dropped from r, g and b (alpha kept: opaque and translucent
@@ -190,25 +212,31 @@ fn median_cut(entries: &mut [(Color, f32)], k: usize) -> Vec<Color> {
 /// moves to the worst-served color.
 fn kmeans(entries: &[(Color, f32)], centers: &mut [Color], fixed: usize, iterations: usize) {
     let mut assigned: Vec<u8> = vec![0; entries.len()];
+    let mut picks: Vec<u8> = vec![0; entries.len()];
     for it in 0..iterations {
         let nearest = Nearest::new(centers);
+        // The nearest centers, in slices much finer than par::CHUNK: an image's colors are often
+        // only one or two chunks, which left most threads idle. The sums below still add up in
+        // CHUNK-sized parts and color order, so the centers come out the same.
+        par::fill(&mut picks, PICK_SLICE, |offset, slice| {
+            for (e, pick) in slice.iter_mut().enumerate() {
+                *pick = nearest.find(&entries[offset + e].0, (it > 0).then_some(assigned[offset + e])).0;
+            }
+        });
         let parts = par::chunked(entries, |offset, chunk| {
             let mut sums = vec![([0f64; DIM], 0f64); centers.len()];
-            let mut picks = Vec::with_capacity(chunk.len());
             for (e, (c, w)) in chunk.iter().enumerate() {
-                let (i, _) = nearest.find(c, (it > 0).then_some(assigned[offset + e]));
-                picks.push(i);
-                let s = &mut sums[i as usize];
+                let s = &mut sums[picks[offset + e] as usize];
                 for k in 0..DIM {
                     s.0[k] += *w as f64 * c[k] as f64;
                 }
                 s.1 += *w as f64;
             }
-            (sums, picks)
+            sums
         });
+        assigned.copy_from_slice(&picks);
         let mut sums = vec![([0f64; DIM], 0f64); centers.len()];
-        for (offset, (part, picks)) in parts.into_iter().enumerate().map(|(i, p)| (i * par::CHUNK, p)) {
-            assigned[offset..offset + picks.len()].copy_from_slice(&picks);
+        for part in parts {
             for (s, p) in sums.iter_mut().zip(part) {
                 for k in 0..DIM {
                     s.0[k] += p.0[k];

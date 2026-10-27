@@ -17,6 +17,21 @@ pub fn chunked<T: Sync, U: Send>(items: &[T], f: impl Fn(usize, &[T]) -> U + Syn
     }
 }
 
+/// `f` over `parts` consecutive, about equal slices of `items`, results in order (for work whose
+/// results combine the same however the items are divided).
+pub fn split<T: Sync, U: Send>(items: &[T], parts: usize, f: impl Fn(&[T]) -> U + Sync + Send) -> Vec<U> {
+    let size = items.len().div_ceil(parts).max(1);
+    #[cfg(feature = "parallel")]
+    {
+        use rayon::prelude::*;
+        items.par_chunks(size).map(f).collect()
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        items.chunks(size).map(f).collect()
+    }
+}
+
 /// `f` on consecutive `size`-item chunks of `out` (with the chunk's offset).
 pub fn fill<T: Send>(out: &mut [T], size: usize, f: impl Fn(usize, &mut [T]) + Sync + Send) {
     #[cfg(feature = "parallel")]

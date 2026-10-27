@@ -372,12 +372,30 @@ A user's 35.9 MP PNG was refused: the browser version took at most 16 MP (12 MP 
 - **Checked**: on all 180 benchmark images, at automatic quality and at target 85, the files and reports are byte-identical to before, both as shipped and with the lean reference forced on for every image. The browser builds and the command line give the same bytes on the 4–40 MP test images.
 - A lean check runs its blurs on one thread even in the threaded build (in parallel each blur needs its own scratch plane, 16 bytes a pixel more), so above 8 MP scoring is no faster threaded.
 
+## Round 18: threads for large images and palettes
+
+Speed only: on all 180 benchmark images, at automatic quality and at target 85, the files and reports are byte-identical to 0.1.2.
+
+- **Blur**: fast-ssim2's scalar blur (what the browser runs) now does its horizontal pass a row per thread and its vertical pass a 256-column range per thread. A recursive Gaussian treats each row, then each column, on its own, so the scores are bit-identical; no plane is added, and products of two planes are formed a row at a time in the output plane, which the vertical pass overwrites anyway, instead of in a plane of their own (`vendor/fast-ssim2/PATCHES.md`, change 5). This undoes round 17's last point: above 8 MP the threaded build's checks are no longer on one thread.
+- **Palette**: k-means assigns colors to centers in parallel, then adds them up in the old order; plain color counts are made in 16 parts and merged (whole numbers below 2^24, which f32 adds exactly in any order). Weighted counts, and builds without threads, keep the single pass. Median cut stays serial: sorting in parallel would change the order of ties.
+- **Threaded browser build** (headless Chrome, 14 threads):
+
+  | Image | Before | After |
+  |---|---|---|
+  | kodim01 (0.4 MP) | 1.6 s, 110 MB | 1.3 s, 101 MB |
+  | stripe@2x (5.2 MP) | 5.7 s, 984 MB | 5.0 s, 859 MB |
+  | sun poster at 16 MP | 22.3 s, 1.25 GB | 14.8 s, 1.25 GB |
+  | cut-out with alpha, 24 MP | 77 s, 2.10 GB | 57 s, 2.10 GB |
+  | 6 screenshots, 36 MP | 48.8 s, 2.78 GB | 27.3 s, 2.78 GB |
+
+- **Command line** (14 threads, best of 3): kodim01 1.26 → 0.99 s, stripe@2x 3.66 → 3.36 s, sun poster at 4 MP 3.39 → 3.04 s, cup-of-tea 2.11 → 1.79 s, 4 screenshots at 21 MP 9.11 → 8.84 s. On one thread, and in the single-threaded browser build, times are unchanged. That build's WebAssembly memory grows 1–2% further (kodim01 56 → 58 MB, stripe@2x 643 → 654 MB, sun poster at 4 MP 497 → 506 MB; unchanged at 21 MP), though the most live data at once is the same (dhat on the scalar scorer: stripe@2x 818 MB, sun poster at 16 MP 2527 MB, before and after) and each comparison makes 108 fewer allocations: the allocator packs the planes differently.
+
 ## Still unsolved
 
 - **Educational line drawings on transparent backgrounds**: the category furthest from TinyPNG since round 13. bicycle-diagram, even at 256 colors, can't reach TinyPNG's 90.0; mouse-mechanism, renal-corpuscle, college-of-arms and fortepian are 1–2 points lower under automatic quality. Anti-aliased semi-transparent edges are not dithered (since round 15, semi-transparent pixels with smooth alpha are dithered), and there may still be room in palette allocation for flat patches and thin lines. (The former worst case, `linear@2x`: size at equal quality 116% → 107% (round 12) → 93%; react-dev@2x 123% → 100%; both solved in round 13.)
 - **3D / illustrations at the high-quality end**: rounds 8 and 9 added three 256-color candidates: full dithering, plain palette and refined palette (round 12 also added the quantette palette for opaque images), and the mean gap on the hard images shrank from −1.27 to −0.69; for what remains, see the last item of round 9 (those are libimagequant-version numbers).
 - **Neither metric sees banding**: round 15 works around it with the "always dither smooth gradients" rule, but the search still has no signal that quantifies banding and contour lines (such as Netflix's CAMBI). What counts as "smooth" is a threshold; calibrating it with a blind test would be more reliable.
-- **Search on large images**: since round 2 the native version is no slower than TinyPNG, and since round 5 the browser version handles 5MP in under 10 s; the bottleneck is still SSIMULACRA2, and the coarse search on a downscaled image costs 1.5% in size. The native version can also use `--preview-pixels`, but bench does not enable it. Above 8 MP the browser's checks score on one thread (round 17); splitting each blur's rows and column blocks across threads would need no extra memory.
+- **Search on large images**: since round 2 the native version is no slower than TinyPNG, and since round 5 the browser version handles 5MP in under 10 s; the bottleneck is still SSIMULACRA2, and the coarse search on a downscaled image costs 1.5% in size. The native version can also use `--preview-pixels`, but bench does not enable it. Since round 18 the threaded browser build also splits each blur across threads above 8 MP.
 
 ## Reproducing
 
