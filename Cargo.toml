@@ -1,6 +1,6 @@
 [package]
 name = "pngdeer"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
 description = "Lossy PNG compression: per image, the smallest palette PNG that keeps a SSIMULACRA2 quality. The same code runs on the command line and in the browser (web/)."
