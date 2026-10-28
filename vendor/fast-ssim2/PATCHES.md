@@ -4,7 +4,8 @@ Vendored from crates.io (BSD-2-Clause, https://github.com/imazen/fast-ssim2); ev
 it (`[patch.crates-io]` in the root `Cargo.toml`). Examples, tests, benches and dev-dependencies
 are left out. The first three changes are in the scalar kernels that the wasm build runs; scores are
 unchanged (checked against the native build to 4 decimals on 5 MP screenshots). The fourth cuts
-memory and the fifth threads the scalar blur, both with bit-identical scores:
+memory, the fifth threads the scalar blur and the sixth speeds up translucent pixels, all with
+bit-identical scores:
 
 1. `pipeline/mod.rs` adds a `Fma` trait, and `gauss.rs`, `xyb.rs`, `maps.rs`, `simd.rs` call `.fma(`
    where they called `.mul_add(`. wasm32 has no scalar fused multiply-add, so `mul_add` compiled to a
@@ -40,3 +41,12 @@ memory and the fifth threads the scalar blur, both with bit-identical scores:
    a 256-column range per task. Every row and column goes through the same arithmetic as before,
    so scores are bit-identical (whole-image and lean, with and without rayon, on 47 image pairs),
    and no plane is added: a threaded lean comparison is no longer on one thread.
+6. `pipeline/mod.rs` `linearize_stop`: an 8-bit pixel that isn't opaque is blended onto the
+   background and linearized with linear-srgb's rational polynomial, eight f64 `mul_add`s per
+   channel, which wasm32 runs as calls into compiler-builtins' software fma. Its value depends only
+   on the alpha byte, the channel byte and the background, so each pair is computed once per call
+   (a 256×256 table filled as pairs come up) and looked up after. An alpha that isn't exactly some
+   byte's `b * (1/255)` is computed as before. In the threaded browser build a 24 MP cut-out's PNG
+   search spent 44 s scoring (5.5 s natively), now 12 s, and its PNG output takes 23 s instead of
+   56 s. Scores are bit-identical (natively, on 96 image pairs with alpha, the 24 MP one included) and
+   so are pngdeer's files (its tests, the web samples and the cut-out, browser against native).

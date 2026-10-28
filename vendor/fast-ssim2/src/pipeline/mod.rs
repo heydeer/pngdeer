@@ -239,15 +239,32 @@ pub(crate) fn linearize_stop(
         };
         match &enc.data {
             EncodedData::U8(data) => {
+                // pngdeer patch: a blended pixel's value depends only on its alpha byte, its
+                // channel byte and `bg`, so each pair is computed once (NaN: not yet). The
+                // rational polynomial behind `encoded` is eight f64 `mul_add`s, which wasm32
+                // runs as software fma calls: most of a translucent image's scoring there.
+                // An alpha that isn't some byte's `b * (1/255)` (a caller's own) is computed
+                // as before.
+                let mut blended = vec![f32::NAN; 256 * 256];
                 for (r, row) in data.chunks_exact(3 * w).enumerate() {
                     if r & (LINEARIZE_STOP_ROWS - 1) == 0 {
                         stop.check()?;
                     }
                     for (j, px) in row.chunks_exact(3).enumerate() {
                         let i = r * w + j;
+                        let af = alpha[i];
+                        let b = (af * 255.0).round();
+                        let exact = (0.0..=255.0).contains(&b)
+                            && (b as u8 as f32 * (1.0 / 255.0)).to_bits() == af.to_bits();
                         for c in 0..3 {
-                            out[c].push(if alpha[i] == 1.0 {
+                            out[c].push(if af == 1.0 {
                                 lut8::LINEAR_LUT_U8[px[c] as usize]
+                            } else if exact {
+                                let k = (b as usize) << 8 | px[c] as usize;
+                                if blended[k].is_nan() {
+                                    blended[k] = encoded(i, px[c] as f32 * (1.0 / 255.0));
+                                }
+                                blended[k]
                             } else {
                                 encoded(i, px[c] as f32 * (1.0 / 255.0))
                             });
