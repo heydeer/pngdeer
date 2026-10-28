@@ -53,7 +53,7 @@ const VERIFY_STEPS: u32 = 3;
 /// Added to the target for the preview search, since downscaling hides some damage.
 const PREVIEW_MARGIN: f64 = 2.0;
 /// Auto mode aims no higher than this: 90 is indistinguishable at 1:1.
-const AUTO_CAP: f64 = 90.0;
+pub(crate) const AUTO_CAP: f64 = 90.0;
 /// Above this many scored pixels the reference keeps only the source between checks (fast-ssim2's
 /// lean reference): about half the memory at the peak, slower checks, the same scores. It is what
 /// lets wasm32's 4 GB hold images of 40 MP (web/worker.js).
@@ -231,11 +231,31 @@ fn enlargement(w: usize, h: usize) -> usize {
 
 /// One-off score of `distorted` against `source` (pngdeer --score), with the same small-image rule.
 pub fn score(source: &[RGBA], distorted: &[RGBA], w: usize, h: usize) -> Result<f64, BoxError> {
-    let factor = enlargement(w, h);
-    let (sw, sh) = (w * factor, h * factor);
-    let (a, b) = (enlarged_bytes(source, w, h, factor), enlarged_bytes(distorted, w, h, factor));
-    let reference = new_reference(&slice(&a, sw, sh, is_opaque(source))?)?;
-    Ok(reference.compare_with_config(&slice(&b, sw, sh, is_opaque(distorted))?, &ssim_config())?)
+    Scorer::new(source, w, h)?.score(distorted)
+}
+
+/// Scores any number of versions of one image against it as the search does (small images
+/// enlarged, a lean reference for large ones), with its reference built once: WebP's candidates.
+pub struct Scorer {
+    reference: Ssimulacra2Reference,
+    w: usize,
+    h: usize,
+    factor: usize,
+}
+
+impl Scorer {
+    pub fn new(source: &[RGBA], w: usize, h: usize) -> Result<Self, BoxError> {
+        let factor = enlargement(w, h);
+        let bytes = enlarged_bytes(source, w, h, factor);
+        let reference = new_reference(&slice(&bytes, w * factor, h * factor, is_opaque(source))?)?;
+        Ok(Scorer { reference, w, h, factor })
+    }
+
+    pub fn score(&self, distorted: &[RGBA]) -> Result<f64, BoxError> {
+        let (w, h) = (self.w * self.factor, self.h * self.factor);
+        let bytes = enlarged_bytes(distorted, self.w, self.h, self.factor);
+        Ok(self.reference.compare_with_config(&slice(&bytes, w, h, is_opaque(distorted))?, &ssim_config())?)
+    }
 }
 
 fn is_opaque(pixels: &[RGBA]) -> bool {

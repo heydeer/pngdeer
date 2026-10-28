@@ -10,12 +10,14 @@ repository = "https://github.com/heydeer/pngdeer"
 include = ["/src", "/tests", "/README.md", "/LICENSE"]
 
 [features]
-default = ["parallel", "oxipng"]
+default = ["parallel", "oxipng", "webp"]
 # Threads for palettes, remapping, scoring and oxipng (web/'s threaded build turns it on too).
 # Results don't depend on the number of threads.
 parallel = ["dep:rayon", "fast-ssim2/rayon", "oxipng?/parallel"]
 # compress() recompresses its final file with oxipng -o 2.
 oxipng = ["dep:oxipng"]
+# WebP output (pngdeer::compress_webp), with the vendored libwebp (vendor/libwebp).
+webp = ["dep:libwebp"]
 # For wasm32: oxipng's libdeflate built without libc (needs a clang that targets wasm32, see web/build.sh).
 freestanding = ["oxipng?/freestanding"]
 
@@ -25,6 +27,7 @@ fast-ssim2 = "0.9.0"
 # Math functions that give the same bits on every platform (std's come from the system libm on
 # native targets), so the browser build's output matches the command line's.
 libm = "0.2.16"
+libwebp = { package = "pngdeer-libwebp", path = "vendor/libwebp", optional = true }
 miniz_oxide = "0.9.1"
 oxipng = { version = "10.2.1", default-features = false, optional = true }
 png = "0.18.1"
@@ -32,7 +35,7 @@ rayon = { version = "1", optional = true }
 rgb = { version = "0.8.53", default-features = false, features = ["as-bytes"] }
 
 [workspace]
-members = [".", "web/wasm", "tools/quantlab"]
+members = [".", "web/wasm", "tools/quantlab", "tools/webplab"]
 default-members = ["."]
 resolver = "2"
 

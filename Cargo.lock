@@ -448,8 +448,17 @@ dependencies = [
  "miniz_oxide 0.9.1",
  "oxipng",
  "png",
+ "pngdeer-libwebp",
  "rayon",
  "rgb",
+]
+
+[[package]]
+name = "pngdeer-libwebp"
+version = "1.6.0"
+dependencies = [
+ "cc",
+ "libm",
 ]
 
 [[package]]
@@ -772,6 +781,16 @@ checksum = "88261b9deccee56594c11a3460c462c41f58d148598fe70ad77070126a68aba4"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webplab"
+version = "0.1.0"
+dependencies = [
+ "pngdeer",
+ "pngdeer-libwebp",
+ "rayon",
+ "rgb",
 ]
 
 [[package]]

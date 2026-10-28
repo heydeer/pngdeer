@@ -7,6 +7,7 @@
 //! - remap: pixels onto a palette (Floyd–Steinberg), neighbour smoothing
 //! - search: the palette size and remapping that reach the target in the fewest bytes
 //! - codec: PNG decoding, a quick palette PNG writer, and oxipng for the final file
+//! - webp: WebP output, the smaller of a palette image losslessly and a lossy file of the same quality
 //! - compress (here): the whole pipeline for one file
 
 // Index loops over a color's few coordinates read better here than zipped iterators.
@@ -18,9 +19,13 @@ mod palette;
 mod par;
 mod remap;
 pub mod search;
+#[cfg(feature = "webp")]
+pub mod webp;
 
 use codec::Error;
 use search::{Report, Variant, DEFAULT_VARIANTS};
+#[cfg(feature = "webp")]
+pub use webp::{compress_webp, CompressedWebp};
 
 /// An 8-bit RGBA pixel (the `rgb` crate's).
 pub use rgb::RGBA8 as RGBA;
@@ -32,6 +37,7 @@ pub const PREVIEW_PIXELS: usize = 350_000;
 /// the search's file.
 const EXACT_SLACK: f64 = 0.15;
 
+#[derive(Clone)]
 pub struct Settings {
     /// SSIMULACRA2 score to reach; None picks one per image, as TinyPNG would (search.rs).
     pub target: Option<f64>,
@@ -42,11 +48,52 @@ pub struct Settings {
     pub preview_pixels: usize,
     /// Milliseconds since some fixed point, for the report's time breakdown (wasm has no std clock).
     pub clock: Option<fn() -> f64>,
+    /// How compress_webp encodes (the defaults are what pngdeer ships; for experiments).
+    pub webp: WebpOptions,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { target: None, variants: DEFAULT_VARIANTS.to_vec(), preview_pixels: PREVIEW_PIXELS, clock: None }
+        Settings { target: None, variants: DEFAULT_VARIANTS.to_vec(), preview_pixels: PREVIEW_PIXELS, clock: None, webp: WebpOptions::default() }
+    }
+}
+
+/// compress_webp's encoder settings (webp.rs).
+#[derive(Clone, Copy, Debug)]
+pub struct WebpOptions {
+    /// A slower lossless level (cwebp -z 7-9) to try where the lossless file may win, besides
+    /// webp.rs's FAST_LEVELS: none by default, as level 9 saves about 2% for 20 times the time.
+    pub slow_lossless_level: Option<u8>,
+    /// The lossy candidates' method, as cwebp -m (0-6).
+    pub method: u8,
+    /// The lossy candidates' sharper RGB to YUV conversion (cwebp -sharp_yuv).
+    pub sharp_yuv: bool,
+    /// The lossy candidates' alpha plane prediction filtering: 0 none, 1 fast, 2 best (cwebp -alpha_filter).
+    pub alpha_filtering: u8,
+    /// Automatic quality only: the lossy quality whose file TinyPNG's WebP is (webp.rs). None keeps
+    /// the PNG's automatic target instead.
+    pub reference_quality: Option<u8>,
+    /// The lossy candidates' auto filter (cwebp -af), which adjusts the deblocking filter per
+    /// segment: 3% fewer bytes for the same score on the median image, 6% in total.
+    pub autofilter: bool,
+    /// The effort for the alpha plane of lossy files over 8 MP, compressed losslessly (smaller
+    /// images use `method`). At method 6 libwebp runs its slowest lossless search: on a 24 MP
+    /// cut-out 13 s natively for 0.25% smaller files than 5. Below 8 MP that runs alongside the PNG
+    /// search, and 5 would make files 0.6% bigger on the benchmark's translucent images (up to 11%).
+    pub large_alpha_effort: u8,
+}
+
+impl Default for WebpOptions {
+    fn default() -> Self {
+        WebpOptions {
+            slow_lossless_level: None,
+            method: 6,
+            sharp_yuv: true,
+            alpha_filtering: 1,
+            reference_quality: Some(70),
+            autofilter: true,
+            large_alpha_effort: 5,
+        }
     }
 }
 
@@ -70,7 +117,11 @@ impl Compressed {
 /// if the palette came out bigger, a lossless palette for images of few colors when it costs little
 /// more (EXACT_SLACK), and the input itself if nothing beats it.
 pub fn compress(input: &[u8], settings: &Settings) -> Result<Compressed, Error> {
-    let bitmap = codec::decode(input)?;
+    compress_decoded(input, &codec::decode(input)?, settings)
+}
+
+/// `compress` of a file already decoded.
+fn compress_decoded(input: &[u8], bitmap: &codec::Bitmap, settings: &Settings) -> Result<Compressed, Error> {
     let (w, h) = (bitmap.width, bitmap.height);
     let (searched, mut report) = search::run(&bitmap.pixels, w, h, settings)?;
     let tick = || settings.clock.map_or(0.0, |c| c());

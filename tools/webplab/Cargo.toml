@@ -1,0 +1,13 @@
+[package]
+name = "webplab"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Measures libwebp settings for pngdeer's WebP output: bytes at a fixed score (experiments/webp)."
+
+[dependencies]
+pngdeer = { path = "../.." }
+libwebp = { package = "pngdeer-libwebp", path = "../../vendor/libwebp" }
+rayon = "1"
+rgb = { version = "0.8.53", default-features = false, features = ["as-bytes"] }

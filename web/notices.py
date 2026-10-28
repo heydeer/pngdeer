@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NAMES = ("license", "licence", "copying", "notice", "copyright")
+NAMES = ("license", "licence", "copying", "notice", "copyright", "patents")
 
 
 def license_files(directory: Path) -> list[Path]:

@@ -123,6 +123,7 @@
   .empty h2 { font: 600 clamp(28px, 3.4vw, 38px)/1.1 var(--display); letter-spacing: -.035em; margin: 0 0 10px; color: var(--ink); text-wrap: balance; }
   .empty p { margin: 0 0 26px; color: var(--muted); }
   .empty .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .empty .output { margin-top: 18px; display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13.5px; }
   .release { position: absolute; inset: 0; display: grid; place-items: center; font: 600 34px var(--display); letter-spacing: -.03em; color: var(--walnut); background: #fff8dccc; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 5; }
   .table.over .release { opacity: 1; }
 
@@ -167,6 +168,7 @@
   .foot { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 14px 12px 20px; background: #ffffffe0; backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
   .palette { display: flex; height: 22px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 0 1px #0000000f; min-width: 0; background: var(--checker) 0 0 / 8px 8px; }
   .palette i { flex: 1 1 0; min-width: 0; }
+  .palette.none { visibility: hidden; }
   .palette.wait { background: repeating-linear-gradient(90deg, var(--paper-2) 0 10px, var(--line) 10px 12px); background-size: 48px 100%; animation: drift 1s linear infinite; }
   @keyframes drift { to { background-position: 48px 0; } }
   .foot .label { color: var(--muted); white-space: nowrap; font-size: 14px; }
@@ -435,11 +437,13 @@
         </button>
         <button class="pill ghost" id="samples" type="button">Try sample images</button>
       </div>
+      <div class="output">Output <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="png" aria-pressed="true">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div></div>
     </div>
     <div class="viewer" id="viewer">
       <div class="bar">
         <span class="name" id="v-name"></span><span class="dim mono" id="v-dim"></span>
         <span class="spacer"></span>
+        <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="png" aria-pressed="true">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div>
         <div class="seg" role="group" aria-label="Zoom" id="zoom">
           <button type="button" data-zoom="fit" aria-pressed="true">Fit</button><button type="button" data-zoom="1" aria-pressed="false">1:1</button><button type="button" data-zoom="2" aria-pressed="false">2×</button>
         </div>
@@ -651,13 +655,19 @@
 const $ = (s) => document.querySelector(s);
 const SAMPLES = ["sun-poster", "kodim01", "pngdeer@2x", "cup-of-tea", "openmoji-1f431"];
 const CORES = navigator.hardwareConcurrency || 4;
-const files = []; // {id, name, bytes, size, width, height, url, status, error, notPng, out, outUrl, report, ms, palette}
+// {id, name, bytes, size, width, height, url, jobs: {png, webp}}; a job: {status, error, out, outUrl,
+// report, ms, palette}. A file that isn't a PNG has `refused`, an error job, in place of jobs.
+const files = [];
 let nextId = 0, active = null;
+// The output format: each file is compressed to it once, and its jobs keep both when switching.
+let format = "png";
+try { if (localStorage.getItem("pngdeer-format") === "webp") format = "webp"; } catch {}
+const job = (f) => f.refused ?? f.jobs[format];
 let skipped = ""; // what the last dropped folders held besides PNGs
 
 const size = (n) => (n < 1024 * 1024 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : (n / 1048576).toFixed(2) + " MB");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const saving = (f) => Math.round(100 * (1 - f.out.byteLength / f.size));
+const saving = (f) => Math.round(100 * (1 - job(f).out.byteLength / f.size));
 
 /* ---------- worker pool ---------- */
 // Threaded build (cross-origin isolated page): one worker, whose thread pool uses every core (a
@@ -704,13 +714,13 @@ function pump() {
     const job = queue.shift();
     slot.busy = true;
     pending.set(job.key, job.resolve);
+    slot.worker.postMessage({ id: job.key, bytes: job.bytes, format: job.format });
     job.started();
-    slot.worker.postMessage({ id: job.key, bytes: job.bytes });
   }
 }
-const run = (key, bytes, started) => new Promise((resolve) => {
+const run = (key, bytes, format, started) => new Promise((resolve) => {
   if (poolError) return resolve({ error: poolError });
-  queue.push({ key, bytes: bytes.slice(0), resolve, started });
+  queue.push({ key, bytes: bytes.slice(0), format, resolve, started });
   pump();
 });
 
@@ -721,40 +731,62 @@ async function add(name, bytes) {
   const blob = new Blob([bytes], { type: "image/png" });
   const url = URL.createObjectURL(blob);
   const [width, height] = await dimensions(blob);
-  const f = { id: nextId++, name, bytes, size: bytes.byteLength, width, height, url, status: "queued" };
+  const f = { id: nextId++, name, bytes, size: bytes.byteLength, width, height, url, jobs: {} };
+  f.jobs[format] = { status: "queued" };
   enter(f);
-  compress(f);
+  compress(f, format);
 }
 
 /** A file that isn't a PNG: an error card, showing the file itself when the browser can draw it. */
 async function refuse(file) {
   const [width, height] = await dimensions(file);
-  enter({ id: nextId++, name: file.name, size: file.size, width, height, url: URL.createObjectURL(file), status: "error", error: "not a PNG file", notPng: true });
+  const refused = { status: "error", error: "not a PNG file", notPng: true };
+  enter({ id: nextId++, name: file.name, size: file.size, width, height, url: URL.createObjectURL(file), refused });
 }
 
 function enter(f) {
   files.push(f);
-  if (!active || active.status === "done" || active.status === "error") show(f); else render();
+  if (!active || ["done", "error"].includes(job(active).status)) show(f); else render();
 }
 
-async function compress(f) {
-  const data = await run(String(f.id), f.bytes, () => {
-    f.status = "busy";
+async function compress(f, to) {
+  const j = (f.jobs[to] ??= { status: "queued" });
+  const data = await run(`${f.id}:${to}`, f.bytes, to, () => {
+    j.status = "busy";
     render();
   });
   if (data.error) {
-    f.status = "error";
-    f.error = data.error;
+    j.status = "error";
+    j.error = data.error;
   } else {
-    f.status = "done";
-    f.out = data.png;
-    f.outUrl = URL.createObjectURL(new Blob([data.png], { type: "image/png" }));
-    f.report = data.report;
-    f.ms = data.ms;
-    f.palette = paletteOf(data.png);
+    j.status = "done";
+    j.out = data.file;
+    j.outUrl = URL.createObjectURL(new Blob([data.file], { type: `image/${to}` }));
+    j.report = data.report;
+    j.ms = data.ms;
+    j.palette = to === "png" ? paletteOf(data.file) : [];
   }
-  if (f === active) show(f, true); else render();
+  if (f === active && to === format) show(f, true); else render();
 }
+
+/** Switches the output format, compressing to it what isn't yet. */
+function setFormat(to) {
+  format = to;
+  try { localStorage.setItem("pngdeer-format", to); } catch {}
+  for (const x of document.querySelectorAll(".format button")) x.setAttribute("aria-pressed", x.dataset.format === to);
+  // every file gets its job before any starts: starting one renders them all
+  const todo = files.filter((f) => !f.refused && !f.jobs[to]);
+  for (const f of todo) f.jobs[to] = { status: "queued" };
+  for (const f of todo) compress(f, to);
+  if (active) show(active); else render();
+}
+for (const seg of document.querySelectorAll(".format")) {
+  seg.onclick = (e) => {
+    const b = e.target.closest("button");
+    if (b && b.dataset.format !== format) setFormat(b.dataset.format);
+  };
+}
+for (const x of document.querySelectorAll(".format button")) x.setAttribute("aria-pressed", x.dataset.format === format);
 
 /** The PLTE (and tRNS) entries of a palette PNG, lightest first; [] for any other PNG. */
 function paletteOf(png) {
@@ -783,14 +815,14 @@ function show(f, intro = false) {
   active = f;
   table.classList.add("loaded");
   $("#img-before").src = f.url;
-  $("#img-after").src = f.outUrl || f.url;
+  $("#img-after").src = job(f).outUrl || f.url;
   $("#v-name").textContent = f.name;
   $("#v-dim").textContent = f.width ? `${f.width}×${f.height}` : "";
   stage.hidden = !f.width;
   setSplit(50);
   layout();
   render();
-  if (intro && f.status === "done") sweep();
+  if (intro && job(f).status === "done") sweep();
 }
 
 function layout() {
@@ -842,7 +874,7 @@ function sweep() {
 }
 
 stage.addEventListener("pointerdown", (e) => {
-  if (active?.status !== "done") return;
+  if (!active || job(active).status !== "done") return;
   dragging = true;
   stage.setPointerCapture(e.pointerId);
   move(e);
@@ -874,8 +906,12 @@ $("#bg").onclick = (e) => {
 addEventListener("resize", layout);
 
 /* ---------- rendering ---------- */
-function outcome(f) {
-  const r = f.report;
+function outcome(j) {
+  const r = j.report;
+  if (r.format === "webp") {
+    if (r.mode === "lossy") return `Lossy WebP, quality ${r.quality}`;
+    return ["hit", "miss"].includes(r.png.outcome) ? `Lossless WebP, ${r.png.colors} colors` : "Lossless WebP";
+  }
   if (r.outcome === "exact" || r.outcome === "lossless") return "Lossless";
   if (r.outcome === "original") return "Already optimal";
   return `${r.colors} colors`;
@@ -884,55 +920,61 @@ function outcome(f) {
 function render() {
   const f = active;
   if (f) {
-    const done = f.status === "done", waiting = f.status === "queued" || f.status === "busy";
+    const j = job(f);
+    const done = j.status === "done", waiting = j.status === "queued" || j.status === "busy";
     stage.classList.toggle("busy", waiting);
-    stage.classList.toggle("failed", f.status === "error");
+    stage.classList.toggle("failed", j.status === "error");
     stage.classList.toggle("ready", done);
     $("#t-before").textContent = size(f.size);
-    $("#t-after").textContent = done ? size(f.out.byteLength) : f.status === "error" ? "failed" : "working…";
+    $("#t-after").textContent = done ? size(j.out.byteLength) : j.status === "error" ? "failed" : "working…";
     $("#t-save").textContent = done ? `−${saving(f)}%` : "";
     $("#t-save").hidden = !done;
     const pal = $("#palette");
     pal.classList.toggle("wait", waiting);
-    pal.innerHTML = done ? f.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
+    pal.classList.toggle("none", done && !j.palette.length); // a lossy WebP or a true-color PNG has none
+    pal.innerHTML = done ? j.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
+    const busy = format === "webp" ? "Finding the smallest WebP…" : "Finding the smallest palette…";
     $("#p-label").innerHTML = done
-      ? `<b>${outcome(f)}</b> · SSIMULACRA2 ${f.report.score.toFixed(1)}`
-      : f.status === "error" ? `Couldn't compress: ${esc(f.error)}` : f.status === "busy" ? "Finding the smallest palette…" : "Waiting for the files before it…";
+      ? `<b>${outcome(j)}</b> · SSIMULACRA2 ${j.report.score.toFixed(1)}`
+      : j.status === "error" ? `Couldn't compress: ${esc(j.error)}` : j.status === "busy" ? busy : "Waiting for the files before it…";
     $("#dl-one").disabled = !done;
   }
-  const done = files.filter((x) => x.status === "done");
+  const done = files.filter((x) => job(x).status === "done");
   $("#tray").classList.toggle("on", files.length > 0);
   $("#cards").innerHTML = files.map((x) => {
-    const ok = x.status === "done";
-    const sub = ok ? `${size(x.size)} → ${size(x.out.byteLength)} <b>−${saving(x)}%</b>`
-      : x.status === "error" ? (x.notPng ? "Not a PNG" : "Couldn't compress") : x.status === "busy" ? "Compressing…" : "Waiting";
+    const j = job(x), ok = j.status === "done";
+    const sub = ok ? `${size(x.size)} → ${size(j.out.byteLength)} <b>−${saving(x)}%</b>`
+      : j.status === "error" ? (j.notPng ? "Not a PNG" : "Couldn't compress") : j.status === "busy" ? "Compressing…" : "Waiting";
     return `<button class="card" type="button" data-id="${x.id}" aria-current="${x === active}">
-      ${x.width ? `<img class="thumb" src="${x.outUrl || x.url}" alt="">` : '<span class="thumb"></span>'}
-      <span><div class="t" title="${esc(x.name)}">${esc(x.name)}</div><div class="s ${x.status === "error" ? "err" : ""}">${sub}</div>${ok || x.status === "error" ? "" : '<div class="meter"></div>'}</span>
+      ${x.width ? `<img class="thumb" src="${j.outUrl || x.url}" alt="">` : '<span class="thumb"></span>'}
+      <span><div class="t" title="${esc(x.name)}">${esc(x.name)}</div><div class="s ${j.status === "error" ? "err" : ""}">${sub}</div>${ok || j.status === "error" ? "" : '<div class="meter"></div>'}</span>
     </button>`;
   }).join("");
-  const before = done.reduce((s, x) => s + x.size, 0), after = done.reduce((s, x) => s + x.out.byteLength, 0);
+  const before = done.reduce((s, x) => s + x.size, 0), after = done.reduce((s, x) => s + job(x).out.byteLength, 0);
   const plural = files.length > 1 ? "s" : "";
   $("#sum").innerHTML = done.length
     ? `<b>−${Math.round(100 * (1 - after / before))}%</b>${size(before - after)} saved · ${done.length} of ${files.length} done`
-    : files.every((x) => x.status === "error") ? `<b>Couldn't compress</b>${files.length} file${plural}`
+    : files.every((x) => job(x).status === "error") ? `<b>Couldn't compress</b>${files.length} file${plural}`
     : `<b>Working…</b>${files.length} file${plural}`;
   $("#all").disabled = !done.length;
   renderNote();
-  window.__pngdeer = files.map((x) => ({ name: x.name, before: x.size, after: x.out?.byteLength, ms: x.ms, report: x.report, status: x.status, error: x.error }));
+  window.__pngdeer = files.map((x) => {
+    const j = job(x);
+    return { name: x.name, format, before: x.size, after: j.out?.byteLength, ms: j.ms, report: j.report, status: j.status, error: j.error };
+  });
 }
 
 function renderNote() {
   const status = files.length
-    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG would give it, at most 90.`
+    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG's ${format === "webp" ? "WebP" : "PNG"} would be, at most 90.`
     : "";
   $("#note").innerHTML = (skipped ? `<span class="err">${esc(skipped)}</span> ` : "") + esc(status);
 }
 
 function download(f) {
   const a = document.createElement("a");
-  a.href = f.outUrl;
-  a.download = f.name.replace(/\.png$/i, "") + ".min.png";
+  a.href = job(f).outUrl;
+  a.download = f.name.replace(/\.png$/i, "") + `.min.${format}`;
   a.click();
 }
 
@@ -1029,8 +1071,8 @@ $("#cards").onclick = (e) => {
   const c = e.target.closest(".card");
   if (c) show(files.find((x) => x.id == c.dataset.id));
 };
-$("#dl-one").onclick = () => active?.status === "done" && download(active);
-$("#all").onclick = () => files.filter((x) => x.status === "done").forEach((x, i) => setTimeout(() => download(x), i * 250));
+$("#dl-one").onclick = () => active && job(active).status === "done" && download(active);
+$("#all").onclick = () => files.filter((x) => job(x).status === "done").forEach((x, i) => setTimeout(() => download(x), i * 250));
 
 /* ---------- research ---------- */
 // bench/bench.py, October 2026: pngdeer's pd70–pd95 runs and every other tool's ten settings, each

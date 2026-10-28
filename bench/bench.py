@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PNG compression benchmark: pngdeer, pngquant and other open-source quantizers vs TinyPNG.
+"""PNG compression benchmark: pngdeer, pngquant and other open-source quantizers vs TinyPNG, and WebP.
 
 Every output is scored against its original with SSIMULACRA2
 (100 = identical, 90 = indistinguishable at 1:1, 70 = high quality, 50 = medium).
@@ -12,6 +12,13 @@ Pipelines (pick with --pipelines):
   pqN-dD   same with dithering level D/100 (pq80-d50 = --floyd=0.5, pq80-d0 = --nofs)
   <tool>N  other open-source quantizers at N colors, then oxipng (see QUANT_TOOLS)
   tinypng  TinyPNG API (results cached in bench/.cache/tinypng to save quota)
+
+WebP pipelines (outputs decoded with dwebp, as browsers decode them, then scored the same way):
+  wpT      pngdeer --format webp --target T
+  wpauto   pngdeer --format webp at its automatic quality
+  cwQ      cwebp -q Q -m 6 -sharp_yuv -alpha_q 100 (libwebp at its slowest and sharpest)
+  cwll     cwebp -lossless -z 9
+  tinywebp TinyPNG API, converted to WebP (cached in bench/.cache/tinypng; costs two compressions)
 """
 
 import argparse
@@ -52,15 +59,19 @@ COLOR_CHUNKS = {b"gAMA", b"cHRM", b"sRGB", b"iCCP", b"cICP", b"mDCV", b"cLLI"}
 @dataclass(frozen=True)
 class Pipeline:
     name: str
-    kind: str  # "oxipng" | "pngdeer" | "pngquant" | "quant" | "tinypng"
-    quality: int | None = None  # pngquant: --quality; quant: palette size
+    kind: str  # "oxipng" | "pngdeer" | "pngquant" | "quant" | "tinypng" | "pngdeer-webp" | "cwebp" | "tinywebp"
+    quality: int | None = None  # pngquant: --quality; quant: palette size; cwebp: -q (None: lossless)
     dither: int | None = None  # pngquant and quant; None = the tool's default dithering
     target: int | None = None  # pngdeer: SSIMULACRA2 score to reach (None: automatic)
     tool: str | None = None  # quant: a QUANT_TOOLS key
 
     @property
     def family(self) -> str:
-        return re.sub(r"^(pq|pd|" + "|".join(QUANT_TOOLS) + r")\d+", r"\1", self.name)
+        return re.sub(r"^(pq|pd|wp|cw|" + "|".join(QUANT_TOOLS) + r")\d+", r"\1", self.name)
+
+    @property
+    def webp(self) -> bool:
+        return self.kind in ("pngdeer-webp", "cwebp", "tinywebp")
 
 
 @dataclass(frozen=True)
@@ -101,6 +112,9 @@ class Config:
     pd_preview_pixels: int | None = None  # pngdeer --preview-pixels (None: its default, as shipped)
     quantlab: str | None = None  # tools/quantlab, for the exq / qte / nq / qzr pipelines
     small_side: int = 256  # score images with a shorter longer side enlarged; 0 = off
+    pd_args: tuple[str, ...] = ()  # more pngdeer arguments, e.g. --webp-method 5
+    cwebp: str | None = None
+    dwebp: str | None = None
 
 
 class TinyPNGError(Exception):
@@ -154,10 +168,36 @@ class TinyPNG:
         shutil.copyfile(cached, dst)
         return False, seconds
 
-    def _request(self, method: str, url: str, data: bytes | None = None):
+    def convert_webp(self, src: Path, dst: Path) -> tuple[bool, float | None]:
+        """Writes TinyPNG's output for src, converted to WebP, to dst (a shrink, then a conversion of
+        its result: two compressions). Returns whether it came from the cache and the round trip's time."""
+        data = src.read_bytes()
+        cached = self.cache_dir / f"{hashlib.sha256(data).hexdigest()}.webp"
+        timing = cached.with_suffix(".webp.json")
+        if cached.exists():
+            shutil.copyfile(cached, dst)
+            return True, json.loads(timing.read_text())["seconds"] if timing.exists() else None
+        if self.fatal:
+            raise TinyPNGError(self.fatal)
+        with self.slots:
+            start = time.perf_counter()
+            _, headers, body = self._request("POST", TINYPNG_SHRINK_URL, data)
+            url = headers.get("Location") or json.loads(body)["output"]["url"]
+            _, _, out = self._request("POST", url, json.dumps({"convert": {"type": "image/webp"}}).encode(), "application/json")
+            seconds = time.perf_counter() - start
+        if out[:4] != b"RIFF" or out[8:12] != b"WEBP":
+            raise TinyPNGError("TinyPNG's conversion is not a WebP file")
+        tmp = cached.with_suffix(f".{threading.get_ident()}.tmp")
+        tmp.write_bytes(out)
+        os.replace(tmp, cached)
+        timing.write_text(json.dumps({"seconds": round(seconds, 3)}))
+        shutil.copyfile(cached, dst)
+        return False, seconds
+
+    def _request(self, method: str, url: str, data: bytes | None = None, content_type: str = "application/octet-stream"):
         req = urllib.request.Request(url, data=data, method=method, headers={"Authorization": self.auth})
         if data is not None:
-            req.add_header("Content-Type", "application/octet-stream")
+            req.add_header("Content-Type", content_type)
         for attempt in range(4):
             try:
                 with urllib.request.urlopen(req, timeout=120) as resp:
@@ -209,10 +249,10 @@ def find_pngdeer() -> str | None:
     return os.environ.get("PNGDEER") or (str(PNGDEER_BUILT) if PNGDEER_BUILT.exists() else shutil.which("pngdeer"))
 
 
-def find_tools(need_pngdeer: bool, quant_tools: set[str] = frozenset()) -> dict[str, str]:
+def find_tools(need_pngdeer: bool, quant_tools: set[str] = frozenset(), webp: bool = False) -> dict[str, str]:
     tools = {}
     missing = []
-    needed = ["pngquant", "oxipng", "ssimulacra2"] + ["magick"] * ("im" in quant_tools) + ["ffmpeg"] * ("ff" in quant_tools)
+    needed = ["pngquant", "oxipng", "ssimulacra2"] + ["magick"] * ("im" in quant_tools) + ["ffmpeg"] * ("ff" in quant_tools) + ["cwebp", "dwebp"] * webp
     for name in needed:
         path = shutil.which(name)
         if path:
@@ -220,7 +260,7 @@ def find_tools(need_pngdeer: bool, quant_tools: set[str] = frozenset()) -> dict[
         else:
             missing.append(name)
     if missing:
-        sys.exit(f"missing tools: {', '.join(missing)}\ninstall with: brew install pngquant oxipng jpeg-xl imagemagick ffmpeg")
+        sys.exit(f"missing tools: {', '.join(missing)}\ninstall with: brew install pngquant oxipng jpeg-xl imagemagick ffmpeg webp")
     if quant_tools & set(QUANTLAB_ALGOS):
         path = os.environ.get("QUANTLAB") or (str(QUANTLAB_BUILT) if QUANTLAB_BUILT.exists() else None)
         if not path:
@@ -286,6 +326,13 @@ def run_quantizer(cfg: Config, tool: str, colors: int, dither: bool, src: Path, 
         run([cfg.quantlab, QUANTLAB_ALGOS[tool], str(colors), "1" if dither else "0", str(src), str(dst)])
 
 
+def run_cwebp(cfg: Config, src: Path, dst: Path, quality: int | None) -> None:
+    """libwebp's own encoder: lossy at -q quality with its slowest method and sharp YUV, alpha kept
+    lossless; or lossless at its highest effort."""
+    args = ["-lossless", "-z", "9"] if quality is None else ["-q", str(quality), "-m", "6", "-sharp_yuv", "-alpha_q", "100"]
+    run([cfg.cwebp, "-quiet", *args, str(src), "-o", str(dst)])
+
+
 def png_chunks(data: bytes):
     """Yields (type, raw chunk bytes) for each chunk after the PNG signature."""
     pos = 8
@@ -330,7 +377,10 @@ class Scorer:
 
     def score(self, path: Path) -> float:
         scored = self.workdir / "score-candidate.png"
-        strip_color_chunks(path, scored)
+        if path.suffix == ".webp":
+            run([self.cfg.dwebp, "-quiet", str(path), "-o", str(scored)])
+        else:
+            strip_color_chunks(path, scored)
         if self.factor > 1:
             enlarged = self.workdir / "score-candidate-big.png"
             run([self.cfg.pngdeer, str(scored), "-o", str(enlarged), "--upscale", str(self.factor)])
@@ -338,10 +388,12 @@ class Scorer:
         return ssimulacra2(self.cfg, self.reference, scored)
 
 
-def run_pngdeer(cfg: Config, src: Path, dst: Path, target: int | None) -> tuple[str, float]:
+def run_pngdeer(cfg: Config, src: Path, dst: Path, target: int | None, webp: bool = False) -> tuple[str, float]:
     """pngdeer's whole pipeline (search, oxipng -o 2, lossless fallbacks), as the CLI and the browser
-    run it. Returns what it picked and the time it took."""
-    cmd = [cfg.pngdeer, str(src), "-o", str(dst), "--target", "auto" if target is None else str(target)]
+    run it, or its WebP output. Returns what it picked and the time it took."""
+    cmd = [cfg.pngdeer, str(src), "-o", str(dst), "--target", "auto" if target is None else str(target), *cfg.pd_args]
+    if webp:
+        cmd += ["--format", "webp"]
     if cfg.pd_variants:
         cmd += ["--variants", cfg.pd_variants]
     if cfg.pd_preview_pixels is not None:
@@ -352,6 +404,10 @@ def run_pngdeer(cfg: Config, src: Path, dst: Path, target: int | None) -> tuple[
     if proc.returncode != 0:
         raise RuntimeError(f"pngdeer exited {proc.returncode}: {proc.stderr.strip()}")
     report = json.loads(proc.stdout)
+    if webp:
+        q = "" if report["quality"] is None else f" q{report['quality']}"
+        tries = f"tries={report['tries']} rounds={report['rounds']}" if "tries" in report else f"probes={report['probes']}"
+        return f"{report['mode']}{q} t{report['target']:g} {tries} z{report['lossless_level']} png={report['png']['bytes']}", seconds
     outcome = "" if report["outcome"] == "hit" else f" {report['outcome']}"
     return f"n{report['colors']} {report['variant']} t{report['target']:g} evals={report['evals']}{outcome}", seconds
 
@@ -379,13 +435,25 @@ def parse_pipelines(spec: str) -> list[Pipeline]:
             pipelines.append(Pipeline(name, "quant", colors, 0 if m.group(3) else None, tool=m.group(1)))
         elif name == "pdauto":
             pipelines.append(Pipeline(name, "pngdeer"))
+        elif name == "wpauto":
+            pipelines.append(Pipeline(name, "pngdeer-webp"))
+        elif m := re.fullmatch(r"wp(\d{1,3})", name):
+            pipelines.append(Pipeline(name, "pngdeer-webp", target=int(m.group(1))))
+        elif name == "cwll":
+            pipelines.append(Pipeline(name, "cwebp"))
+        elif m := re.fullmatch(r"cw(\d{1,3})", name):
+            if not 0 <= int(m.group(1)) <= 100:
+                sys.exit(f"cwebp quality must be 0-100: {name}")
+            pipelines.append(Pipeline(name, "cwebp", int(m.group(1))))
+        elif name == "tinywebp":
+            pipelines.append(Pipeline(name, "tinywebp"))
         elif m := re.fullmatch(r"pd(\d{1,3})", name):
             target = int(m.group(1))
             if not 1 <= target <= 100:
                 sys.exit(f"pngdeer target must be an SSIMULACRA2 score 1-100: {name}")
             pipelines.append(Pipeline(name, "pngdeer", target=target))
         else:
-            sys.exit(f"unknown pipeline: {name} (expected oxipng, tinypng, pdT, pdauto, pqN, pqN-dD, or <tool>N / <tool>N-d0 with tool {'/'.join(QUANT_TOOLS)})")
+            sys.exit(f"unknown pipeline: {name} (expected oxipng, tinypng, pdT, pdauto, pqN, pqN-dD, <tool>N / <tool>N-d0 with tool {'/'.join(QUANT_TOOLS)}, wpT, wpauto, cwQ, cwll or tinywebp)")
     return pipelines
 
 
@@ -433,7 +501,7 @@ def process_image(img: Image, pipelines: list[Pipeline], cfg: Config, tiny: Tiny
         scorer = Scorer(cfg, source, Path(tmp), width, height)
         for p in pipelines:
             row = Row(str(img.rel), img.category, width, height, color, p.name, orig_bytes)
-            dst = out_dir / p.name / img.rel
+            dst = out_dir / p.name / (img.rel.with_suffix(".webp") if p.webp else img.rel)
             dst.parent.mkdir(parents=True, exist_ok=True)
             start = time.perf_counter()
             seconds = None
@@ -450,13 +518,15 @@ def process_image(img: Image, pipelines: list[Pipeline], cfg: Config, tiny: Tiny
                     run_quantizer(cfg, p.tool, p.quality, p.dither != 0, source, quantized)
                     row.pngquant_bytes = quantized.stat().st_size
                     run_oxipng(cfg, quantized, dst)
-                elif p.kind == "pngdeer":
-                    row.params, seconds = run_pngdeer(cfg, source, dst, p.target)
-                elif p.kind == "tinypng":
-                    cached, seconds = tiny.compress(source, dst)
+                elif p.kind in ("pngdeer", "pngdeer-webp"):
+                    row.params, seconds = run_pngdeer(cfg, source, dst, p.target, p.kind == "pngdeer-webp")
+                elif p.kind == "cwebp":
+                    run_cwebp(cfg, source, dst, p.quality)
+                elif p.kind in ("tinypng", "tinywebp"):
+                    cached, seconds = (tiny.compress if p.kind == "tinypng" else tiny.convert_webp)(source, dst)
                     if cached:
                         row.note = "cached"
-                if p.kind in ("oxipng", "pngquant", "quant"):
+                if p.kind in ("oxipng", "pngquant", "quant", "cwebp"):
                     seconds = time.perf_counter() - start
                 if seconds is not None:
                     row.seconds = round(seconds, 3)
@@ -838,6 +908,7 @@ def main() -> None:
     parser.add_argument("--zopfli", action="store_true", help="use zopfli in oxipng (smaller, much slower)")
     parser.add_argument("--pq-speed", type=int, choices=range(1, 12), metavar="1-11", help="pngquant --speed (default: pngquant's own, 4)")
     parser.add_argument("--pd-variants", help="pngdeer --variants for the pd pipelines: what it tries per palette size (default: pngdeer's own)")
+    parser.add_argument("--pd-args", default="", help="more pngdeer arguments for the pd and wp pipelines, e.g. '--webp-method 5'")
     parser.add_argument("--pd-preview-pixels", type=int,
                         help="pngdeer --preview-pixels for the pd pipelines; 0 searches at full size (default: pngdeer's own, as shipped)")
     parser.add_argument("--small-side", type=int, default=256,
@@ -846,17 +917,17 @@ def main() -> None:
     args = parser.parse_args()
 
     pipelines = parse_pipelines(args.pipelines)
-    tools = find_tools(need_pngdeer=any(p.kind == "pngdeer" for p in pipelines), quant_tools={p.tool for p in pipelines if p.kind == "quant"})
+    tools = find_tools(need_pngdeer=any(p.kind in ("pngdeer", "pngdeer-webp") for p in pipelines), quant_tools={p.tool for p in pipelines if p.kind == "quant"}, webp=any(p.webp for p in pipelines))
     cfg = Config(
         tools["pngquant"], tools["oxipng"], tools["ssimulacra2"], args.oxipng_level, args.zopfli, args.pq_speed,
         tools.get("pngdeer"), args.pd_variants, args.pd_preview_pixels, tools.get("quantlab"),
-        args.small_side if tools.get("pngdeer") else 0,
+        args.small_side if tools.get("pngdeer") else 0, tuple(args.pd_args.split()), tools.get("cwebp"), tools.get("dwebp"),
     )
     if args.small_side and not tools.get("pngdeer"):
         print("warning: pngdeer not found, so small images are scored at their own size", file=sys.stderr)
 
     tiny = None
-    if any(p.kind == "tinypng" for p in pipelines):
+    if any(p.kind in ("tinypng", "tinywebp") for p in pipelines):
         key = load_api_key()
         if key:
             tiny = TinyPNG(key, BENCH_DIR / ".cache" / "tinypng")
@@ -868,7 +939,7 @@ def main() -> None:
                 print(f"warning: {e}; only cached TinyPNG results will be used", file=sys.stderr)
         else:
             print("warning: TINYPNG_API_KEY not set (env or .env), skipping tinypng", file=sys.stderr)
-            pipelines = [p for p in pipelines if p.kind != "tinypng"]
+            pipelines = [p for p in pipelines if p.kind not in ("tinypng", "tinywebp")]
     if not pipelines:
         sys.exit("no pipelines to run")
 

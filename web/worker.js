@@ -1,6 +1,7 @@
-// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time. On a cross-origin
-// isolated page (see serve.py) it loads the threaded build, whose rayon pool spreads each file's
-// quantizing, scoring and oxipng over all cores; elsewhere, or with ?single, the single-threaded one.
+// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time, to PNG or WebP. On
+// a cross-origin isolated page (see serve.py) it loads the threaded build, whose rayon pool spreads
+// each file's quantizing, encoding, scoring and oxipng over all cores; elsewhere, or with ?single,
+// the single-threaded one.
 const threaded = self.crossOriginIsolated === true && !new URL(self.location.href).searchParams.has("single");
 
 // 16×16 gradient. Compressing it first proves the thread pool works: in Chromium, a page reloaded
@@ -26,8 +27,12 @@ const ready = (async () => {
   return mod;
 })();
 
+// WebP's own limit, per side.
+const WEBP_MAX_SIDE = 16383;
+
 self.onmessage = async ({ data }) => {
-  const { id, bytes, target, preview } = data; // no target: automatic quality; no preview: pngdeer's default
+  // format: "png" or "webp"; no target: automatic quality; no preview: pngdeer's default
+  const { id, bytes, format, target, preview } = data;
   try {
     const input = new Uint8Array(bytes);
     const ihdr = new DataView(input.buffer, 16, 8);
@@ -38,14 +43,17 @@ self.onmessage = async ({ data }) => {
       const size = `${width} × ${height} pixels (${(pixels / 1e6).toFixed(1)} MP)`;
       throw new Error(`too large for the browser version: ${size}, at most ${MAX_PIXELS / 1e6} MP; use the command line`);
     }
-    const { compress } = await ready;
+    if (format === "webp" && Math.max(width, height) > WEBP_MAX_SIDE) {
+      throw new Error(`too large for WebP: ${width} × ${height} pixels, at most ${WEBP_MAX_SIDE} a side; choose PNG`);
+    }
+    const mod = await ready;
     const start = performance.now();
-    const result = compress(input, target, preview);
+    const result = format === "webp" ? mod.compress_webp(input, target, preview) : mod.compress(input, target, preview);
     const ms = performance.now() - start;
-    const png = result.png;
+    const file = format === "webp" ? result.webp : result.png;
     const report = JSON.parse(result.report);
     result.free();
-    self.postMessage({ id, png, report, ms, threaded }, [png.buffer]);
+    self.postMessage({ id, file, report, ms, threaded }, [file.buffer]);
   } catch (error) {
     self.postMessage({ id, error: String(error) });
   }

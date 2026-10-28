@@ -44,3 +44,30 @@ pub fn fill<T: Send>(out: &mut [T], size: usize, f: impl Fn(usize, &mut [T]) + S
         out.chunks_mut(size).enumerate().for_each(|(i, c)| f(i * size, c));
     }
 }
+
+/// `f` on each item, results in order.
+#[cfg(feature = "webp")] // its only user
+pub fn map<T: Sync, U: Send>(items: &[T], f: impl Fn(&T) -> U + Sync + Send) -> Vec<U> {
+    #[cfg(feature = "parallel")]
+    {
+        use rayon::prelude::*;
+        items.par_iter().map(f).collect()
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        items.iter().map(f).collect()
+    }
+}
+
+/// `a` and `b`, at once where there are threads.
+#[cfg(feature = "webp")] // its only user
+pub fn join<A: Send, B: Send>(a: impl FnOnce() -> A + Send, b: impl FnOnce() -> B + Send) -> (A, B) {
+    #[cfg(feature = "parallel")]
+    {
+        rayon::join(a, b)
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        (a(), b())
+    }
+}

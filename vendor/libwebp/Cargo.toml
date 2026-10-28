@@ -1,0 +1,19 @@
+[package]
+name = "pngdeer-libwebp"
+version = "1.6.0"
+edition = "2021"
+# libwebp is BSD-3-Clause with Google's patent grant (libwebp/COPYING, libwebp/PATENTS); the Rust
+# and glue code here is pngdeer's, MIT.
+license = "BSD-3-Clause AND MIT"
+description = "libwebp 1.6.0 for pngdeer: WebP encoding and decoding with the same bytes on every target"
+publish = false
+
+[lib]
+name = "libwebp"
+
+[dependencies]
+# The math libwebp calls (glue/pngdeer.h), the same bits on every target
+libm = "0.2.16"
+
+[build-dependencies]
+cc = "1"
