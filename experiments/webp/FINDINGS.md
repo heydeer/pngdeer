@@ -278,3 +278,49 @@ back is instant):
   its PNG search). Computed once per alpha and channel byte instead (vendor/fast-ssim2/PATCHES.md,
   6; the same bits), it takes 67 s, and its PNG output 23 s instead of 56 s.
 - libwebp adds about 0.45 MB to each build (1.34 MB single-threaded, 1.92 MB threaded).
+
+## Round 6: a leaderboard
+
+The PNG leaderboard's method (README; experiments/palette-feedback/tool_rank.py) with TinyPNG's WebP
+as the yardstick: per tool, all its settings form one size–quality frontier per image. Runs
+`bench/results/wlb-{main,holdout}-20261028-091328`, summarized by experiments/webp/leaderboard.py.
+TinyPNG's real WebP for the 120 images it was fetched for (WebP's settings were chosen on these),
+the stand-in for the other 60.
+
+The contenders. Every open-source WebP tool we know of encodes with libwebp (Squoosh, sharp,
+Pillow, ImageMagick, FFmpeg), so they differ in settings, which cwebp covers:
+
+- **pngdeer**: 12 targets (40–98) and automatic.
+- **cwebp**: 27 settings, best per image picked after the fact: -q 10–100 (13 steps) at -m 6
+  -sharp_yuv, the same with -af (pngdeer's lossy encoder settings), and -lossless -z 9.
+- **pngquant + cwebp**: pngquant at 60–100, with and without dithering (as in the PNG
+  leaderboard), stored as lossless WebP (-z 9): TinyPNG's palette route from open-source parts.
+
+Against TinyPNG's WebP (120 images):
+
+| Tool | Size at TinyPNG's quality, median / total | Points | Reaches |
+|---|---:|---:|---:|
+| **pngdeer** | **95.0% / 93.9%** | **+1.6** (all 120) | 118 |
+| TinyPNG (yardstick) | 100% | 0 | 120 |
+| cwebp, best of 27 | 97.9% / 110.2% | +0.9 (102) | 120 |
+| pngquant + cwebp, best of 10 | 135.0% / 212.1% | +1.1 (58) | 115 |
+
+- Points (score at TinyPNG's file size) exist only where TinyPNG's file is no smaller than a
+  tool's smallest, so the medians cover different images: pngquant + cwebp's 58 are mostly where
+  TinyPNG went lossless itself. On the 40 images all three cover: pngdeer +2.6, pngquant + cwebp
+  +1.9, cwebp −0.3. Size at TinyPNG's quality covers nearly every image.
+- By category (median size at TinyPNG's quality, pngdeer / cwebp / pngquant + cwebp): 3D 97 / 100 /
+  142%, icons 95 / 118 / 96%, illustrations 92 / 97 / 100%, photos 92 / 93 / 317%, cut-outs 97 / 97 /
+  229%, UI 96 / 98 / 105%. pngdeer is under TinyPNG in every category; cwebp loses on icons, where a
+  palette wins, and pngquant everywhere else.
+- pngdeer can't reach 2 (and 2 of the 60): line drawings where TinyPNG's palette scores 0.2–1.0
+  above pngdeer's best palette and lossy can't get there; pngdeer has no truecolor lossless WebP.
+- One setting, as tools ship: cwebp's default (-q 75) is 105.8% of TinyPNG's size (111.8% in
+  total) at −0.32 points, bigger and worse on 64 of the 120; -q 80 (sharp's and Pillow's default
+  quality, at method 4 as here) 124.9% at +2.23. pngdeer's automatic quality: 94.6% / 93.8% at
+  +0.07, bigger and worse on 1.
+
+Against the stand-in (the other 60): pngdeer 95.8% / 92.0%, +1.2, reaches 58; cwebp 99.7% /
+111.8%, +0.4 (50), 60; pngquant + cwebp 115.9% / 181.5%, +1.9 (34), 57; on the 24 images all
+cover, +3.2 / +0.1 / +2.2. cwebp -q 75: 110.4% at −1.89; pngdeer automatic 95.9% / 94.1% at +0.13.
+The cwebp files are byte-identical to round 1's.

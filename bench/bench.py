@@ -17,7 +17,11 @@ WebP pipelines (outputs decoded with dwebp, as browsers decode them, then scored
   wpT      pngdeer --format webp --target T
   wpauto   pngdeer --format webp at its automatic quality
   cwQ      cwebp -q Q -m 6 -sharp_yuv -alpha_q 100 (libwebp at its slowest and sharpest)
+  cwafQ    the same with the auto filter (-af), as pngdeer encodes
+  cwdQ     cwebp -q Q at cwebp's other defaults (method 4, plain YUV)
   cwll     cwebp -lossless -z 9
+  pqwN     pngquant --quality 0-N, then cwebp -lossless -z 9: a palette image as lossless WebP
+  pqwN-d0  same without dithering
   tinywebp TinyPNG API, converted to WebP (cached in bench/.cache/tinypng; costs two compressions)
 """
 
@@ -59,19 +63,20 @@ COLOR_CHUNKS = {b"gAMA", b"cHRM", b"sRGB", b"iCCP", b"cICP", b"mDCV", b"cLLI"}
 @dataclass(frozen=True)
 class Pipeline:
     name: str
-    kind: str  # "oxipng" | "pngdeer" | "pngquant" | "quant" | "tinypng" | "pngdeer-webp" | "cwebp" | "tinywebp"
-    quality: int | None = None  # pngquant: --quality; quant: palette size; cwebp: -q (None: lossless)
-    dither: int | None = None  # pngquant and quant; None = the tool's default dithering
+    kind: str  # "oxipng" | "pngdeer" | "pngquant" | "quant" | "tinypng" | "pngdeer-webp" | "cwebp" | "pngquant-webp" | "tinywebp"
+    quality: int | None = None  # pngquant(-webp): --quality; quant: palette size; cwebp: -q (None: lossless)
+    dither: int | None = None  # pngquant(-webp) and quant; None = the tool's default dithering
     target: int | None = None  # pngdeer: SSIMULACRA2 score to reach (None: automatic)
     tool: str | None = None  # quant: a QUANT_TOOLS key
+    cwebp: str | None = None  # cwebp: "af" adds the auto filter, "d" keeps cwebp's defaults (see run_cwebp)
 
     @property
     def family(self) -> str:
-        return re.sub(r"^(pq|pd|wp|cw|" + "|".join(QUANT_TOOLS) + r")\d+", r"\1", self.name)
+        return re.sub(r"^(pqw|pq|pd|wp|cwaf|cwd|cw|" + "|".join(QUANT_TOOLS) + r")\d+", r"\1", self.name)
 
     @property
     def webp(self) -> bool:
-        return self.kind in ("pngdeer-webp", "cwebp", "tinywebp")
+        return self.kind in ("pngdeer-webp", "cwebp", "pngquant-webp", "tinywebp")
 
 
 @dataclass(frozen=True)
@@ -326,10 +331,16 @@ def run_quantizer(cfg: Config, tool: str, colors: int, dither: bool, src: Path, 
         run([cfg.quantlab, QUANTLAB_ALGOS[tool], str(colors), "1" if dither else "0", str(src), str(dst)])
 
 
-def run_cwebp(cfg: Config, src: Path, dst: Path, quality: int | None) -> None:
+def run_cwebp(cfg: Config, src: Path, dst: Path, quality: int | None, style: str | None = None) -> None:
     """libwebp's own encoder: lossy at -q quality with its slowest method and sharp YUV, alpha kept
-    lossless; or lossless at its highest effort."""
-    args = ["-lossless", "-z", "9"] if quality is None else ["-q", str(quality), "-m", "6", "-sharp_yuv", "-alpha_q", "100"]
+    lossless (style "af": also the auto filter; "d": cwebp's defaults but -q); or lossless at its
+    highest effort."""
+    if quality is None:
+        args = ["-lossless", "-z", "9"]
+    elif style == "d":
+        args = ["-q", str(quality)]
+    else:
+        args = ["-q", str(quality), "-m", "6", "-sharp_yuv", "-alpha_q", "100"] + ["-af"] * (style == "af")
     run([cfg.cwebp, "-quiet", *args, str(src), "-o", str(dst)])
 
 
@@ -441,10 +452,16 @@ def parse_pipelines(spec: str) -> list[Pipeline]:
             pipelines.append(Pipeline(name, "pngdeer-webp", target=int(m.group(1))))
         elif name == "cwll":
             pipelines.append(Pipeline(name, "cwebp"))
-        elif m := re.fullmatch(r"cw(\d{1,3})", name):
-            if not 0 <= int(m.group(1)) <= 100:
+        elif m := re.fullmatch(r"cw(af|d)?(\d{1,3})", name):
+            if not 0 <= int(m.group(2)) <= 100:
                 sys.exit(f"cwebp quality must be 0-100: {name}")
-            pipelines.append(Pipeline(name, "cwebp", int(m.group(1))))
+            pipelines.append(Pipeline(name, "cwebp", int(m.group(2)), cwebp=m.group(1)))
+        elif m := re.fullmatch(r"pqw(\d{1,3})(?:-d(\d{1,3}))?", name):
+            quality = int(m.group(1))
+            dither = int(m.group(2)) if m.group(2) else None
+            if not 1 <= quality <= 100 or (dither is not None and dither > 100):
+                sys.exit(f"pngquant quality must be 1-100 and dithering 0-100: {name}")
+            pipelines.append(Pipeline(name, "pngquant-webp", quality, dither))
         elif name == "tinywebp":
             pipelines.append(Pipeline(name, "tinywebp"))
         elif m := re.fullmatch(r"pd(\d{1,3})", name):
@@ -453,7 +470,7 @@ def parse_pipelines(spec: str) -> list[Pipeline]:
                 sys.exit(f"pngdeer target must be an SSIMULACRA2 score 1-100: {name}")
             pipelines.append(Pipeline(name, "pngdeer", target=target))
         else:
-            sys.exit(f"unknown pipeline: {name} (expected oxipng, tinypng, pdT, pdauto, pqN, pqN-dD, <tool>N / <tool>N-d0 with tool {'/'.join(QUANT_TOOLS)}, wpT, wpauto, cwQ, cwll or tinywebp)")
+            sys.exit(f"unknown pipeline: {name} (expected oxipng, tinypng, pdT, pdauto, pqN, pqN-dD, <tool>N / <tool>N-d0 with tool {'/'.join(QUANT_TOOLS)}, wpT, wpauto, cwQ, cwafQ, cwdQ, cwll, pqwN, pqwN-dD or tinywebp)")
     return pipelines
 
 
@@ -521,12 +538,17 @@ def process_image(img: Image, pipelines: list[Pipeline], cfg: Config, tiny: Tiny
                 elif p.kind in ("pngdeer", "pngdeer-webp"):
                     row.params, seconds = run_pngdeer(cfg, source, dst, p.target, p.kind == "pngdeer-webp")
                 elif p.kind == "cwebp":
-                    run_cwebp(cfg, source, dst, p.quality)
+                    run_cwebp(cfg, source, dst, p.quality, p.cwebp)
+                elif p.kind == "pngquant-webp":
+                    quantized = Path(tmp) / "quantized.png"
+                    run_pngquant(cfg, source, quantized, p.quality, p.dither)
+                    row.pngquant_bytes = quantized.stat().st_size
+                    run_cwebp(cfg, quantized, dst, None)
                 elif p.kind in ("tinypng", "tinywebp"):
                     cached, seconds = (tiny.compress if p.kind == "tinypng" else tiny.convert_webp)(source, dst)
                     if cached:
                         row.note = "cached"
-                if p.kind in ("oxipng", "pngquant", "quant", "cwebp"):
+                if p.kind in ("oxipng", "pngquant", "quant", "cwebp", "pngquant-webp"):
                     seconds = time.perf_counter() - start
                 if seconds is not None:
                     row.seconds = round(seconds, 3)

@@ -208,12 +208,13 @@
   .switch { display: inline-flex; border-radius: 999px; background: var(--white); padding: 4px; border: 1px solid var(--line); margin-bottom: 28px; }
   .switch button { border: 0; background: none; padding: 7px 14px; border-radius: 999px; font-size: 13.5px; cursor: pointer; color: var(--muted); }
   .switch button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
+  .switch.r-format { margin: 26px 0 0; }
   .stat { padding: 18px 0; border-top: 1px solid var(--line-2); }
   .stat:first-child { border-top: 0; padding-top: 0; }
   .stat b { display: block; font: 600 54px/1 var(--display); letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
   .stat b em { font-style: normal; color: var(--faint); font-size: .5em; letter-spacing: -.02em; }
   .stat span { display: block; margin-top: 8px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
-  .chart { background: var(--white); border-radius: 20px; padding: 26px 26px 18px; border: 1px solid var(--line); min-width: 0; }
+  .chart { background: var(--white); border-radius: 20px; padding: 26px 26px 18px; border: 1px solid var(--line); min-width: 0; align-self: start; }
   .chart h3 { font: 600 19px/1.3 var(--display); letter-spacing: -.02em; margin: 0 0 4px; color: var(--ink); }
   .chart .sub { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
   .rows { display: grid; grid-template-columns: 104px minmax(0, 1fr) 60px; row-gap: 9px; column-gap: 14px; align-items: center; }
@@ -490,12 +491,15 @@
   <section class="block" id="research">
     <div class="reveal">
       <div class="kicker"><i></i>Research</div>
-      <h2 class="big">The best open-source PNG compressor we've measured.</h2>
-      <p class="intro">We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
+      <h2 class="big" id="r-title">The best open-source PNG compressor we've measured.</h2>
+      <p class="intro" id="r-intro">We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
+      <div class="switch r-format" id="r-format" role="group" aria-label="Output format">
+        <button type="button" data-kind="png" aria-pressed="true">PNG</button><button type="button" data-kind="webp" aria-pressed="false">WebP</button>
+      </div>
     </div>
     <div class="lab reveal">
       <div>
-        <div class="switch" role="group" aria-label="Image set">
+        <div class="switch" id="r-set" role="group" aria-label="Image set">
           <button type="button" data-set="holdout" aria-pressed="true">Held-out · 71</button><button type="button" data-set="main" aria-pressed="false">Tuning set · 109</button>
         </div>
         <div class="stats">
@@ -505,13 +509,13 @@
         </div>
       </div>
       <div class="chart">
-        <h3>Quality at TinyPNG's file size</h3>
-        <p class="sub">Median SSIMULACRA2 points above or below TinyPNG when each tool's output is as big as TinyPNG's, and how many images each can bring up to TinyPNG's quality.</p>
+        <h3 id="r-chart">Quality at TinyPNG's file size</h3>
+        <p class="sub" id="r-sub">Median SSIMULACRA2 points above or below TinyPNG when each tool's output is as big as TinyPNG's, and how many images each can bring up to TinyPNG's quality.</p>
         <div class="rows" id="rows"></div>
         <div class="axis"><span></span><div class="labels" id="axis"></div><span></span></div>
       </div>
     </div>
-    <div class="method reveal">
+    <div class="method reveal" id="r-method">
       <div><b>Held out</b>The parameters were tuned on 109 images. The other 71 were collected afterwards and never used for tuning; both sets agree.</div>
       <div><b>Generous to the others</b>Each open-source tool gets its best of ten settings per image, picked after the fact. pngdeer's results are searched at compression time, as you get them here.</div>
       <div><b>A second opinion</b>Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026.</div>
@@ -1075,39 +1079,93 @@ $("#dl-one").onclick = () => active && job(active).status === "done" && download
 $("#all").onclick = () => files.filter((x) => job(x).status === "done").forEach((x, i) => setTimeout(() => download(x), i * 250));
 
 /* ---------- research ---------- */
-// bench/bench.py, October 2026: pngdeer's pd70–pd95 runs and every other tool's ten settings, each
-// pooled into one size–quality curve per image (experiments/palette-feedback/tool_rank.py).
+// bench/bench.py, October 2026: each tool's settings pooled into one size–quality curve per image.
+// PNG: pngdeer's pd70–pd95 runs and every other tool's ten settings, as SSIMULACRA2 points at
+// TinyPNG's file size (experiments/palette-feedback/tool_rank.py). WebP: pngdeer's wp40–wp98 and
+// automatic runs, cwebp's 27 settings and pngquant + cwebp's ten, as bytes saved at the quality of
+// TinyPNG's WebP, on the 120 images it was fetched for (experiments/webp/leaderboard.py).
 const RESEARCH = {
-  holdout: { n: 71, smaller: 12, points: 1.7, reach: 67, tools: [
-    ["pngdeer", 1.7, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
-    ["FFmpeg", -7.0, 16], ["quantette", -7.6, 18], ["ImageMagick", -11.3, 3], ["Pillow", -16.8, 4]] },
-  main: { n: 109, smaller: 8, points: 2.0, reach: 106, tools: [
-    ["pngdeer", 2.0, 106], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
-    ["quantette", -9.6, 21], ["NeuQuant", -9.8, 5], ["ImageMagick", -14.5, 8], ["Pillow", -19.5, 4]] },
+  png: {
+    title: "The best open-source PNG compressor we've measured.",
+    intro: "We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.",
+    chart: "Quality at TinyPNG's file size",
+    sub: "Median SSIMULACRA2 points above or below TinyPNG when each tool's output is as big as TinyPNG's, and how many images each can bring up to TinyPNG's quality.",
+    column: "Points vs TinyPNG", unit: "", lo: -20, ticks: [-20, -15, -10, -5, 0], narrow: [-20, -10, 0],
+    method: [
+      ["Held out", "The parameters were tuned on 109 images. The other 71 were collected afterwards and never used for tuning; both sets agree."],
+      ["Generous to the others", "Each open-source tool gets its best of ten settings per image, picked after the fact. pngdeer's results are searched at compression time, as you get them here."],
+      ["A second opinion", "Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026."]],
+    sets: {
+      holdout: { label: "Held-out · 71", n: 71, smaller: 12, points: 1.7, reach: 67, tools: [
+        ["pngdeer", 1.7, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
+        ["FFmpeg", -7.0, 16], ["quantette", -7.6, 18], ["ImageMagick", -11.3, 3], ["Pillow", -16.8, 4]] },
+      main: { label: "Tuning set · 109", n: 109, smaller: 8, points: 2.0, reach: 106, tools: [
+        ["pngdeer", 2.0, 106], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
+        ["quantette", -9.6, 21], ["NeuQuant", -9.8, 5], ["ImageMagick", -14.5, 8], ["Pillow", -19.5, 4]] },
+    },
+  },
+  webp: {
+    title: "The best open-source WebP compressor we've measured.",
+    intro: "We turned 120 of the same PNGs into WebP with pngdeer, TinyPNG and cwebp, libwebp's own encoder (the library Squoosh, sharp and Pillow encode with), alone and after pngquant. Every output was scored with SSIMULACRA2, as browsers decode it.",
+    chart: "Bytes saved at TinyPNG's quality",
+    sub: "Median size against TinyPNG's WebP when each tool's output matches its quality, and how many images each can bring up to TinyPNG's quality.",
+    column: "Saved vs TinyPNG", unit: "%", lo: -40, ticks: [-40, -30, -20, -10, 0], narrow: [-40, 0],
+    method: [
+      ["Generous to cwebp", "It gets its best of 27 settings per image, picked after the fact: 13 qualities with and without the auto filter, and lossless. pngdeer's results are searched at compression time, as you get them here."],
+      ["Out of the box", "At its default quality, cwebp's files are 6% bigger than TinyPNG's on the median image, and slightly worse. pngdeer's automatic quality makes them 5% smaller, as good."],
+      ["Beyond these 120", "WebP's settings were chosen on these images. On 60 others, against a stand-in that matches TinyPNG's WebP here (same size and score, median), pngdeer is 4% smaller. TinyPNG ran through its API in October 2026."]],
+    sets: {
+      tiny: { label: "TinyPNG's WebP · 120", n: 120, smaller: 5, points: 1.6, reach: 118, tools: [
+        ["pngdeer", 5.0, 118], ["cwebp", 2.1, 120], ["pngquant + cwebp", -35.0, 115]] },
+    },
+  },
 };
-const LO = -20;
+let researchFormat = "png", researchSet = "holdout";
+let LO = -20;
 let HI = 4; // research() widens it where the best gain's label needs the room
 const at = (v) => ((v - LO) / (HI - LO)) * 100;
 const rows = $("#rows");
-rows.innerHTML = `<span class="hd">Tool</span><span class="hd">Points vs TinyPNG</span><span class="hd" style="text-align:right">Reaches</span>` +
-  RESEARCH.holdout.tools.map(([name]) => {
-    const us = name === "pngdeer" ? "us" : "";
-    return `<span class="tool ${us}" data-row="${name}">${name}</span>
-      <div class="track" data-row="${name}"><span class="zero"></span><span class="fill ${us}" style="width:0"></span><span class="val ${us}"></span></div>
-      <span class="reach ${us}" data-row="${name}"></span>`;
-  }).join("");
 
-function research(which) {
-  const d = RESEARCH[which];
-  const [best, gain] = d.tools.reduce((a, b) => (b[1] > a[1] ? b : a));
-  const label = rows.querySelector(`.track[data-row="${best}"] .val`);
-  label.textContent = "+" + gain.toFixed(1);
-  const span = label.parentElement.clientWidth, narrow = span < 200;
-  HI = Math.max(4, LO + (gain - LO) / (0.985 - (label.offsetWidth + 2) / span));
+// the chart's rows, the set switch and the texts for one format
+function researchFormatShown(kind) {
+  const f = RESEARCH[kind];
+  researchFormat = kind;
+  researchSet = Object.keys(f.sets)[0];
+  LO = f.lo;
+  for (const x of $("#r-format").children) x.setAttribute("aria-pressed", x.dataset.kind === kind);
+  $("#r-title").textContent = f.title;
+  $("#r-intro").textContent = f.intro;
+  $("#r-chart").textContent = f.chart;
+  $("#r-sub").textContent = f.sub;
+  $("#r-method").innerHTML = f.method.map(([b, text]) => `<div><b>${b}</b>${text}</div>`).join("");
+  $("#r-set").innerHTML = Object.entries(f.sets).map(([key, d]) =>
+    `<button type="button" data-set="${key}" aria-pressed="${key === researchSet}">${d.label}</button>`).join("");
+  rows.innerHTML = `<span class="hd">Tool</span><span class="hd">${f.column}</span><span class="hd" style="text-align:right">Reaches</span>` +
+    f.sets[researchSet].tools.map(([name]) => {
+      const us = name === "pngdeer" ? "us" : "";
+      return `<span class="tool ${us}" data-row="${name}">${name}</span>
+        <div class="track" data-row="${name}"><span class="zero"></span><span class="fill ${us}" style="width:0"></span><span class="val ${us}"></span></div>
+        <span class="reach ${us}" data-row="${name}"></span>`;
+    }).join("");
+  stats(f.sets[researchSet]);
+}
+
+function stats(d) {
   $("#r-smaller").textContent = `−${d.smaller}%`;
   $("#r-points").textContent = `+${d.points.toFixed(1)}`;
   $("#r-reach").innerHTML = `${d.reach}<em>/${d.n}</em>`;
-  $("#axis").innerHTML = (narrow ? [-20, -10, 0] : [-20, -15, -10, -5, 0]).map((v) => `<span style="left:${at(v)}%">${v === 0 ? "TinyPNG" : v}</span>`).join("");
+}
+
+function research(which) {
+  const f = RESEARCH[researchFormat], d = f.sets[which];
+  const shown = (v) => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(1) + f.unit;
+  const [best, gain] = d.tools.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const label = rows.querySelector(`.track[data-row="${best}"] .val`);
+  label.textContent = shown(gain);
+  const span = label.parentElement.clientWidth, narrow = span < 200;
+  HI = Math.max(4, LO + (gain - LO) / (0.985 - (label.offsetWidth + 2) / span));
+  stats(d);
+  $("#axis").innerHTML = (narrow ? f.narrow : f.ticks).map((v) => `<span style="left:${at(v)}%">${v === 0 ? "TinyPNG" : v + f.unit}</span>`).join("");
   for (const [name, v, reach] of d.tools) {
     const [tool, track, count] = rows.querySelectorAll(`[data-row="${name}"]`);
     rows.append(tool, track, count); // this set's ranking
@@ -1116,7 +1174,7 @@ function research(which) {
     const from = Math.min(at(0), at(v)), width = Math.abs(at(v) - at(0));
     fill.style.left = from + "%";
     fill.style.width = Math.max(width, 0.5) + "%";
-    val.textContent = (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(1);
+    val.textContent = shown(v);
     // past zero to the right of a gain; to the left of a small loss, or inside a long one
     const inside = v < 0 && (width / 100) * span > val.offsetWidth + 8;
     val.style.left = v > 0 ? `${at(v) + 1.2}%` : inside ? `calc(${from}% + 6px)` : `${from - 1.2}%`;
@@ -1124,12 +1182,19 @@ function research(which) {
     count.textContent = `${reach}/${d.n}`;
   }
 }
-let researchSet = "holdout";
-$(".switch").onclick = (e) => {
+researchFormatShown("png");
+$("#r-format").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.kind === researchFormat) return;
+  researchFormatShown(b.dataset.kind);
+  // after a frame, so the new rows' bars grow from zero
+  if (researchShown) requestAnimationFrame(() => requestAnimationFrame(() => research(researchSet)));
+};
+$("#r-set").onclick = (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   researchSet = b.dataset.set;
-  for (const x of $(".switch").children) x.setAttribute("aria-pressed", x === b);
+  for (const x of $("#r-set").children) x.setAttribute("aria-pressed", x === b);
   research(researchSet);
 };
 
@@ -1157,9 +1222,6 @@ if ("IntersectionObserver" in window) {
   researchShown = true;
   research(researchSet);
 }
-$("#r-smaller").textContent = `−${RESEARCH.holdout.smaller}%`;
-$("#r-points").textContent = `+${RESEARCH.holdout.points.toFixed(1)}`;
-$("#r-reach").innerHTML = `${RESEARCH.holdout.reach}<em>/${RESEARCH.holdout.n}</em>`;
 addEventListener("scroll", () => $("#top").classList.toggle("scrolled", scrollY > 8), { passive: true });
 addEventListener("resize", () => researchShown && research(researchSet));
 

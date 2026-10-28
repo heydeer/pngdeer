@@ -45,6 +45,22 @@ At TinyPNG's quality, pngdeer's files are 12% smaller on the held-out set and 8%
 - **A second opinion**: scored with butteraugli instead, which the search never looks at, pngdeer's files are still 6–9% smaller than TinyPNG's at the same quality.
 - TinyPNG ran through its API in October 2026. [bench/](bench/) reruns everything; the website screenshots in the sets aren't ours to share, so a rerun covers 155 of the 180 images.
 
+### WebP
+
+pngdeer also writes WebP (an output name ending in `.webp`, or the switch in the browser): the smaller of its palette image stored losslessly and the lowest lossy quality that keeps the target. Against TinyPNG's WebP on 120 of the images, the size each tool needs to match TinyPNG's quality (median image / in total), and how many images it can bring up to that quality:
+
+| Compressor | Size at TinyPNG's quality | Reaches |
+|---|---:|---:|
+| **pngdeer** | **95.0% / 93.9%** | **118** |
+| TinyPNG (the yardstick) | 100% | 120 |
+| cwebp, best of 27 settings | 97.9% / 110.2% | 120 |
+| pngquant + cwebp, best of 10 | 135.0% / 212.1% | 115 |
+
+- **cwebp** is libwebp's own encoder, the library Squoosh, sharp and Pillow encode with. It gets its best of 27 settings per image, picked after the fact: 13 qualities with and without the auto filter, and lossless. **pngquant + cwebp** stores pngquant's palette image as lossless WebP, TinyPNG's palette route from open-source parts.
+- At TinyPNG's file size, on the 40 images where all three can be compared, pngdeer scores 2.6 SSIMULACRA2 points above TinyPNG, pngquant + cwebp 1.9, cwebp −0.3.
+- Out of the box, cwebp's default quality makes files 6% bigger than TinyPNG's on the median image, and slightly worse. pngdeer's automatic quality makes them 5% smaller, as good.
+- WebP's settings were chosen on these 120 images. On the other 60, against a stand-in that matches TinyPNG's WebP on these (same size and score, median), pngdeer is 4% smaller. The [WebP notes](experiments/webp/FINDINGS.md) have the details.
+
 ## How it works
 
 - **Searches the palette**: palette sizes from 2 to 256 colors, each tried a few ways (with and without Floyd–Steinberg dithering, with neighbour smoothing, with a second palette builder), and the smallest file that reaches the target wins.
@@ -58,6 +74,7 @@ The [research notes](experiments/palette-feedback/FINDINGS.md) follow every step
 ```bash
 pngdeer input.png -o output.png              # automatic quality
 pngdeer input.png -o output.png --target 85  # a fixed SSIMULACRA2 quality
+pngdeer input.png -o output.webp             # WebP, automatic quality
 pngdeer --help
 ```
 
