@@ -20,6 +20,13 @@
 //! target is out of reach even at 256 colors, the miss rule runs on full-size scores. Scoring
 //! dominates the cost, so this trades about 1.3% in file size for several times the speed where it
 //! matters most: big images in a single-threaded browser.
+//!
+//! An animation (`run_animation`) is searched as all its frames at once, on one palette (a palette
+//! APNG has one PLTE for every frame): palettes are built from every frame, each frame is remapped
+//! on its own, and where a pixel's source is unchanged from the frame before it keeps that frame's
+//! index, so dithering stays still where the picture does (and the frame's changed rectangle stays
+//! small). A candidate's score is its worst frame's; its size is the APNG's (apng::encode). No
+//! preview: its frames are usually small, and scored enlarged anyway.
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -27,10 +34,11 @@ use std::collections::HashMap;
 use fast_ssim2::{PixelDescriptor, PixelSlice, Ssimulacra2Config, Ssimulacra2Reference};
 use rgb::ComponentBytes;
 
+use crate::apng::{self, Timing};
 use crate::codec::{encode_palette, palette_size_hint};
 use crate::palette::{self, fits_palette, refine_palette, wu_palette};
 use crate::remap::{prefer_neighbours, remap};
-use crate::{Settings, RGBA};
+use crate::{par, Settings, RGBA};
 
 /// Also how close to the target a candidate counts when the target is only just in reach (at 256
 /// colors, or out of full-size checks), so the smallest file wins: the extras are dithered, and
@@ -44,6 +52,9 @@ const EXACT: f64 = 99.99;
 const TOP_SLACK: f64 = 3.0;
 /// A full-size check that falls short steps up to at most this many times its palette size.
 const MAX_STEP_UP: u32 = 3;
+/// An animation's frames are scored several at once (on all threads), as many as fit in this many
+/// scored pixels: each scoring's buffers take about 300 bytes a pixel at their peak.
+const PARALLEL_SCORED_PIXELS: usize = 2_500_000;
 /// Images whose longer side is below this are scored enlarged (nearest neighbour, a power of two, at
 /// most 8×): SSIMULACRA2 looks at several downscaled levels, and on a 72 px icon there is little left
 /// to compare. bench.py scores the same way.
@@ -160,6 +171,8 @@ pub struct Report {
     pub preview: usize,
     /// The chosen candidate's score on the preview (same as `score` without a preview).
     pub preview_score: f64,
+    /// Animation frames (1 for a still image); an animation's scores are its worst frame's.
+    pub frames: usize,
     pub profile: Profile,
 }
 
@@ -191,8 +204,9 @@ impl Profile {
 impl Report {
     pub fn json(&self) -> String {
         let p = &self.profile;
+        let frames = if self.frames > 1 { format!(r#", "frames": {}"#, self.frames) } else { String::new() };
         format!(
-            r#"{{"target": {:.2}, "colors": {}, "variant": "{}", "score": {:.3}, "evals": {}, "checks": {}, "miss": {}, "preview": {}, "preview_score": {:.3}, "ms": {{"reference": {:.0}, "quantize": {:.0}, "remap": {:.0}, "score": {:.0}, "encode": {:.0}, "optimize": {:.0}}}}}"#,
+            r#"{{"target": {:.2}, "colors": {}, "variant": "{}", "score": {:.3}, "evals": {}, "checks": {}, "miss": {}, "preview": {}, "preview_score": {:.3}{}, "ms": {{"reference": {:.0}, "quantize": {:.0}, "remap": {:.0}, "score": {:.0}, "encode": {:.0}, "optimize": {:.0}}}}}"#,
             self.target,
             self.colors,
             self.variant.label(),
@@ -202,6 +216,7 @@ impl Report {
             self.miss,
             self.preview,
             self.preview_score,
+            frames,
             p.reference,
             p.quantize,
             p.remap,
@@ -264,21 +279,31 @@ fn is_opaque(pixels: &[RGBA]) -> bool {
 
 fn new_reference(source: &PixelSlice<'_>) -> Result<Ssimulacra2Reference, BoxError> {
     let pixels = source.width() as usize * source.rows() as usize;
-    Ok(if pixels > LEAN_PIXELS {
-        Ssimulacra2Reference::new_lean_with_config(source, &ssim_config())?
-    } else {
-        Ssimulacra2Reference::new_with_config(source, &ssim_config())?
-    })
+    reference_of(source, pixels > LEAN_PIXELS)
+}
+
+fn reference_of(source: &PixelSlice<'_>, lean: bool) -> Result<Ssimulacra2Reference, BoxError> {
+    Ok(if lean { Ssimulacra2Reference::new_lean_with_config(source, &ssim_config())? } else { Ssimulacra2Reference::new_with_config(source, &ssim_config())? })
 }
 
 pub fn run(pixels: &[RGBA], w: usize, h: usize, options: &Settings) -> Result<(Vec<u8>, Report), BoxError> {
+    run_frames(pixels, w, h, None, options)
+}
+
+/// `run` for an animation: `frames` canvases of `w` × `h` in `pixels`, written as an APNG with
+/// `timing` (see the module docs).
+pub fn run_animation(pixels: &[RGBA], w: usize, h: usize, frames: usize, timing: &Timing, options: &Settings) -> Result<(Vec<u8>, Report), BoxError> {
+    run_frames(pixels, w, h, Some((frames, timing)), options)
+}
+
+fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Timing)>, options: &Settings) -> Result<(Vec<u8>, Report), BoxError> {
     // Wu's palettes (wN) model opaque colors only
     let opaque = pixels.iter().all(|p| p.a == 255);
     let variants: Vec<Variant> = options.variants.iter().copied().filter(|v| opaque || v.source != Source::Wu).collect();
     let variants = if variants.is_empty() { options.variants.clone() } else { variants };
-    let k = preview_factor(w, h, options.preview_pixels);
+    let k = if animation.is_some() { 1 } else { preview_factor(w, h, options.preview_pixels) };
     if k == 1 {
-        let mut search = Search::new(pixels, w, h, options);
+        let mut search = Search::new(pixels, w, h, animation, options);
         let target = match options.target {
             Some(target) => target,
             None => {
@@ -299,6 +324,7 @@ pub fn run(pixels: &[RGBA], w: usize, h: usize, options: &Settings) -> Result<(V
             miss,
             preview: 1,
             preview_score: score,
+            frames: animation.map_or(1, |(frames, _)| frames),
             profile: search.profile,
         };
         return Ok((png, report));
@@ -309,8 +335,8 @@ pub fn run(pixels: &[RGBA], w: usize, h: usize, options: &Settings) -> Result<(V
     // search (it then never tries smoothing, the usual winner). Sampling keeps its colors and grain.
     let sample = fits_palette(pixels);
     let (small, sw, sh) = downscale(pixels, w, h, k, sample);
-    let mut preview = Search::new(&small, sw, sh, options);
-    let mut full = Search::new(pixels, w, h, options);
+    let mut preview = Search::new(&small, sw, sh, None, options);
+    let mut full = Search::new(pixels, w, h, None, options);
     let target = match options.target {
         Some(target) => target,
         // One full-size scoring, the plain palette's; the search's own best at 256 colors (which
@@ -392,6 +418,7 @@ pub fn run(pixels: &[RGBA], w: usize, h: usize, options: &Settings) -> Result<(V
         miss: score < target,
         preview: k,
         preview_score,
+        frames: 1,
         profile: preview.profile.plus(full.profile),
     };
     Ok((png, report))
@@ -449,12 +476,18 @@ fn downscale(pixels: &[RGBA], w: usize, h: usize, k: usize, sample: bool) -> (Ve
 }
 
 struct Search<'p> {
+    /// The image, or an animation's frames one after another, each `w` × `h`.
     pixels: &'p [RGBA],
     w: usize,
     h: usize,
+    frames: usize,
+    /// An animation's timing, for its file (None for a still image).
+    timing: Option<&'p Timing>,
     factor: usize,
     opaque: bool,
     reference: Option<Ssimulacra2Reference>,
+    /// An animation's references, one per frame.
+    frame_references: Vec<Ssimulacra2Reference>,
     /// Palettes by size and source.
     palettes: HashMap<(u32, Source), Vec<RGBA>>,
     evaluations: HashMap<(u32, Variant), Evaluation>,
@@ -463,14 +496,17 @@ struct Search<'p> {
 }
 
 impl<'p> Search<'p> {
-    fn new(pixels: &'p [RGBA], w: usize, h: usize, options: &Settings) -> Self {
+    fn new(pixels: &'p [RGBA], w: usize, h: usize, animation: Option<(usize, &'p Timing)>, options: &Settings) -> Self {
         Search {
             pixels,
             w,
             h,
+            frames: animation.map_or(1, |(frames, _)| frames),
+            timing: animation.map(|(_, timing)| timing),
             factor: enlargement(w, h),
             opaque: is_opaque(pixels),
             reference: None,
+            frame_references: Vec::new(),
             palettes: HashMap::new(),
             evaluations: HashMap::new(),
             clock: options.clock,
@@ -702,14 +738,21 @@ impl<'p> Search<'p> {
         if let Some(score) = self.evaluations[&key].score {
             return Ok(score);
         }
-        let e = self.evaluations.remove(&key).unwrap();
+        let mut e = self.evaluations.remove(&key).unwrap();
         let score = self.score_of(&e.palette, &e.indices);
+        if self.frames > 1 && e.png.is_none() {
+            // an animation's indices are frames × pixels: remapped again if it is ever encoded
+            e.indices = Vec::new();
+        }
         self.evaluations.insert(key, Evaluation { score: score.as_ref().ok().copied(), ..e });
         score
     }
 
-    /// SSIMULACRA2 of a remapped image against the source.
+    /// SSIMULACRA2 of a remapped image against the source (an animation's: its worst frame's).
     fn score_of(&mut self, palette: &[RGBA], indices: &[u8]) -> Result<f64, BoxError> {
+        if self.frames > 1 {
+            return self.frames_score_of(palette, indices);
+        }
         let (w, h) = (self.w * self.factor, self.h * self.factor);
         if self.reference.is_none() {
             let t = self.tick();
@@ -728,6 +771,42 @@ impl<'p> Search<'p> {
         Ok(score)
     }
 
+    /// `score_of` for an animation: every frame against its source, the lowest score. A frame
+    /// whose source and indices repeat the frame before's scores the same, so isn't scored again.
+    fn frames_score_of(&mut self, palette: &[RGBA], indices: &[u8]) -> Result<f64, BoxError> {
+        let (n, w, h) = (self.w * self.h, self.w * self.factor, self.h * self.factor);
+        let pixels = self.pixels;
+        let source = |f: usize| &pixels[f * n..(f + 1) * n];
+        if self.frame_references.is_empty() {
+            let t = self.tick();
+            // full references for all frames would take several times the memory of the frames
+            let lean = w * h * self.frames > LEAN_PIXELS;
+            let (sw, sh, factor) = (self.w, self.h, self.factor);
+            let opaque = self.opaque;
+            let built = par::map(&(0..self.frames).collect::<Vec<_>>(), |&f| {
+                let bytes = enlarged_bytes(source(f), sw, sh, factor);
+                slice(&bytes, w, h, opaque).and_then(|s| reference_of(&s, lean)).map_err(|e| e.to_string())
+            });
+            self.frame_references = built.into_iter().collect::<Result<_, _>>()?;
+            self.profile.reference += self.tick() - t;
+        }
+        let t = self.tick();
+        let repeats = |f: usize| f > 0 && source(f) == source(f - 1) && indices[f * n..(f + 1) * n] == indices[(f - 1) * n..f * n];
+        let distinct: Vec<usize> = (0..self.frames).filter(|&f| !repeats(f)).collect();
+        let opaque = is_opaque(palette);
+        let (sw, sh, factor) = (self.w, self.h, self.factor);
+        let references = &self.frame_references;
+        let score = |&f: &usize| {
+            let remapped: Vec<RGBA> = indices[f * n..(f + 1) * n].iter().map(|&i| palette[i as usize]).collect();
+            let bytes = enlarged_bytes(&remapped, sw, sh, factor);
+            slice(&bytes, w, h, opaque).and_then(|s| Ok(references[f].compare_with_config(&s, &ssim_config())?)).map_err(|e| e.to_string())
+        };
+        let at_once = (PARALLEL_SCORED_PIXELS / (w * h)).max(1);
+        let scores: Vec<Result<f64, String>> = distinct.chunks(at_once).flat_map(|frames| par::map(frames, score)).collect();
+        self.profile.score += self.tick() - t;
+        Ok(scores.into_iter().collect::<Result<Vec<f64>, String>>()?.into_iter().fold(f64::INFINITY, f64::min))
+    }
+
     /// Quantizes (once per palette size) and remaps one candidate, without scoring it.
     fn candidate(&mut self, (colors, variant): (u32, Variant)) -> Result<(), BoxError> {
         if self.evaluations.contains_key(&(colors, variant)) {
@@ -735,14 +814,16 @@ impl<'p> Search<'p> {
         }
         let t0 = self.tick();
         let palette_key = (colors, variant.source);
+        // an animation's frames stacked into one tall image
+        let all_h = self.h * self.frames;
         if !self.palettes.contains_key(&palette_key) {
             let palette = match variant.source {
-                Source::Search => palette::SEARCH.palette(self.pixels, self.w, self.h, colors),
-                Source::Plain => palette::PLAIN.palette(self.pixels, self.w, self.h, colors),
+                Source::Search => palette::SEARCH.palette(self.pixels, self.w, all_h, colors),
+                Source::Plain => palette::PLAIN.palette(self.pixels, self.w, all_h, colors),
                 Source::Refined => {
                     let base = match self.palettes.get(&(colors, Source::Plain)) {
                         Some(palette) => palette.clone(),
-                        None => palette::PLAIN.palette(self.pixels, self.w, self.h, colors),
+                        None => palette::PLAIN.palette(self.pixels, self.w, all_h, colors),
                     };
                     refine_palette(self.pixels, &base, REFINE_ITERATIONS, REFINE_POWER)
                 }
@@ -752,21 +833,51 @@ impl<'p> Search<'p> {
         }
         let t1 = self.tick();
         let palette = self.palettes[&palette_key].clone();
-        let mut indices = remap(self.pixels, self.w, self.h, &palette, variant.dither as f32 / 100.0);
-        if let Some(delta) = variant.rdo {
-            prefer_neighbours(self.pixels, &palette, &mut indices, self.w, delta);
-        }
+        let indices = self.remapped(&palette, variant);
         self.profile.quantize += t1 - t0;
         self.profile.remap += self.tick() - t1;
         self.evaluations.insert((colors, variant), Evaluation { score: None, palette, indices, png: None });
         Ok(())
     }
 
+    /// The pixels on `palette` by `variant`: an animation's frame by frame, each pixel whose source
+    /// is the frame before's keeping that frame's index.
+    fn remapped(&self, palette: &[RGBA], variant: Variant) -> Vec<u8> {
+        let (w, h, n) = (self.w, self.h, self.w * self.h);
+        let frames: Vec<&[RGBA]> = self.pixels.chunks_exact(n).collect();
+        let remapped = par::map(&frames, |frame| {
+            let mut indices = remap(frame, w, h, palette, variant.dither as f32 / 100.0);
+            if let Some(delta) = variant.rdo {
+                prefer_neighbours(frame, palette, &mut indices, w, delta);
+            }
+            indices
+        });
+        let mut indices = remapped.concat();
+        for f in 1..frames.len() {
+            for p in 0..n {
+                if frames[f][p] == frames[f - 1][p] {
+                    indices[f * n + p] = indices[(f - 1) * n + p];
+                }
+            }
+        }
+        indices
+    }
+
     fn encoded(&mut self, key: (u32, Variant)) -> &[u8] {
         let (w, h, t0) = (self.w, self.h, self.tick());
-        let e = self.evaluations.get_mut(&key).unwrap();
-        if e.png.is_none() {
-            e.png = Some(encode_palette(&e.palette, &e.indices, w, h));
+        if self.evaluations[&key].png.is_none() {
+            if self.evaluations[&key].indices.is_empty() {
+                let indices = self.remapped(&self.evaluations[&key].palette, key.1);
+                self.evaluations.get_mut(&key).unwrap().indices = indices;
+            }
+            let e = self.evaluations.get_mut(&key).unwrap();
+            e.png = Some(match self.timing {
+                Some(timing) => apng::encode(&e.palette, &e.indices, w, h, timing),
+                None => encode_palette(&e.palette, &e.indices, w, h),
+            });
+            if self.frames > 1 && e.score.is_some() {
+                e.indices = Vec::new();
+            }
         }
         self.profile.encode += self.tick() - t0;
         self.evaluations[&key].png.as_deref().unwrap()

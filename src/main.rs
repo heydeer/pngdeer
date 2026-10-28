@@ -4,7 +4,9 @@
 //!
 //! Writes the smallest palette PNG that keeps IN's quality as SSIMULACRA2 measures it: a score
 //! chosen per image (auto, the default; see search.rs), or at least T. Prints a JSON report: the
-//! target, palette size and variant, score, evaluations, time per stage, outcome and bytes.
+//! target, palette size and variant, score, evaluations, time per stage, outcome and bytes. An
+//! animated PNG stays animated, every frame at least T on one palette (the report adds "frames",
+//! and its score is the worst frame's).
 //!
 //! --format webp (also chosen by an OUT ending in .webp): the smaller of a palette image as lossless
 //!   WebP and the lossiest WebP that keeps the target. Automatic quality there is TinyPNG's WebP's:
@@ -24,7 +26,8 @@
 //!
 //! Two helpers for bench/bench.py:
 //!   pngdeer IN.png --score OTHER            SSIMULACRA2 of OTHER (PNG or WebP) against IN, as the
-//!                                           search scores
+//!                                           search scores; for an animated IN, the worst frame's,
+//!                                           each against the frame OTHER shows at that time
 //!   pngdeer IN.png -o OUT.png --upscale K   nearest-neighbour K× enlargement, written as RGBA
 
 use std::{env, fs, process, sync::OnceLock, time::Instant};
@@ -80,6 +83,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let input = fs::read(input.ok_or(USAGE)?)?;
 
     if let Some(other) = score_against {
+        if pngdeer::apng::is_animated(&input) {
+            println!("{:.4}", frame_scores(&input, &fs::read(other)?)?.into_iter().fold(f64::INFINITY, f64::min));
+            return Ok(());
+        }
         let (a, b) = (codec::decode(&input)?, decode_any(&fs::read(other)?)?);
         if (a.width, a.height) != (b.width, b.height) {
             return Err("images differ in size".into());
@@ -121,6 +128,31 @@ fn write_webp(input: &[u8], output: &str, settings: &pngdeer::Settings) -> Resul
 #[cfg(not(feature = "webp"))]
 fn write_webp(_: &[u8], _: &str, _: &pngdeer::Settings) -> Result<(), Box<dyn std::error::Error>> {
     Err("this pngdeer was built without the webp feature".into())
+}
+
+/// SSIMULACRA2 of each frame of animation `a` against the frame animation `b` shows at the same
+/// time (b may have merged frames that repeat into longer ones), default images aside.
+fn frame_scores(a: &[u8], b: &[u8]) -> Result<Vec<f64>, Box<dyn std::error::Error>> {
+    let (a, b) = (pngdeer::apng::decode(a)?, pngdeer::apng::decode(b)?);
+    if (a.width, a.height) != (b.width, b.height) {
+        return Err("animations differ in size".into());
+    }
+    let starts = |timing: &pngdeer::apng::Timing| {
+        let seconds = |&(num, den): &(u16, u16)| num as f64 / if den == 0 { 100.0 } else { den as f64 };
+        timing.delays.iter().scan(0.0, |t, d| Some(std::mem::replace(t, *t + seconds(d)))).collect::<Vec<f64>>()
+    };
+    let (sa, sb) = (starts(&a.timing), starts(&b.timing));
+    fn frame(anim: &pngdeer::apng::Animation, i: usize) -> &[pngdeer::RGBA] {
+        let (n, f) = (anim.width * anim.height, i + anim.timing.default_image as usize);
+        &anim.pixels[f * n..(f + 1) * n]
+    }
+    sa.iter()
+        .enumerate()
+        .map(|(i, &t)| {
+            let j = sb.iter().rposition(|&s| s <= t + 1e-9).unwrap_or(0);
+            search::score(frame(&a, i), frame(&b, j), a.width, a.height)
+        })
+        .collect()
 }
 
 /// A PNG, or a WebP file with the webp feature, as RGBA.

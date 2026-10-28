@@ -26,24 +26,25 @@ pub fn decode(bytes: &[u8]) -> Result<Bitmap, Error> {
     let mut reader = decoder.read_info()?;
     let mut buf = vec![0; reader.output_buffer_size().ok_or("image too large")?];
     let info = reader.next_frame(&mut buf)?;
-    let data = &buf[..info.buffer_size()];
-    let pixels = match info.color_type {
+    let pixels = rgba_of(&buf[..info.buffer_size()], info.color_type)?;
+    Ok(Bitmap { pixels, width: info.width as usize, height: info.height as usize })
+}
+
+/// A decoded frame's samples (8-bit, palettes expanded) as RGBA.
+pub(crate) fn rgba_of(data: &[u8], color_type: png::ColorType) -> Result<Vec<RGBA>, Error> {
+    Ok(match color_type {
         png::ColorType::Rgba => data.as_chunks::<4>().0.iter().map(|p| RGBA::new(p[0], p[1], p[2], p[3])).collect(),
         png::ColorType::Rgb => data.as_chunks::<3>().0.iter().map(|p| RGBA::new(p[0], p[1], p[2], 255)).collect(),
         png::ColorType::GrayscaleAlpha => data.as_chunks::<2>().0.iter().map(|p| RGBA::new(p[0], p[0], p[0], p[1])).collect(),
         png::ColorType::Grayscale => data.iter().map(|&g| RGBA::new(g, g, g, 255)).collect(),
         png::ColorType::Indexed => return Err("palette was not expanded".into()),
-    };
-    Ok(Bitmap { pixels, width: info.width as usize, height: info.height as usize })
+    })
 }
 
 pub fn encode_palette(palette: &[RGBA], indices: &[u8], w: usize, h: usize) -> Vec<u8> {
     let (palette, depth, rows) = pack(palette, indices, w);
     let mut png = start(w, h, depth, 3);
-    chunk(&mut png, b"PLTE", &palette.iter().flat_map(|c| [c.r, c.g, c.b]).collect::<Vec<u8>>());
-    if let Some(last) = palette.iter().rposition(|c| c.a < 255) {
-        chunk(&mut png, b"tRNS", &palette[..=last].iter().map(|c| c.a).collect::<Vec<u8>>());
-    }
+    palette_chunks(&mut png, &palette);
     chunk(&mut png, b"IDAT", &best_idat(&rows, 1));
     chunk(&mut png, b"IEND", &[]);
     png
@@ -57,21 +58,33 @@ pub fn palette_size_hint(palette: &[RGBA], indices: &[u8], w: usize) -> usize {
 
 /// The palette reordered for tRNS (translucent entries first), its bit depth, and packed rows.
 fn pack(palette: &[RGBA], indices: &[u8], w: usize) -> (Vec<RGBA>, u8, Vec<Vec<u8>>) {
+    let (palette, renumber, depth) = palette_order(palette);
+    let rows = packed_rows(indices, w, &renumber, depth);
+    (palette, depth, rows)
+}
+
+/// The palette reordered for tRNS (translucent entries first), each old index's new one, and the
+/// bit depth it needs.
+pub(crate) fn palette_order(palette: &[RGBA]) -> (Vec<RGBA>, Vec<u8>, u8) {
     let mut order: Vec<usize> = (0..palette.len()).collect();
     order.sort_by_key(|&i| palette[i].a == 255); // stable: translucent entries first
     let mut renumber = vec![0u8; palette.len()];
     for (new, &old) in order.iter().enumerate() {
         renumber[old] = new as u8;
     }
-    let palette: Vec<RGBA> = order.iter().map(|&i| palette[i]).collect();
     let depth = match palette.len() {
         0..=2 => 1,
         3..=4 => 2,
         5..=16 => 4,
         _ => 8,
     };
-    let per_byte = 8 / depth;
-    let rows: Vec<Vec<u8>> = indices
+    (order.iter().map(|&i| palette[i]).collect(), renumber, depth)
+}
+
+/// Rows of `w` indices, renumbered and packed at `depth` bits.
+pub(crate) fn packed_rows(indices: &[u8], w: usize, renumber: &[u8], depth: u8) -> Vec<Vec<u8>> {
+    let (depth, per_byte) = (depth as usize, 8 / depth as usize);
+    indices
         .chunks_exact(w)
         .map(|line| {
             let mut row = vec![0u8; w.div_ceil(per_byte)];
@@ -80,8 +93,15 @@ fn pack(palette: &[RGBA], indices: &[u8], w: usize) -> (Vec<RGBA>, u8, Vec<Vec<u
             }
             row
         })
-        .collect();
-    (palette, depth as u8, rows)
+        .collect()
+}
+
+/// The PLTE and (if any entry is translucent) tRNS chunks of a palette in `palette_order`.
+pub(crate) fn palette_chunks(png: &mut Vec<u8>, palette: &[RGBA]) {
+    chunk(png, b"PLTE", &palette.iter().flat_map(|c| [c.r, c.g, c.b]).collect::<Vec<u8>>());
+    if let Some(last) = palette.iter().rposition(|c| c.a < 255) {
+        chunk(png, b"tRNS", &palette[..=last].iter().map(|c| c.a).collect::<Vec<u8>>());
+    }
 }
 
 pub fn encode_rgba(pixels: &[RGBA], w: usize, h: usize) -> Vec<u8> {
@@ -167,7 +187,7 @@ pub fn optimize(png: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(png.to_vec())
 }
 
-fn start(w: usize, h: usize, depth: u8, color_type: u8) -> Vec<u8> {
+pub(crate) fn start(w: usize, h: usize, depth: u8, color_type: u8) -> Vec<u8> {
     let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
     let mut ihdr = Vec::with_capacity(13);
     ihdr.extend_from_slice(&(w as u32).to_be_bytes());
@@ -177,7 +197,7 @@ fn start(w: usize, h: usize, depth: u8, color_type: u8) -> Vec<u8> {
     png
 }
 
-fn chunk(png: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
+pub(crate) fn chunk(png: &mut Vec<u8>, kind: &[u8; 4], data: &[u8]) {
     png.extend_from_slice(&(data.len() as u32).to_be_bytes());
     let start = png.len();
     png.extend_from_slice(kind);
@@ -194,7 +214,7 @@ enum Strategy {
 
 /// The filter strategy that deflates smallest at miniz level 4. No harder pass: the final file is
 /// recompressed by `optimize` anyway.
-fn best_idat(rows: &[Vec<u8>], bpp: usize) -> Vec<u8> {
+pub(crate) fn best_idat(rows: &[Vec<u8>], bpp: usize) -> Vec<u8> {
     let strategies = [Strategy::Fixed(0), Strategy::Fixed(1), Strategy::Fixed(2), Strategy::Fixed(4), Strategy::Adaptive];
     strategies.into_iter().map(|s| compress_to_vec_zlib(&filter_rows(rows, bpp, s), 4)).min_by_key(|idat| idat.len()).unwrap()
 }

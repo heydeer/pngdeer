@@ -15,6 +15,20 @@ const SELF_TEST = Uint8Array.from(atob(
 // reference: LEAN_PIXELS in src/search.rs), in either build, and wasm32 has 4 GB. Running out of
 // memory would hang the threaded build, so the limit leaves room: 40 MP peaks at about 3.5 GB.
 const MAX_PIXELS = 40e6;
+// An animation's frames together peak at about 65 bytes a pixel (36 frames of 1000 × 640, 23 MP:
+// 1.5 GB), so it gets the same limit over all its frames, less some room.
+const MAX_ANIMATION_PIXELS = 30e6;
+
+// The number of frames of an animated PNG (its acTL chunk, ahead of the image data), else 1.
+function frames(png) {
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  for (let pos = 8; pos + 16 <= png.length; pos += 12 + view.getUint32(pos)) {
+    const kind = String.fromCharCode(...png.subarray(pos + 4, pos + 8));
+    if (kind === "IDAT") return 1;
+    if (kind === "acTL") return view.getUint32(pos + 8);
+  }
+  return 1;
+}
 
 const ready = (async () => {
   const mod = await import(threaded ? "./pkg-mt/pngdeer_wasm.js" : "./pkg/pngdeer_wasm.js");
@@ -37,11 +51,15 @@ self.onmessage = async ({ data }) => {
     const input = new Uint8Array(bytes);
     const ihdr = new DataView(input.buffer, 16, 8);
     const [width, height] = [ihdr.getUint32(0), ihdr.getUint32(4)];
-    const pixels = width * height;
+    const pixels = width * height, count = frames(input);
     if (pixels > MAX_PIXELS) {
       // in pixels as well as megapixels: a well-compressed screenshot can be a few MB and still too big
       const size = `${width} × ${height} pixels (${(pixels / 1e6).toFixed(1)} MP)`;
       throw new Error(`too large for the browser version: ${size}, at most ${MAX_PIXELS / 1e6} MP; use the command line`);
+    }
+    if (count > 1 && pixels * count > MAX_ANIMATION_PIXELS) {
+      const size = `${count} frames of ${width} × ${height} (${((pixels * count) / 1e6).toFixed(1)} MP)`;
+      throw new Error(`animation too large for the browser version: ${size}, at most ${MAX_ANIMATION_PIXELS / 1e6} MP; use the command line`);
     }
     if (format === "webp" && Math.max(width, height) > WEBP_MAX_SIDE) {
       throw new Error(`too large for WebP: ${width} × ${height} pixels, at most ${WEBP_MAX_SIDE} a side; choose PNG`);

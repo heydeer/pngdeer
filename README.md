@@ -14,6 +14,7 @@ pngdeer input.png -o output.png
 - **Picks the quality for you**: about what TinyPNG would give the image, never above 90 on SSIMULACRA2's scale, which is indistinguishable at 1:1.
 - **Same bytes everywhere**: the command line (macOS and Linux) and the browser (WebAssembly, on every core) run the same Rust code and write identical files.
 - **Big images too**: up to 40 megapixels in the browser, more on the command line.
+- **Animated PNGs stay animated**: every frame on one palette and at the target quality, timing kept; 28% of the original size on 12 animated emoji, about even to 16% smaller than TinyPNG ([notes](experiments/apng/FINDINGS.md)).
 - **Free and open source**: MIT.
 
 ## Leaderboard

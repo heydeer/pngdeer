@@ -7,12 +7,14 @@
 //! - remap: pixels onto a palette (Floyd–Steinberg), neighbour smoothing
 //! - search: the palette size and remapping that reach the target in the fewest bytes
 //! - codec: PNG decoding, a quick palette PNG writer, and oxipng for the final file
+//! - apng: animated PNGs, frames as shown and a palette animation written back
 //! - webp: WebP output, the smaller of a palette image losslessly and a lossy file of the same quality
 //! - compress (here): the whole pipeline for one file
 
 // Index loops over a color's few coordinates read better here than zipped iterators.
 #![allow(clippy::needless_range_loop)]
 
+pub mod apng;
 pub mod codec;
 mod color;
 mod palette;
@@ -115,15 +117,35 @@ impl Compressed {
 
 /// Compresses one PNG file: the search, oxipng -o 2 on its result, the input optimized losslessly
 /// if the palette came out bigger, a lossless palette for images of few colors when it costs little
-/// more (EXACT_SLACK), and the input itself if nothing beats it.
+/// more (EXACT_SLACK), and the input itself if nothing beats it. An animated PNG stays animated: its
+/// frames are searched together on one palette (search::run_animation).
 pub fn compress(input: &[u8], settings: &Settings) -> Result<Compressed, Error> {
+    if apng::is_animated(input) {
+        let animation = apng::decode(input)?;
+        let (w, h, timing) = (animation.width, animation.height, &animation.timing);
+        let (searched, report) = search::run_animation(&animation.pixels, w, h, animation.frames, timing, settings)?;
+        return finish(input, searched, report, &animation.pixels, settings, |palette, indices| apng::encode(palette, indices, w, h, timing));
+    }
     compress_decoded(input, &codec::decode(input)?, settings)
 }
 
-/// `compress` of a file already decoded.
+/// `compress` of a still image already decoded.
 fn compress_decoded(input: &[u8], bitmap: &codec::Bitmap, settings: &Settings) -> Result<Compressed, Error> {
     let (w, h) = (bitmap.width, bitmap.height);
-    let (searched, mut report) = search::run(&bitmap.pixels, w, h, settings)?;
+    let (searched, report) = search::run(&bitmap.pixels, w, h, settings)?;
+    finish(input, searched, report, &bitmap.pixels, settings, |palette, indices| codec::encode_palette(palette, indices, w, h))
+}
+
+/// The search's file optimized, or the fallbacks `compress` describes; `encode` writes `pixels` (an
+/// animation's frames) on a palette, for the lossless one.
+fn finish(
+    input: &[u8],
+    searched: Vec<u8>,
+    mut report: Report,
+    pixels: &[RGBA],
+    settings: &Settings,
+    encode: impl Fn(&[RGBA], &[u8]) -> Vec<u8>,
+) -> Result<Compressed, Error> {
     let tick = || settings.clock.map_or(0.0, |c| c());
     let start = tick();
     // every output gets the input's color chunks (the search scored the pixel values as they are, so
@@ -135,9 +157,9 @@ fn compress_decoded(input: &[u8], bitmap: &codec::Bitmap, settings: &Settings) -
         // smooth gradients: the palette costs more than the source itself
         png = codec::with_chunks(&codec::optimize(input)?, &color);
         outcome = "lossless";
-    } else if let Some((palette, indices)) = palette::exact_palette(&bitmap.pixels) {
+    } else if let Some((palette, indices)) = palette::exact_palette(pixels) {
         let budget = png.len() as f64 * (1.0 + EXACT_SLACK);
-        let exact = codec::encode_palette(&palette, &indices, w, h);
+        let exact = encode(&palette, &indices);
         // oxipng shrinks this writer's palette files by 14% at most on the benchmark (10% median),
         // so skip it where even 25% couldn't bring the lossless file within budget
         if exact.len() as f64 * 0.75 <= budget {

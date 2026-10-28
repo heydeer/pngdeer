@@ -46,7 +46,6 @@ pub fn fill<T: Send>(out: &mut [T], size: usize, f: impl Fn(usize, &mut [T]) + S
 }
 
 /// `f` on each item, results in order.
-#[cfg(feature = "webp")] // its only user
 pub fn map<T: Sync, U: Send>(items: &[T], f: impl Fn(&T) -> U + Sync + Send) -> Vec<U> {
     #[cfg(feature = "parallel")]
     {

@@ -916,9 +916,10 @@ function outcome(j) {
     if (r.mode === "lossy") return `Lossy WebP, quality ${r.quality}`;
     return ["hit", "miss"].includes(r.png.outcome) ? `Lossless WebP, ${r.png.colors} colors` : "Lossless WebP";
   }
-  if (r.outcome === "exact" || r.outcome === "lossless") return "Lossless";
-  if (r.outcome === "original") return "Already optimal";
-  return `${r.colors} colors`;
+  const frames = r.frames > 1 ? `${r.frames} frames, ` : "";
+  if (r.outcome === "exact" || r.outcome === "lossless") return `${frames}Lossless`;
+  if (r.outcome === "original") return `${frames}Already optimal`;
+  return `${frames}${r.colors} colors`;
 }
 
 function render() {
@@ -939,7 +940,7 @@ function render() {
     pal.innerHTML = done ? j.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
     const busy = format === "webp" ? "Finding the smallest WebP…" : "Finding the smallest palette…";
     $("#p-label").innerHTML = done
-      ? `<b>${outcome(j)}</b> · SSIMULACRA2 ${j.report.score.toFixed(1)}`
+      ? `<b>${outcome(j)}</b> · SSIMULACRA2 ${j.report.score.toFixed(1)}${j.report.frames > 1 ? ", worst frame" : ""}`
       : j.status === "error" ? `Couldn't compress: ${esc(j.error)}` : j.status === "busy" ? busy : "Waiting for the files before it…";
     $("#dl-one").disabled = !done;
   }
