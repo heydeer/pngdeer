@@ -25,6 +25,13 @@ palette (`search::run_animation`), and `apng::encode` writes the frames back.
   or landing on a clear pixel) and smaller. A frame that changes nothing adds its delay to the one
   before. Delays, play count and a separate default image are kept. oxipng then recompresses every
   frame (it turns off its color reductions on APNGs).
+- **A preview of a few frames.** An animation over the preview budget (0.35 MP over all frames)
+  and of at least 16 frames, or with frames large enough to downscale, is searched first on 8 of
+  its frames, then checked on all of them as a still image's preview is checked at full size. The 8
+  are the frames a plain 256-color palette serves worst (auto mode scores it anyway): evenly spaced
+  frames missed the hardest ones, the checks then stepped up past the target, and files came out
+  up to 9% bigger at a fixed target. Frames are downscaled only past the budget, and never below
+  256 px on their longer side; full-size frames get no preview margin.
 - The usual fallbacks: the input optimized losslessly if that is smaller, a lossless palette for
   animations of at most 256 colors (when it costs at most 15% more), the input if nothing beats it.
 
@@ -52,23 +59,26 @@ palette (`search::run_animation`), and `apng::encode` writes the frames back.
 Against TinyPNG (its API compresses APNGs: one palette of 255–256 colors, the input's frame
 rectangles and dispose ops kept), on 3 of the emoji and a screen recording (36 frames of 1000 ×
 640: a cursor moving over pngdeer's site, then a scroll). pngdeer's size where it matches TinyPNG's
-worst frame, and where it matches TinyPNG's average frame:
+worst frame, and (searching for an average frame instead, an experiment, before the preview)
+where it matches TinyPNG's average frame:
 
 | Animation | TinyPNG | Worst frame: TinyPNG | pngdeer's size at it | Average frame: TinyPNG | pngdeer's size at it |
 |---|---:|---:|---:|---:|---:|
-| fire | 470 KB | 82.5 | 84.2% | 87.3 | 89.8% |
+| fire | 470 KB | 82.5 | 84.3% | 87.3 | 89.8% |
 | ghost | 757 KB | 81.7 | 94.9% | 84.8 | 99.2% |
-| beating heart | 280 KB | 88.7 | 103.7% | 89.9 | 103.7% |
+| beating heart | 280 KB | 88.7 | 101.6% | 89.9 | 103.7% |
 | screen recording | 151 KB | 88.0 | 91.3% (average 90.8 against 90.1) | 90.1 | at most 91.3% |
 
 So about even to 16% smaller, less of a lead than on still images. TinyPNG's frames are uneven
 (fire: worst 82.5, median 87.8), which a worst-frame match favours; on the average frame two of the
 emoji come out about level. Deflate isn't where it differs: zopfli shrinks either file by 1% at most.
 
-Time and memory (natively, 14 threads): the emoji 1.4–4.7 s and up to 0.8 GB (73 frames); the
-screen recording 18 s and 1.5 GB. In the threaded browser build, byte-identical to the command
-line: fire 4.5 s, ghost 6.6 s, the screen recording 26 s. The browser takes animations up to 30 MP
-over all frames (web/worker.js).
+Time and memory (natively, 14 threads): with the preview, the emoji take 2.6 s on the median (3.5
+s searched whole; 25% less over the 12) and the screen recording 4.9 s (16.4 s whole), for
+100.1% of the whole search's bytes; up to 0.9 GB (73 frames) and 1.5 GB (the screen recording),
+which the full-size checks still need. In the threaded browser build, byte-identical to the
+command line: fire 3.5 s, ghost 3.8 s, the screen recording 6.8 s (26 s searched whole). The
+browser takes animations up to 30 MP over all frames (web/worker.js).
 
 ## Tried and dropped
 
@@ -83,7 +93,7 @@ over all frames (web/worker.js).
 
 ## Open
 
-- Long or large animations are slow (the screen recording: 18 s), most of it scoring every frame
-  of every candidate. Searching on a subset of frames and checking all at the end, as a still
-  image's preview does, would cut that.
+- Palettes: building them is most of an emoji's time (median cut and k-means over ~120,000
+  colors, again for every palette size). Reusing work across sizes would change the palettes
+  slightly (k-means reads the colors in the order median cut leaves them).
 - WebP output still refuses animations (an animated WebP would need its own search).

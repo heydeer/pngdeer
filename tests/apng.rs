@@ -85,23 +85,34 @@ fn frames_are_drawn_as_viewers_draw_them() {
 /// A disc moving over two gradients, a frame held twice, a transparent corner.
 fn moving_disc() -> Vec<u8> {
     let (w, h) = (64u32, 48u32);
-    let canvas = |step: i32| -> Vec<RGBA> {
-        (0..w * h)
-            .map(|i| {
-                let (x, y) = ((i % w) as i32, (i / w) as i32);
-                let (dx, dy) = (x - 12 - step * 8, y - 24);
-                if dx * dx + dy * dy < 100 {
-                    RGBA::new(250, 200, 40, 255)
-                } else if x + y < 10 {
-                    RGBA::new(0, 0, 0, 0)
-                } else {
-                    RGBA::new((x * 4) as u8, (60 + y / 8 * 12) as u8, 160, 255)
-                }
-            })
-            .collect()
-    };
+    let canvas = |step: i32| disc_canvas(w, h, step * 8);
     let full = |step, delay| Frame { rect: (0, 0, w, h), delay, dispose: 0, blend: 0, pixels: canvas(step) };
     apng_file(w, h, 2, &[full(0, (1, 10)), full(1, (1, 10)), full(1, (2, 10)), full(2, (1, 10)), full(3, (3, 20)), full(4, (1, 10))])
+}
+
+/// 20 frames of 160 × 120, enough to be searched on a preview of 8 of them.
+fn long_animation() -> Vec<u8> {
+    let (w, h) = (160u32, 120u32);
+    let frames: Vec<Frame> =
+        (0..20).map(|step| Frame { rect: (0, 0, w, h), delay: (1, 20), dispose: 0, blend: 0, pixels: disc_canvas(w, h, step * 6) }).collect();
+    apng_file(w, h, 0, &frames)
+}
+
+/// A `w` × `h` canvas: gradients, a transparent corner, and a disc `shift` pixels along.
+fn disc_canvas(w: u32, h: u32, shift: i32) -> Vec<RGBA> {
+    (0..w * h)
+        .map(|i| {
+            let (x, y) = ((i % w) as i32, (i / w) as i32);
+            let (dx, dy) = (x - 12 - shift, y - 24);
+            if dx * dx + dy * dy < 100 {
+                RGBA::new(250, 200, 40, 255)
+            } else if x + y < 10 {
+                RGBA::new(0, 0, 0, 0)
+            } else {
+                RGBA::new((x * 4 % 256) as u8, (60 + y / 8 * 12 % 160) as u8, 160, 255)
+            }
+        })
+        .collect()
 }
 
 /// Each frame's start, in seconds.
@@ -135,9 +146,13 @@ fn a_compressed_animation_stays_one() {
     assert_eq!(out.report.frames, 6);
 }
 
-/// The same bytes on every platform and in the browser build (see tests/webp.rs).
+/// The same bytes on every platform and in the browser build (see tests/webp.rs), searched whole
+/// and on a preview.
 #[test]
 fn same_animation_bytes_everywhere() {
-    let out = compress(&moving_disc(), &Settings::default()).unwrap();
-    assert_eq!((out.png.len(), crc32fast::hash(&out.png)), (2025, 3733983883));
+    let digest = |input: &[u8]| {
+        let out = compress(input, &Settings::default()).unwrap();
+        (out.png.len(), crc32fast::hash(&out.png), out.report.preview_frames)
+    };
+    assert_eq!([digest(&moving_disc()), digest(&long_animation())], [(2025, 3733983883, 0), (5448, 695571180, 8)]);
 }

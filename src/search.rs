@@ -25,8 +25,10 @@
 //! APNG has one PLTE for every frame): palettes are built from every frame, each frame is remapped
 //! on its own, and where a pixel's source is unchanged from the frame before it keeps that frame's
 //! index, so dithering stays still where the picture does (and the frame's changed rectangle stays
-//! small). A candidate's score is its worst frame's; its size is the APNG's (apng::encode). No
-//! preview: its frames are usually small, and scored enlarged anyway.
+//! small). A candidate's score is its worst frame's; its size is the APNG's (apng::encode). Its
+//! preview is a few of its frames (`animation_preview`), downscaled only if they are large: the ones
+//! a plain 256-color palette serves worst, where the target is hardest to reach (evenly spaced
+//! frames could miss them, and the checks then overshoot the target as they step up).
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -55,6 +57,8 @@ const MAX_STEP_UP: u32 = 3;
 /// An animation's frames are scored several at once (on all threads), as many as fit in this many
 /// scored pixels: each scoring's buffers take about 300 bytes a pixel at their peak.
 const PARALLEL_SCORED_PIXELS: usize = 2_500_000;
+/// An animation's preview search runs on at most this many of its frames, evenly spaced.
+const PREVIEW_FRAMES: usize = 8;
 /// Images whose longer side is below this are scored enlarged (nearest neighbour, a power of two, at
 /// most 8×): SSIMULACRA2 looks at several downscaled levels, and on a 72 px icon there is little left
 /// to compare. bench.py scores the same way.
@@ -173,6 +177,8 @@ pub struct Report {
     pub preview_score: f64,
     /// Animation frames (1 for a still image); an animation's scores are its worst frame's.
     pub frames: usize,
+    /// How many of an animation's frames its preview search ran on (0 without a preview).
+    pub preview_frames: usize,
     pub profile: Profile,
 }
 
@@ -204,7 +210,7 @@ impl Profile {
 impl Report {
     pub fn json(&self) -> String {
         let p = &self.profile;
-        let frames = if self.frames > 1 { format!(r#", "frames": {}"#, self.frames) } else { String::new() };
+        let frames = if self.frames > 1 { format!(r#", "frames": {}, "preview_frames": {}"#, self.frames, self.preview_frames) } else { String::new() };
         format!(
             r#"{{"target": {:.2}, "colors": {}, "variant": "{}", "score": {:.3}, "evals": {}, "checks": {}, "miss": {}, "preview": {}, "preview_score": {:.3}{}, "ms": {{"reference": {:.0}, "quantize": {:.0}, "remap": {:.0}, "score": {:.0}, "encode": {:.0}, "optimize": {:.0}}}}}"#,
             self.target,
@@ -301,8 +307,11 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
     let opaque = pixels.iter().all(|p| p.a == 255);
     let variants: Vec<Variant> = options.variants.iter().copied().filter(|v| opaque || v.source != Source::Wu).collect();
     let variants = if variants.is_empty() { options.variants.clone() } else { variants };
-    let k = if animation.is_some() { 1 } else { preview_factor(w, h, options.preview_pixels) };
-    if k == 1 {
+    let (k, picked) = match animation {
+        None => (preview_factor(w, h, options.preview_pixels), None),
+        Some((frames, _)) => animation_preview(w, h, frames, options.preview_pixels),
+    };
+    if k == 1 && picked.is_none() {
         let mut search = Search::new(pixels, w, h, animation, options);
         let target = match options.target {
             Some(target) => target,
@@ -325,6 +334,7 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
             preview: 1,
             preview_score: score,
             frames: animation.map_or(1, |(frames, _)| frames),
+            preview_frames: 0,
             profile: search.profile,
         };
         return Ok((png, report));
@@ -333,10 +343,31 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
     // An image of at most 256 colors is often a palette PNG already, dithered: averaging would blur
     // the dithering away and invent colors it doesn't have, and the preview would mislead the
     // search (it then never tries smoothing, the usual winner). Sampling keeps its colors and grain.
+    let mut full = Search::new(pixels, w, h, animation, options);
+    let picked = match picked {
+        Some(even) => {
+            full.evaluate(HIGH, REFERENCE)?; // auto mode's reference anyway
+            let mut order: Vec<usize> = (0..full.frames).collect();
+            order.sort_by(|&a, &b| full.frame_scores[a].total_cmp(&full.frame_scores[b]).then(a.cmp(&b)));
+            let mut worst = order[..even.len()].to_vec();
+            worst.sort_unstable();
+            Some(worst)
+        }
+        None => None,
+    };
     let sample = fits_palette(pixels);
-    let (small, sw, sh) = downscale(pixels, w, h, k, sample);
-    let mut preview = Search::new(&small, sw, sh, None, options);
-    let mut full = Search::new(pixels, w, h, None, options);
+    let (small, sw, sh) = match &picked {
+        None => downscale(pixels, w, h, k, sample),
+        Some(frames) => {
+            let n = w * h;
+            let parts: Vec<_> = frames.iter().map(|&f| downscale(&pixels[f * n..(f + 1) * n], w, h, k, sample)).collect();
+            let (sw, sh) = (parts[0].1, parts[0].2);
+            (parts.into_iter().flat_map(|p| p.0).collect(), sw, sh)
+        }
+    };
+    // the preview's timing only sizes its candidates, to rank them
+    let preview_timing = picked.as_ref().map(|frames| Timing { delays: vec![(1, 10); frames.len()], plays: 0, default_image: false });
+    let mut preview = Search::new(&small, sw, sh, picked.as_ref().map(|f| f.len()).zip(preview_timing.as_ref()), options);
     let target = match options.target {
         Some(target) => target,
         // One full-size scoring, the plain palette's; the search's own best at 256 colors (which
@@ -349,7 +380,9 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
             reference(plain, top).min(AUTO_CAP)
         }
     };
-    let (mut ranked, mut preview_miss) = preview.ranked(target + PREVIEW_MARGIN, &variants)?;
+    // frames at full size hide nothing
+    let margin = if k > 1 { PREVIEW_MARGIN } else { 0.0 };
+    let (mut ranked, mut preview_miss) = preview.ranked(target + margin, &variants)?;
     if preview_miss {
         // the margin alone may put it out of reach on the preview: let full size decide
         (ranked, preview_miss) = preview.ranked(target, &variants)?;
@@ -418,7 +451,8 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
         miss: score < target,
         preview: k,
         preview_score,
-        frames: 1,
+        frames: animation.map_or(1, |(frames, _)| frames),
+        preview_frames: picked.map_or(0, |f| f.len()),
         profile: preview.profile.plus(full.profile),
     };
     Ok((png, report))
@@ -436,6 +470,27 @@ fn reference(plain: f64, top: f64) -> f64 {
     } else {
         plain.max(top - TOP_SLACK)
     }
+}
+
+/// An animation's preview: its downscale factor and how many frames it runs on (up to
+/// PREVIEW_FRAMES; `run_frames` picks which), so that together they fit `budget` pixels where they
+/// can without a frame's longer side going under SMALL_SIDE (it would be scored enlarged again).
+/// (1, None) for an animation small enough to search whole, or of too few frames for a few of them
+/// to save much when they aren't downscaled.
+fn animation_preview(w: usize, h: usize, frames: usize, budget: usize) -> (usize, Option<Vec<usize>>) {
+    if budget == 0 || w * h * frames <= budget || frames <= 2 {
+        return (1, None);
+    }
+    let count = frames.min(PREVIEW_FRAMES);
+    let picked: Vec<usize> = (0..count).map(|j| j * (frames - 1) / (count - 1)).collect();
+    let mut k = preview_factor(w, h, budget / count);
+    while k > 1 && w.max(h) / k < SMALL_SIDE {
+        k -= 1;
+    }
+    if k == 1 && frames < 2 * PREVIEW_FRAMES {
+        return (1, None);
+    }
+    (k, Some(picked))
 }
 
 /// Smallest k >= 2 whose k×k box downscale fits in `budget` pixels; 1 if the image already does.
@@ -488,6 +543,8 @@ struct Search<'p> {
     reference: Option<Ssimulacra2Reference>,
     /// An animation's references, one per frame.
     frame_references: Vec<Ssimulacra2Reference>,
+    /// Every frame's score in the latest animation scoring.
+    frame_scores: Vec<f64>,
     /// Palettes by size and source.
     palettes: HashMap<(u32, Source), Vec<RGBA>>,
     evaluations: HashMap<(u32, Variant), Evaluation>,
@@ -507,6 +564,7 @@ impl<'p> Search<'p> {
             opaque: is_opaque(pixels),
             reference: None,
             frame_references: Vec::new(),
+            frame_scores: Vec::new(),
             palettes: HashMap::new(),
             evaluations: HashMap::new(),
             clock: options.clock,
@@ -647,10 +705,14 @@ impl<'p> Search<'p> {
             self.candidate(key)?;
         }
         let t = self.tick();
-        keys.sort_by_cached_key(|key| {
-            let e = &self.evaluations[key];
-            palette_size_hint(&e.palette, &e.indices, self.w)
-        });
+        if self.timing.is_some() {
+            keys.sort_by_cached_key(|&key| self.encoded(key).len());
+        } else {
+            keys.sort_by_cached_key(|key| {
+                let e = &self.evaluations[key];
+                palette_size_hint(&e.palette, &e.indices, self.w)
+            });
+        }
         self.profile.encode += self.tick() - t;
         Ok(keys)
     }
@@ -804,7 +866,21 @@ impl<'p> Search<'p> {
         let at_once = (PARALLEL_SCORED_PIXELS / (w * h)).max(1);
         let scores: Vec<Result<f64, String>> = distinct.chunks(at_once).flat_map(|frames| par::map(frames, score)).collect();
         self.profile.score += self.tick() - t;
-        Ok(scores.into_iter().collect::<Result<Vec<f64>, String>>()?.into_iter().fold(f64::INFINITY, f64::min))
+        let scores = scores.into_iter().collect::<Result<Vec<f64>, String>>()?;
+        // a repeat scores what the frame before did
+        let mut each = Vec::with_capacity(self.frames);
+        let mut scored = distinct.iter().zip(&scores).peekable();
+        for f in 0..self.frames {
+            match scored.peek() {
+                Some(&(&g, &score)) if g == f => {
+                    each.push(score);
+                    scored.next();
+                }
+                _ => each.push(each[f - 1]),
+            }
+        }
+        self.frame_scores = each;
+        Ok(scores.into_iter().fold(f64::INFINITY, f64::min))
     }
 
     /// Quantizes (once per palette size) and remaps one candidate, without scoring it.
