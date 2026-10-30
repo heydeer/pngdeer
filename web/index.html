@@ -494,7 +494,7 @@
       <h2 class="big" id="r-title">The best open-source PNG compressor we've measured.</h2>
       <p class="intro" id="r-intro">We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
       <div class="switch r-format" id="r-format" role="group" aria-label="Output format">
-        <button type="button" data-kind="png" aria-pressed="true">PNG</button><button type="button" data-kind="webp" aria-pressed="false">WebP</button>
+        <button type="button" data-kind="png" aria-pressed="true">PNG</button><button type="button" data-kind="webp" aria-pressed="false">WebP</button><button type="button" data-kind="jpeg" aria-pressed="false">JPEG</button>
       </div>
     </div>
     <div class="lab reveal">
@@ -1102,7 +1102,9 @@ $("#all").onclick = () => files.filter((x) => job(x).status === "done").forEach(
 // PNG: pngdeer's pd70–pd95 runs and every other tool's ten settings, as SSIMULACRA2 points at
 // TinyPNG's file size (experiments/palette-feedback/tool_rank.py). WebP: pngdeer's wp40–wp98 and
 // automatic runs, cwebp's 27 settings and pngquant + cwebp's ten, as bytes saved at the quality of
-// TinyPNG's WebP, on the 120 images it was fetched for (experiments/webp/leaderboard.py).
+// TinyPNG's WebP, on the 120 images it was fetched for (experiments/webp/leaderboard.py). JPEG:
+// pngdeer's files (its encoder at qualities 50-85, and its runs), mozjpeg's 7 and jpegli's 12
+// settings, as bytes saved at the quality of TinyPNG's JPEG on 60 photos (experiments/jpeg).
 const RESEARCH = {
   png: {
     title: "The best open-source PNG compressor we've measured.",
@@ -1136,6 +1138,21 @@ const RESEARCH = {
     sets: {
       tiny: { label: "TinyPNG's WebP · 120", n: 120, smaller: 5, points: 1.6, reach: 118, tools: [
         ["pngdeer", 5.0, 118], ["cwebp", 2.1, 120], ["pngquant + cwebp", -35.0, 115]] },
+    },
+  },
+  jpeg: {
+    title: "The best open-source JPEG compressor we've measured.",
+    intro: "We recompressed 60 JPEG photos from Wikimedia Commons, 30 web-size copies and 30 camera originals, with pngdeer, TinyPNG, mozjpeg (Mozilla's encoder, which Squoosh uses) and jpegli (Google's, from the JPEG XL project). Every output was scored with SSIMULACRA2 against the photo.",
+    chart: "Bytes saved at TinyPNG's quality",
+    sub: "Median size against TinyPNG's JPEG when each tool's output matches its quality, and how many photos each can bring up to TinyPNG's quality.",
+    column: "Saved vs TinyPNG", unit: "%", lo: -5, ticks: [-5, 0, 5, 10], narrow: [0, 10],
+    method: [
+      ["Generous to the others", "mozjpeg and jpegli each get their best setting per photo, picked after the fact: qualities 40–90, jpegli at 4:4:4 and 4:2:0. pngdeer's files are pooled the same way; the one it writes for TinyPNG's quality is 10.5% smaller on the median photo."],
+      ["Out of the box", "pngdeer's automatic quality makes files 18% smaller than TinyPNG's on the median photo, as good. mozjpeg's default quality makes them 7% bigger, 5 points better."],
+      ["Colors kept", "TinyPNG drops every bit of metadata, the color profile too, so a photo in Display P3 loses its colors. pngdeer keeps a profile that isn't sRGB, and the orientation. TinyPNG ran through its API in October 2026."]],
+    sets: {
+      photos: { label: "Photos · 60", n: 60, smaller: 12, points: 3.3, reach: 60, tools: [
+        ["pngdeer", 12.2, 60], ["jpegli", 10.8, 60], ["mozjpeg", 5.8, 59]] },
     },
   },
 };

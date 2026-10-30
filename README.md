@@ -69,12 +69,13 @@ pngdeer also takes JPEG photos (`pngdeer photo.jpg -o smaller.jpg`, or drop them
 
 | Compressor | Size at TinyPNG's quality | Reaches |
 |---|---:|---:|
-| **pngdeer** | **89.5% / 86.7%** | **60** |
+| **pngdeer** | **87.8% / 85.4%** | **60** |
 | TinyPNG (the yardstick) | 100% | 60 |
 | jpegli, best of 12 settings | 89.2% / 87.2% | 60 |
 | mozjpeg, best of 7 qualities | 94.2% / 89.1% | 59 |
 
-- **jpegli** is Google's JPEG encoder from the JPEG XL project, **mozjpeg** Mozilla's, which Squoosh uses. Each gets its best setting per photo, picked after the fact: qualities 40–90, jpegli also at 4:2:0. pngdeer's numbers are the files it writes, searched at compression time; its encoder is mozjpeg with its MS-SSIM-tuned table at 4:2:0, which given the same sweep needs 87.6% / 86.4%.
+- **jpegli** is Google's JPEG encoder from the JPEG XL project, **mozjpeg** Mozilla's, which Squoosh uses. Each gets its best setting per photo, picked after the fact: qualities 40–90, jpegli also at 4:2:0. pngdeer's files are pooled the same way (its encoder, mozjpeg with its MS-SSIM-tuned table at 4:2:0, at qualities 50–85, and its own runs), as in the PNG and WebP tables. The file it writes with TinyPNG's score as the target is 89.5% / 86.7% of TinyPNG's size.
+- At TinyPNG's file size, pngdeer scores 3.3 SSIMULACRA2 points above TinyPNG on the median photo, jpegli 3.1, mozjpeg 1.8.
 - At its automatic quality, pngdeer's files are 82% of TinyPNG's size on the median photo (84% in total), scoring about the same (median +0.2 points). mozjpeg's default quality makes them 7% bigger than TinyPNG's, 5 points better.
 - Like TinyPNG, pngdeer gives big photos a lower quality than small ones: a large photo is seen scaled down. Unlike TinyPNG, it keeps the color profile (unless sRGB) and the orientation, and drops the rest of the camera's metadata.
 - **WebP from a JPEG** (`pngdeer photo.jpg -o photo.webp`, or the switch in the browser): turned upright, at the same automatic quality. At TinyPNG's WebP quality it needs 95.3% / 91.3% of TinyPNG's WebP size; cwebp, given its best of 13 settings per photo, about the same. At equal quality it is no smaller than pngdeer's own JPEG (99% on the median photo), so it is there for sites that want WebP.

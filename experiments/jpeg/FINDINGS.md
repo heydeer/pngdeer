@@ -119,7 +119,9 @@ within 3 points of TinyPNG's score on half the photos.
   | jpegli, defaults and 4:2:0, qualities 40–90 | 89.2% / 87.2% | 60 | +3.1 |
   | mozjpeg's defaults, qualities 40–90 | 94.2% / 89.1% | 59 | +1.8 |
 
-  Out of the box, mozjpeg's default quality is 5 points above TinyPNG at 7% more bytes.
+  Pooled with its two runs as well, as the README and the site show it, pngdeer's frontier needs
+  87.8% / 85.4% (12.2% saved on the median photo). Out of the box, mozjpeg's default quality is 5
+  points above TinyPNG at 7% more bytes.
 
 ## Round 5: WebP from a JPEG
 
