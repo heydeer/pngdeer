@@ -151,3 +151,61 @@ fn same_bytes_everywhere() {
     let digests = [digest(&plain, None), digest(&tagged, None), digest(&plain, Some(80.0))];
     assert_eq!(digests, [(3767, 3560351722), (3988, 3204447720), (3621, 3529542978)]);
 }
+
+/// The chunks of a WebP file: type and contents.
+#[cfg(feature = "webp")]
+fn webp_chunks(webp: &[u8]) -> Vec<([u8; 4], &[u8])> {
+    let mut out = Vec::new();
+    let mut at = 12;
+    while at + 8 <= webp.len() {
+        let len = u32::from_le_bytes(webp[at + 4..at + 8].try_into().unwrap()) as usize;
+        out.push((webp[at..at + 4].try_into().unwrap(), &webp[at + 8..at + 8 + len]));
+        at += 8 + len + len % 2;
+    }
+    out
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn becomes_lossy_webp_at_the_jpeg_target() {
+    use pngdeer::{compress_webp, webp};
+    let input = camera_jpeg(None, None);
+    let out = compress_webp(&input, &Settings::default()).unwrap();
+    assert_eq!((&out.webp[..4], &out.webp[8..12], out.mode), (&b"RIFF"[..], &b"WEBP"[..], "lossy"));
+    assert!(out.png.is_none() && out.lossless_bytes.is_none());
+    // the automatic target is JPEG output's, reached, and the score is the file's
+    assert_eq!(out.target, compress_jpeg(&input, &Settings::default()).unwrap().target);
+    let (source, decoded) = (jpeg::decode(&input).unwrap(), webp::decode(&out.webp).unwrap());
+    let score = search::score(&source.pixels, &decoded.pixels, W, H).unwrap();
+    assert!((score - out.score).abs() < 1e-9 && out.score >= out.target, "{score} vs {} for {}", out.score, out.target);
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn webp_is_turned_upright_and_keeps_the_colors() {
+    use pngdeer::{compress_webp, webp};
+    let display_p3 = profile("Display P3");
+    let out = compress_webp(&camera_jpeg(Some(&display_p3), Some(&camera_exif(6))), &Settings::default()).unwrap();
+    // a quarter turn: 120 × 160, its top row the photo's left column, bottom up
+    let decoded = webp::decode(&out.webp).unwrap();
+    assert_eq!((decoded.width, decoded.height), (H, W));
+    let (upright, ..) = jpeg::oriented(jpeg::decode(&camera_jpeg(None, None)).unwrap().pixels, W, H, 6);
+    assert!(search::score(&upright, &decoded.pixels, H, W).unwrap() > 60.0);
+    // the profile in an ICCP chunk, no EXIF
+    let chunks = webp_chunks(&out.webp);
+    assert_eq!(chunks.iter().filter(|(k, _)| k == b"ICCP").map(|(_, d)| *d).collect::<Vec<_>>(), [&display_p3[..]]);
+    assert!(chunks.iter().all(|(k, _)| k != b"EXIF"));
+}
+
+/// As `same_bytes_everywhere`, for WebP from a JPEG.
+#[cfg(feature = "webp")]
+#[test]
+fn same_webp_bytes_everywhere() {
+    let digest = |input: &[u8], target| {
+        let out = pngdeer::compress_webp(input, &Settings { target, ..Default::default() }).unwrap();
+        (out.webp.len(), crc32fast::hash(&out.webp))
+    };
+    let (plain, tagged) = (camera_jpeg(None, None), camera_jpeg(Some(&profile("Display P3")), Some(&camera_exif(6))));
+    let digests = [digest(&plain, None), digest(&tagged, None), digest(&plain, Some(80.0))];
+    assert_eq!(digests, [(5560, 3088742262), (5722, 2315651081), (3820, 1353286174)]);
+}

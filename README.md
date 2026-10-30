@@ -49,7 +49,7 @@ At TinyPNG's quality, pngdeer's files are 12% smaller on the held-out set and 8%
 
 ### WebP
 
-pngdeer also writes WebP (an output name ending in `.webp`, or the switch in the browser): the smaller of its palette image stored losslessly and the lowest lossy quality that keeps the target. Against TinyPNG's WebP on 120 of the images, the size each tool needs to match TinyPNG's quality (median image / in total), and how many images it can bring up to that quality:
+pngdeer also writes WebP (an output name ending in `.webp`, or the switch in the browser): the smaller of its palette image stored losslessly and the lowest lossy quality that keeps the target (a JPEG photo: [below](#jpeg)). Against TinyPNG's WebP on 120 of the images, the size each tool needs to match TinyPNG's quality (median image / in total), and how many images it can bring up to that quality:
 
 | Compressor | Size at TinyPNG's quality | Reaches |
 |---|---:|---:|
@@ -76,7 +76,9 @@ pngdeer also takes JPEG photos (`pngdeer photo.jpg -o smaller.jpg`, or drop them
 
 - **jpegli** is Google's JPEG encoder from the JPEG XL project, **mozjpeg** Mozilla's, which Squoosh uses. Each gets its best setting per photo, picked after the fact: qualities 40–90, jpegli also at 4:2:0. pngdeer's numbers are the files it writes, searched at compression time; its encoder is mozjpeg with its MS-SSIM-tuned table at 4:2:0, which given the same sweep needs 87.6% / 86.4%.
 - At its automatic quality, pngdeer's files are 82% of TinyPNG's size on the median photo (84% in total), scoring about the same (median +0.2 points). mozjpeg's default quality makes them 7% bigger than TinyPNG's, 5 points better.
-- Like TinyPNG, pngdeer gives big photos a lower quality than small ones: a large photo is seen scaled down. Unlike TinyPNG, it keeps the color profile (unless sRGB) and the orientation, and drops the rest of the camera's metadata. The [JPEG notes](experiments/jpeg/FINDINGS.md) have the details. TinyPNG ran through its API in October 2026.
+- Like TinyPNG, pngdeer gives big photos a lower quality than small ones: a large photo is seen scaled down. Unlike TinyPNG, it keeps the color profile (unless sRGB) and the orientation, and drops the rest of the camera's metadata.
+- **WebP from a JPEG** (`pngdeer photo.jpg -o photo.webp`, or the switch in the browser): turned upright, at the same automatic quality. At TinyPNG's WebP quality it needs 95.3% / 91.3% of TinyPNG's WebP size; cwebp, given its best of 13 settings per photo, about the same. At equal quality it is no smaller than pngdeer's own JPEG (99% on the median photo), so it is there for sites that want WebP.
+- The [JPEG notes](experiments/jpeg/FINDINGS.md) have the details. TinyPNG ran through its API in October 2026.
 
 ## How it works
 
@@ -93,6 +95,7 @@ pngdeer input.png -o output.png              # automatic quality
 pngdeer input.png -o output.png --target 85  # a fixed SSIMULACRA2 quality
 pngdeer input.png -o output.webp             # WebP, automatic quality
 pngdeer photo.jpg -o photo.min.jpg           # JPEG, automatic quality
+pngdeer photo.jpg -o photo.webp              # a JPEG as WebP
 pngdeer --help
 ```
 

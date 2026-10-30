@@ -41,7 +41,7 @@ fn reaches_the_target_in_the_smaller_file() {
         let score = search::score(&photo(translucent), &decoded.pixels, 96, 80).unwrap();
         assert!((score - out.score).abs() < 1e-6, "{score} vs {}", out.score);
         assert!(out.score >= out.target);
-        assert_eq!(out.webp.len(), out.lossless_bytes.min(out.lossy_bytes.unwrap_or(usize::MAX)));
+        assert_eq!(out.webp.len(), out.lossless_bytes.unwrap().min(out.lossy_bytes.unwrap_or(usize::MAX)));
         assert_eq!(out.mode, "lossy");
         // a translucent pixel stays as it was: lossy WebP keeps the alpha plane lossless
         assert!(decoded.pixels.iter().zip(photo(translucent)).all(|(a, b)| a.a == b.a));
@@ -52,8 +52,9 @@ fn reaches_the_target_in_the_smaller_file() {
 fn misses_by_the_least() {
     // out of reach for a palette (about 28 on this image, scored 4× enlarged) and for lossy WebP
     let out = compress_webp(&png(&photo(false)), &Settings { target: Some(95.0), ..Default::default() }).unwrap();
-    assert!(out.png.report.miss);
-    assert!(out.score < 95.0 && out.score > out.png.report.score + 30.0, "{}", out.score);
+    let png = out.png.unwrap();
+    assert!(png.report.miss);
+    assert!(out.score < 95.0 && out.score > png.report.score + 30.0, "{}", out.score);
     assert_eq!((out.mode, out.quality.is_some()), ("lossy", true));
 }
 
@@ -74,7 +75,7 @@ fn automatic_quality_follows_tinypngs_webp() {
     assert!(out.score >= out.target && out.webp.len() <= bytes, "{} B at {} vs {bytes} B", out.webp.len(), out.score);
     // the palette beats it on a flat image, as TinyPNG would find: the PNG's target stays
     let flat = compress_webp(&png(&flat()), &Settings::default()).unwrap();
-    assert!(flat.reference.unwrap().2 >= flat.lossless_bytes);
+    assert!(flat.reference.unwrap().2 >= flat.lossless_bytes.unwrap());
     assert_eq!(flat.mode, "lossless");
     // a fixed target is kept as it is
     assert!(compress_webp(&png(&photo(false)), &Settings { target: Some(70.0), ..Default::default() }).unwrap().reference.is_none());

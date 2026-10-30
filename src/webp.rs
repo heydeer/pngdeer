@@ -18,6 +18,12 @@
 //! Colors: WebP carries color information only as an ICC profile. An iCCP chunk becomes the file's
 //! ICCP, an image in sRGB needs none, and the rest (cICP, or gAMA and cHRM that aren't sRGB's) is
 //! refused rather than shown in the wrong colors. Animated PNGs are refused too.
+//!
+//! A JPEG photo (with the jpeg feature) has only the lossy candidate: its pixels don't fit a
+//! palette. It is decoded as for JPEG output (jpeg.rs) and turned as its EXIF orientation says,
+//! since browsers don't turn a WebP file; its ICC profile is kept unless it is sRGB's, the rest of
+//! its metadata dropped. Automatic quality is JPEG output's (jpeg::auto_target). The file is WebP
+//! even where it is bigger than the JPEG, since WebP is what was asked for.
 
 use rgb::{ComponentBytes, FromSlice};
 
@@ -30,6 +36,9 @@ use crate::{Compressed, Settings, WebpOptions, RGBA};
 /// The first guess at the quality that reaches the target, without a reference to go by: targets
 /// from TinyPNG's PNG quality mostly land between 80 and 95.
 const FIRST_QUALITY: f64 = 90.0;
+/// The same for a JPEG photo at its automatic target.
+#[cfg(feature = "jpeg")]
+const FIRST_PHOTO_QUALITY: f64 = 70.0;
 /// About how many points a lossy file's score gains per quality step there, to aim from the one
 /// side of the target known so far.
 const SLOPE: f64 = 0.5;
@@ -55,17 +64,17 @@ pub struct CompressedWebp {
     /// The score the file had to reach (see the module).
     pub target: f64,
     /// The PNG whose pixels made the lossless candidate (`compress`'s, at `target` where the PNG
-    /// search ran for it).
-    pub png: Compressed,
+    /// search ran for it); None for a JPEG, which has no lossless candidate.
+    pub png: Option<Compressed>,
     /// "lossy" or "lossless"
     pub mode: &'static str,
     /// The lossy file's quality (also when the lossless one won): the lowest that reaches the
     /// target, or where none does, the best-scoring one tried.
     pub quality: Option<u32>,
     pub score: f64,
-    pub lossless_bytes: usize,
+    pub lossless_bytes: Option<usize>,
     /// The level of the lossless candidate kept.
-    pub lossless_level: u8,
+    pub lossless_level: Option<u8>,
     pub lossy_bytes: Option<usize>,
     /// Lossy files encoded and scored, and in how many rounds.
     pub tries: usize,
@@ -78,6 +87,7 @@ pub struct CompressedWebp {
 
 /// Where the time went, in milliseconds (zeros when Settings::clock is None). The lossy search runs
 /// alongside the PNG search for the reference's target, when there is one: `lossy` is them both.
+/// For a JPEG, `png` is decoding it.
 #[derive(Default)]
 pub struct Profile {
     pub png: f64,
@@ -98,15 +108,15 @@ impl CompressedWebp {
             self.score,
             self.tries,
             self.rounds,
-            self.lossless_bytes,
-            self.lossless_level,
+            or_null(self.lossless_bytes.map(|b| b.to_string())),
+            or_null(self.lossless_level.map(|l| l.to_string())),
             or_null(self.lossy_bytes.map(|b| b.to_string())),
             or_null(self.reference.map(|(q, s, b, l)| format!(r#"{{"quality": {q}, "score": {s:.3}, "bytes": {b}, "lossless_bytes": {l}}}"#))),
             p.png,
             p.lossless,
             p.reference,
             p.lossy,
-            self.png.json(),
+            or_null(self.png.as_ref().map(Compressed::json)),
             self.webp.len()
         )
     }
@@ -114,8 +124,12 @@ impl CompressedWebp {
 
 /// Compresses one PNG file to WebP: `compress` first, for a target and its pixels (twice where the
 /// automatic target moves, see the module), then the lossless and lossy candidates; the smaller one
-/// that reaches the target wins.
+/// that reaches the target wins. A JPEG (with the jpeg feature) becomes lossy WebP (`photo_webp`).
 pub fn compress_webp(input: &[u8], settings: &Settings) -> Result<CompressedWebp, Error> {
+    #[cfg(feature = "jpeg")]
+    if crate::jpeg::is_jpeg(input) {
+        return photo_webp(input, settings);
+    }
     let icc = icc_profile(input)?;
     let bitmap = codec::decode(input)?;
     let (w, h) = (bitmap.width, bitmap.height);
@@ -205,16 +219,58 @@ pub fn compress_webp(input: &[u8], settings: &Settings) -> Result<CompressedWebp
     Ok(CompressedWebp {
         webp,
         target,
-        png,
+        png: Some(png),
         mode,
         quality,
         score,
-        lossless_bytes,
-        lossless_level,
+        lossless_bytes: Some(lossless_bytes),
+        lossless_level: Some(lossless_level),
         lossy_bytes,
         tries: found.tries,
         rounds: found.rounds,
         reference,
+        profile,
+    })
+}
+
+/// A JPEG photo as lossy WebP: the lowest quality whose file, as shown, scores at least the target
+/// against the photo as shown (see the module).
+#[cfg(feature = "jpeg")]
+fn photo_webp(input: &[u8], settings: &Settings) -> Result<CompressedWebp, Error> {
+    let tick = || settings.clock.map_or(0.0, |c| c());
+    let options = settings.webp;
+    let mut profile = Profile::default();
+    let t = tick();
+    let photo = crate::jpeg::decode(input)?;
+    let (pixels, w, h) = crate::jpeg::oriented(photo.pixels, photo.width, photo.height, photo.orientation);
+    let icc = photo.icc.filter(|icc| !crate::jpeg::is_srgb(icc));
+    let lossies = Lossies::new(&pixels, w, h, options, options.method)?;
+    drop(pixels);
+    profile.png = tick() - t;
+
+    let t = tick();
+    let target = settings.target.unwrap_or_else(|| crate::jpeg::auto_target(w, h));
+    let found = lossies.search(target, usize::MAX, FIRST_PHOTO_QUALITY, Vec::new(), tuning(&options))?;
+    let lossy = found.best.or(found.closest).ok_or("no WebP quality to try")?;
+    profile.lossy = tick() - t;
+    let lossy_bytes = Some(lossy.file.len());
+    let webp = match icc {
+        Some(icc) => with_icc(&lossy.file, &icc, w, h),
+        None => lossy.file,
+    };
+    Ok(CompressedWebp {
+        target,
+        png: None,
+        mode: "lossy",
+        quality: Some(lossy.quality),
+        score: lossy.score,
+        lossless_bytes: None,
+        lossless_level: None,
+        lossy_bytes,
+        webp,
+        tries: found.tries,
+        rounds: found.rounds,
+        reference: None,
         profile,
     })
 }

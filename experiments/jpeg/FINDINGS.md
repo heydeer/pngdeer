@@ -5,6 +5,8 @@ photo, re-encodes it at the lowest quality whose SSIMULACRA2 score against it re
 and never returns more bytes than it was given. On 60 photos, at TinyPNG's quality, its files are
 10% smaller than TinyPNG's on the median photo and 13% smaller in total; at its automatic quality,
 which aims at about TinyPNG's, 18% and 16% smaller, scoring about the same (median +0.2 points).
+A photo can also come out as WebP (round 5): 5–9% smaller than TinyPNG's WebP at its quality, but
+no smaller than pngdeer's own JPEG at the same quality.
 
 ## Photos and method
 
@@ -119,6 +121,45 @@ within 3 points of TinyPNG's score on half the photos.
 
   Out of the box, mozjpeg's default quality is 5 points above TinyPNG at 7% more bytes.
 
+## Round 5: WebP from a JPEG
+
+2026-10-30. `compress_webp` takes a JPEG too (webp.rs, `photo_webp`): the photo decoded as for JPEG
+output, turned as its EXIF orientation says (browsers don't turn a WebP file), and encoded as lossy
+WebP with the PNG route's lossy settings (method 6, sharp YUV, auto filter) at the lowest quality
+whose file, as shown, reaches the target. The ICC profile stays unless it is sRGB's; nothing else.
+There is no lossless candidate, and no fallback to the JPEG: a WebP was asked for, even where it is
+bigger. In the browser the PNG/WebP switch now covers JPEGs too ("Same format" or WebP).
+
+**TinyPNG's WebP** (60 photos, 64 compressions: a shrink, then a conversion) is plain lossy VP8
+without metadata, 85% of its own JPEG's bytes on the median photo (94% in total) and 1.1 points
+below it (median score 65.1). It isn't cwebp at one quality applied to its shrunk JPEG (sizes from
+0.82 to 1.60 times cwebp's at quality 75), and its score follows the photo's size as its JPEG's
+does. Fitted the same way as round 3, a size model of its own (69.5 − 2.4 ln(megapixels)) or the
+JPEG model with an offset (−1.4) miss it by as much as the JPEG model unchanged (mean error 3.96,
+4.09 and 3.95 points), which aims 1.4 points above it. So **WebP keeps JPEG output's automatic
+target**: one quality per photo, whichever format it comes out in.
+
+| On the 60 photos, against TinyPNG's WebP | Bytes (median photo / total) | Points (median) |
+|---|---|---|
+| **pngdeer, at TinyPNG's score** | **95.3% / 91.3%** (all 60 reached) | |
+| cwebp, best of 13 settings (frontier) | 94.5% / 91.1% (all 60 reached) | +0.9 at its size |
+| **pngdeer, automatic quality** | **96.5% / 91.0%** | +2.0 |
+| cwebp at its default quality (75) | 106.2% / 106.0% | +1.5 |
+
+cwebp swept qualities 40–90 at its defaults (method 4) and at pngdeer's settings; given its best
+per photo after the fact it ties pngdeer, whose settings (method 6, auto filter) save 5.6% and
+2.5% over method 4 and no auto filter on 10 of the photos. At its automatic quality pngdeer's WebP
+is 9% smaller in total than TinyPNG's and 2 points better (its target is a little higher).
+
+**WebP isn't smaller than pngdeer's JPEG.** At the same automatic target, pngdeer's WebP is 99% of
+its JPEG's bytes on the median photo and 101% in total (middle half 92–107%; smaller on 33 of 60:
+97% on the web photos, 102% on the originals), scoring the same (median +0.06). mozjpeg's trellis
+quantization at 4:2:0 holds its own against VP8 at these qualities. TinyPNG's WebP looks smaller
+than its JPEG only because it is a point worse and TinyPNG's JPEG is less efficient than pngdeer's
+(pngdeer's WebP is 83% of TinyPNG's JPEG, as good). WebP from a JPEG is for sites that want WebP,
+not for smaller files; and it takes longer: 8.6 s per photo (median; 3.4 s web, 15.7 s originals)
+against 2.3 s, mostly libwebp's slowest method and its auto filter.
+
 ## Speed and memory
 
 A round's 3 qualities are encoded and decoded at once, then scored as many at once as fit in 8 MP
@@ -131,9 +172,11 @@ JPEG too; the threaded build compressed one in 42 s, to the same bytes as the co
 
 ```bash
 python3 experiments/jpeg/compare.py run PHOTOS TINY results.csv --cjpeg CJPEG --cjpegli CJPEGLI
+python3 experiments/jpeg/compare.py run PHOTOS TINYWEBP results-webp.csv --webp --cwebp CWEBP
 python3 experiments/jpeg/compare.py summary results.csv
 ```
 
 PHOTOS holds `web/` and `orig/` (the files of `sources.json`), TINY TinyPNG's file for each as
-KIND-NAME (bench.py's `TinyPNG.compress` fetches and caches them: 60 compressions). CJPEG is
-mozjpeg 4.1.5's cjpeg, CJPEGLI jpegli's cjpegli (libjxl 031a0077f579).
+KIND-NAME and TINYWEBP its WebP as KIND-STEM.webp (bench.py's `TinyPNG.compress` and
+`convert_webp` fetch and cache them). CJPEG is mozjpeg 4.1.5's cjpeg, CJPEGLI jpegli's cjpegli
+(libjxl 031a0077f579), CWEBP libwebp 1.6.0's cwebp.

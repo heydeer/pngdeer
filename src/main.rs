@@ -11,7 +11,8 @@
 //! A JPEG IN comes out as a JPEG: re-encoded at the lowest quality that keeps T, never bigger than
 //! IN (pngdeer::jpeg). Automatic quality there is about TinyPNG's JPEG's, which goes by the photo's
 //! size (see jpeg.rs). Its report gives the quality, score and searches; the ICC profile (unless
-//! sRGB's) and the EXIF orientation stay, the rest of EXIF goes.
+//! sRGB's) and the EXIF orientation stay, the rest of EXIF goes. With --format webp (or an OUT
+//! ending in .webp) it comes out as lossy WebP instead, turned as its orientation says (webp.rs).
 //!
 //! --format webp (also chosen by an OUT ending in .webp): the smaller of a palette image as lossless
 //!   WebP and the lossiest WebP that keeps the target. Automatic quality there is TinyPNG's WebP's:
@@ -40,7 +41,7 @@ use std::{env, fs, process, sync::OnceLock, time::Instant};
 use pngdeer::{codec, search};
 
 const USAGE: &str = "usage: pngdeer IN.png -o OUT.png [--format png|webp] [--target auto|T] [--preview-pixels N] [--variants SPEC]
-       pngdeer IN.jpg -o OUT.jpg [--target auto|T]
+       pngdeer IN.jpg -o OUT.jpg|OUT.webp [--target auto|T]
        pngdeer IN.png --score OTHER
        pngdeer IN.png -o OUT.png --upscale K";
 
@@ -110,8 +111,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if is_jpeg(&input) {
         return match format.as_deref() {
-            Some("jpeg") | None if !output.to_lowercase().ends_with(".webp") => write_jpeg(&input, &output, &settings),
-            _ => Err("a JPEG compresses to JPEG for now (--format jpeg, or an output name not ending in .webp)".into()),
+            Some("webp") => write_webp(&input, &output, &settings),
+            None if output.to_lowercase().ends_with(".webp") => write_webp(&input, &output, &settings),
+            Some("jpeg") | None => write_jpeg(&input, &output, &settings),
+            Some(other) => Err(format!("a JPEG compresses to jpeg or webp, not {other}").into()),
         };
     }
     let webp = match format.as_deref() {
@@ -190,12 +193,14 @@ fn frame_scores(a: &[u8], b: &[u8]) -> Result<Vec<f64>, Box<dyn std::error::Erro
         .collect()
 }
 
-/// A PNG, a WebP file with the webp feature, or a JPEG with the jpeg feature, as RGBA.
+/// A PNG, a WebP file with the webp feature, or a JPEG with the jpeg feature (turned as its EXIF
+/// orientation says, as viewers show it), as RGBA.
 fn decode_any(bytes: &[u8]) -> Result<codec::Bitmap, Box<dyn std::error::Error>> {
     #[cfg(feature = "jpeg")]
     if pngdeer::jpeg::is_jpeg(bytes) {
         let photo = pngdeer::jpeg::decode(bytes)?;
-        return Ok(codec::Bitmap { pixels: photo.pixels, width: photo.width, height: photo.height });
+        let (pixels, width, height) = pngdeer::jpeg::oriented(photo.pixels, photo.width, photo.height, photo.orientation);
+        return Ok(codec::Bitmap { pixels, width, height });
     }
     #[cfg(feature = "webp")]
     if bytes.starts_with(b"RIFF") {

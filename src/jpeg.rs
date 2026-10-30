@@ -170,8 +170,7 @@ pub fn compress_jpeg(input: &[u8], settings: &Settings) -> Result<CompressedJpeg
     };
     let target = match settings.target {
         Some(target) => target,
-        // libm: the same bits on every target
-        None => (AUTO_AT_1MP - AUTO_SLOPE * libm::log((w * h) as f64 / 1e6)).min(AUTO_CAP),
+        None => auto_target(w, h),
     };
     let decode_ms = tick() - t;
     let t = tick();
@@ -214,9 +213,42 @@ fn orientation_exif(orientation: u16) -> Vec<u8> {
     exif
 }
 
+/// The automatic target for a photo of `w` × `h` pixels (see the module docs).
+pub(crate) fn auto_target(w: usize, h: usize) -> f64 {
+    // libm: the same bits on every target
+    (AUTO_AT_1MP - AUTO_SLOPE * libm::log((w * h) as f64 / 1e6)).min(AUTO_CAP)
+}
+
+/// A photo's pixels as viewers show them: turned and flipped as its EXIF orientation says (1-8),
+/// with the width and height that come out.
+pub fn oriented(pixels: Vec<RGBA>, w: usize, h: usize, orientation: u16) -> (Vec<RGBA>, usize, usize) {
+    // the stored pixel each shown one comes from; 5-8 swap the sides
+    let from = |x: usize, y: usize| match orientation {
+        2 => (w - 1 - x, y),
+        3 => (w - 1 - x, h - 1 - y),
+        4 => (x, h - 1 - y),
+        5 => (y, x),
+        6 => (y, h - 1 - x),
+        7 => (w - 1 - y, h - 1 - x),
+        8 => (w - 1 - y, x),
+        _ => (x, y),
+    };
+    if !(2..=8).contains(&orientation) {
+        return (pixels, w, h);
+    }
+    let (sw, sh) = if orientation >= 5 { (h, w) } else { (w, h) };
+    let shown = (0..sw * sh)
+        .map(|i| {
+            let (x, y) = from(i % sw, i / sw);
+            pixels[y * w + x]
+        })
+        .collect();
+    (shown, sw, sh)
+}
+
 /// Whether an ICC profile is sRGB's: its description says so (the profile cameras, editors and
 /// Wikimedia embed: "sRGB IEC61966-2.1" and the like). Viewers show an untagged JPEG as sRGB.
-fn is_srgb(icc: &[u8]) -> bool {
+pub(crate) fn is_srgb(icc: &[u8]) -> bool {
     let u32_at = |at: usize| icc.get(at..at + 4).map(|b| u32::from_be_bytes(b.try_into().unwrap()));
     let Some(count) = u32_at(128) else { return false };
     (0..count.min(256) as usize).any(|i| {
@@ -246,6 +278,26 @@ mod tests {
         tiff.extend_from_slice(&[0x12, 0x01, 3, 0, 1, 0, 0, 0, 8, 0, 0, 0]);
         assert_eq!(exif_orientation(&tiff), Some(8));
         assert_eq!(exif_orientation(b"nope"), None);
+    }
+
+    #[test]
+    fn turns_as_the_orientation_says() {
+        // 3 × 2: a b c / d e f
+        let px = |v: u8| RGBA::new(v, 0, 0, 255);
+        let pixels: Vec<RGBA> = (1..=6).map(px).collect();
+        let shown = |o| {
+            let (p, w, h) = oriented(pixels.clone(), 3, 2, o);
+            (p.iter().map(|p| p.r).collect::<Vec<_>>(), w, h)
+        };
+        assert_eq!(shown(1), (vec![1, 2, 3, 4, 5, 6], 3, 2));
+        assert_eq!(shown(2), (vec![3, 2, 1, 6, 5, 4], 3, 2));
+        assert_eq!(shown(3), (vec![6, 5, 4, 3, 2, 1], 3, 2));
+        assert_eq!(shown(4), (vec![4, 5, 6, 1, 2, 3], 3, 2));
+        assert_eq!(shown(5), (vec![1, 4, 2, 5, 3, 6], 2, 3));
+        // 6: a quarter turn clockwise, so the left column, bottom up, becomes the top row
+        assert_eq!(shown(6), (vec![4, 1, 5, 2, 6, 3], 2, 3));
+        assert_eq!(shown(7), (vec![6, 3, 5, 2, 4, 1], 2, 3));
+        assert_eq!(shown(8), (vec![3, 6, 2, 5, 1, 4], 2, 3));
     }
 
     #[test]

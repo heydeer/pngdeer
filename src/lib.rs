@@ -8,7 +8,8 @@
 //! - search: the palette size and remapping that reach the target in the fewest bytes
 //! - codec: PNG decoding, a quick palette PNG writer, and oxipng for the final file
 //! - apng: animated PNGs, frames as shown and a palette animation written back
-//! - webp: WebP output, the smaller of a palette image losslessly and a lossy file of the same quality
+//! - webp: WebP output, the smaller of a palette image losslessly and a lossy file of the same
+//!   quality (a JPEG photo: the lossy file)
 //! - jpeg: JPEG photos re-encoded at the lowest quality that keeps the target
 //! - compress (here): the whole pipeline for one file
 

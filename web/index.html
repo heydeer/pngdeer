@@ -136,7 +136,6 @@
   .bar .dim { color: var(--faint); }
   .bar .spacer { flex: 1; }
   .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; padding: 3px; background: var(--white); }
-  .seg[hidden] { display: none; }
   .seg button { border: 0; background: none; height: 26px; padding: 0 11px; border-radius: 999px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
   .stagewrap { position: relative; min-width: 0; }
@@ -439,13 +438,13 @@
         </button>
         <button class="pill ghost" id="samples" type="button">Try sample images</button>
       </div>
-      <div class="output">Output <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="png" aria-pressed="true">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div></div>
+      <div class="output">Output <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="same" aria-pressed="true" title="PNGs stay PNG, JPEGs stay JPEG">Same format</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div></div>
     </div>
     <div class="viewer" id="viewer">
       <div class="bar">
         <span class="name" id="v-name"></span><span class="dim mono" id="v-dim"></span>
         <span class="spacer"></span>
-        <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="png" aria-pressed="true">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div>
+        <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="same" aria-pressed="true" id="v-same">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div>
         <div class="seg" role="group" aria-label="Zoom" id="zoom">
           <button type="button" data-zoom="fit" aria-pressed="true">Fit</button><button type="button" data-zoom="1" aria-pressed="false">1:1</button><button type="button" data-zoom="2" aria-pressed="false">2×</button>
         </div>
@@ -665,17 +664,21 @@ const CORES = navigator.hardwareConcurrency || 4;
 // job, in place of jobs.
 const files = [];
 let nextId = 0, active = null;
-// The output format for PNGs: each file is compressed to it once, and its jobs keep both when
-// switching. A JPEG stays a JPEG (JPEG to WebP isn't in pngdeer yet).
-let format = "png";
+// The output format: "same" (a PNG stays a PNG, a JPEG a JPEG) or "webp". Each file is compressed
+// to each once, and its jobs keep both when switching.
+let format = "same";
 try { if (localStorage.getItem("pngdeer-format") === "webp") format = "webp"; } catch {}
-const output = (f) => (f.jpeg ? "jpeg" : format);
+const output = (f) => (format === "webp" ? "webp" : f.jpeg ? "jpeg" : "png");
 const job = (f) => f.refused ?? f.jobs[output(f)];
 let skipped = ""; // what the last dropped folders held besides PNGs
 
 const size = (n) => (n < 1024 * 1024 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : (n / 1048576).toFixed(2) + " MB");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const saving = (f) => Math.round(100 * (1 - job(f).out.byteLength / f.size));
+/** The size change as a label: −57% smaller, +7% bigger (a WebP can outgrow its JPEG). */
+const change = (after, before) => {
+  const d = Math.round(100 * (after / before - 1));
+  return d > 0 ? `+${d}%` : `−${-d}%`;
+};
 
 /* ---------- worker pool ---------- */
 // Threaded build (cross-origin isolated page): one worker, whose thread pool uses every core (a
@@ -776,18 +779,18 @@ async function compress(f, to) {
     j.ms = data.ms;
     j.palette = to === "png" ? paletteOf(data.file) : [];
   }
-  if (f === active && to === format) show(f, true); else render();
+  if (f === active && to === output(f)) show(f, true); else render();
 }
 
-/** Switches PNGs' output format, compressing to it what isn't yet. */
+/** Switches the output format, compressing to it what isn't yet. */
 function setFormat(to) {
   format = to;
   try { localStorage.setItem("pngdeer-format", to); } catch {}
   for (const x of document.querySelectorAll(".format button")) x.setAttribute("aria-pressed", x.dataset.format === to);
   // every file gets its job before any starts: starting one renders them all
-  const todo = files.filter((f) => !f.refused && !f.jpeg && !f.jobs[to]);
-  for (const f of todo) f.jobs[to] = { status: "queued" };
-  for (const f of todo) compress(f, to);
+  const todo = files.filter((f) => !f.refused && !f.jobs[output(f)]);
+  for (const f of todo) f.jobs[output(f)] = { status: "queued" };
+  for (const f of todo) compress(f, output(f));
   if (active) show(active); else render();
 }
 for (const seg of document.querySelectorAll(".format")) {
@@ -828,7 +831,7 @@ function show(f, intro = false) {
   $("#img-after").src = job(f).outUrl || f.url;
   $("#v-name").textContent = f.name;
   $("#v-dim").textContent = f.width ? `${f.width}×${f.height}` : "";
-  $(".bar .format").hidden = !!f.jpeg; // a JPEG stays a JPEG
+  $("#v-same").textContent = f.jpeg ? "JPEG" : "PNG"; // what "same format" is for this file
   stage.hidden = !f.width;
   setSplit(50);
   layout();
@@ -940,7 +943,7 @@ function render() {
     stage.classList.toggle("ready", done);
     $("#t-before").textContent = size(f.size);
     $("#t-after").textContent = done ? size(j.out.byteLength) : j.status === "error" ? "failed" : "working…";
-    $("#t-save").textContent = done ? `−${saving(f)}%` : "";
+    $("#t-save").textContent = done ? change(j.out.byteLength, f.size) : "";
     $("#t-save").hidden = !done;
     const pal = $("#palette");
     pal.classList.toggle("wait", waiting);
@@ -956,7 +959,7 @@ function render() {
   $("#tray").classList.toggle("on", files.length > 0);
   $("#cards").innerHTML = files.map((x) => {
     const j = job(x), ok = j.status === "done";
-    const sub = ok ? `${size(x.size)} → ${size(j.out.byteLength)} <b>−${saving(x)}%</b>`
+    const sub = ok ? `${size(x.size)} → ${size(j.out.byteLength)} <b>${change(j.out.byteLength, x.size)}</b>`
       : j.status === "error" ? (j.notImage ? "Not a PNG or JPEG" : "Couldn't compress") : j.status === "busy" ? "Compressing…" : "Waiting";
     return `<button class="card" type="button" data-id="${x.id}" aria-current="${x === active}">
       ${x.width ? `<img class="thumb" src="${j.outUrl || x.url}" alt="">` : '<span class="thumb"></span>'}
@@ -966,7 +969,7 @@ function render() {
   const before = done.reduce((s, x) => s + x.size, 0), after = done.reduce((s, x) => s + job(x).out.byteLength, 0);
   const plural = files.length > 1 ? "s" : "";
   $("#sum").innerHTML = done.length
-    ? `<b>−${Math.round(100 * (1 - after / before))}%</b>${size(before - after)} saved · ${done.length} of ${files.length} done`
+    ? `<b>${change(after, before)}</b>${after <= before ? `${size(before - after)} saved` : `${size(after - before)} more`} · ${done.length} of ${files.length} done`
     : files.every((x) => job(x).status === "error") ? `<b>Couldn't compress</b>${files.length} file${plural}`
     : `<b>Working…</b>${files.length} file${plural}`;
   $("#all").disabled = !done.length;
@@ -980,9 +983,8 @@ function render() {
 function renderNote() {
   const names = { png: "PNG", webp: "WebP", jpeg: "JPEG" };
   const outputs = [...new Set(files.filter((x) => !x.refused).map((x) => names[output(x)]))];
-  const jpegsStay = format === "webp" && files.some((x) => x.jpeg) ? " JPEGs stay JPEGs: WebP output is for PNGs, for now." : "";
   const status = files.length
-    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG's ${outputs.join(" and ") || names[format]} would be, at most 90.${jpegsStay}`
+    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG's ${outputs.join(" and ")} would be, at most 90.`
     : "";
   $("#note").innerHTML = (skipped ? `<span class="err">${esc(skipped)}</span> ` : "") + esc(status);
 }

@@ -68,7 +68,8 @@ impl CompressedWebp {
 
 /// Compresses one PNG file to WebP (pngdeer::compress_webp): the smaller of its palette image stored
 /// losslessly and the lowest lossy quality reaching the target; with no target, TinyPNG's WebP
-/// quality for the image. `preview_pixels` as for `compress`.
+/// quality for the image. `preview_pixels` as for `compress`. A JPEG becomes lossy WebP, at JPEG
+/// output's automatic quality.
 #[wasm_bindgen]
 pub fn compress_webp(input: &[u8], target: Option<f64>, preview_pixels: Option<u32>) -> Result<CompressedWebp, JsError> {
     let result = pngdeer::compress_webp(input, &settings(target, preview_pixels)).map_err(|e| JsError::new(&e.to_string()))?;
