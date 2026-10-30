@@ -12,8 +12,8 @@ publish = false
 name = "libwebp"
 
 [dependencies]
-# The math libwebp calls (glue/pngdeer.h), the same bits on every target
-libm = "0.2.16"
+# the C library functions libwebp calls (math, qsort, and on wasm32 the allocator), the same everywhere
+pngdeer-clib = { path = "../clib" }
 
 [build-dependencies]
 cc = "1"

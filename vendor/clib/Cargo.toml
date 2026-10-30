@@ -1,0 +1,19 @@
+[package]
+name = "pngdeer-clib"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "The C library functions pngdeer's vendored C code (libwebp, mozjpeg) calls, the same on every target"
+publish = false
+# build scripts of the crates that depend on this one read its header folders from DEP_PNGDEER_CLIB_*
+links = "pngdeer_clib"
+
+[lib]
+name = "pngdeer_clib"
+
+[dependencies]
+# the inexact math functions (include/pngdeer_clib.h), the same bits on every target
+libm = "0.2.16"
+
+[build-dependencies]
+cc = "1"

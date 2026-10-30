@@ -8,17 +8,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = ("license", "licence", "copying", "notice", "copyright", "patents")
+# Files holding a license under another name: the IJG license is in libjpeg's README.
+ALSO = ("readme.ijg",)
+# Statements a license asks binary distributions to make, by crate.
+STATEMENTS = {"pngdeer-mozjpeg": "This software is based in part on the work of the Independent JPEG Group."}
 
 
 def cargo(*args: str) -> str:
     return subprocess.check_output(["cargo", *args], cwd=ROOT, text=True)
 
 
+def is_license(path: Path) -> bool:
+    return path.name.lower().startswith(NAMES) or path.name.lower() in ALSO
+
+
 def license_files(package: dict) -> list[Path]:
     directory = Path(package["manifest_path"]).parent
-    files = {p for p in directory.iterdir() if p.is_file() and p.name.lower().startswith(NAMES)}
+    files = {p for p in directory.iterdir() if p.is_file() and is_license(p)}
     if not files or package["name"].endswith("-sys"):
-        files.update(p for p in directory.glob("*/*") if p.is_file() and p.name.lower().startswith(NAMES))
+        files.update(p for p in directory.glob("*/*") if p.is_file() and is_license(p))
     if package.get("license_file"):
         files.add(directory / package["license_file"])
     return sorted(files)
@@ -70,6 +78,8 @@ def main() -> None:
 
     parts = [f"Third-party software compiled into pngdeer's native CLI ({args.target}), and its licenses.",
              "Each license text below is preceded by the crates it covers.", ""]
+    names = {package["name"] for package in dependencies}
+    parts += [text for crate, text in STATEMENTS.items() if crate in names] + ([""] if names & STATEMENTS.keys() else [])
     for text, labels in sorted(texts.values(), key=lambda item: item[1][0]):
         parts += ["=" * 78, *labels, "-" * 78, text, ""]
     if unfiled:

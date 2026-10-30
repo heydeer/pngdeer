@@ -272,6 +272,11 @@ impl Scorer {
         Ok(Scorer { reference, w, h, factor })
     }
 
+    /// The pixels each scoring compares: the image's, enlarged if small.
+    pub fn scored_pixels(&self) -> usize {
+        self.w * self.h * self.factor * self.factor
+    }
+
     pub fn score(&self, distorted: &[RGBA]) -> Result<f64, BoxError> {
         let (w, h) = (self.w * self.factor, self.h * self.factor);
         let bytes = enlarged_bytes(distorted, self.w, self.h, self.factor);

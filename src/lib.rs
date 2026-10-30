@@ -9,6 +9,7 @@
 //! - codec: PNG decoding, a quick palette PNG writer, and oxipng for the final file
 //! - apng: animated PNGs, frames as shown and a palette animation written back
 //! - webp: WebP output, the smaller of a palette image losslessly and a lossy file of the same quality
+//! - jpeg: JPEG photos re-encoded at the lowest quality that keeps the target
 //! - compress (here): the whole pipeline for one file
 
 // Index loops over a color's few coordinates read better here than zipped iterators.
@@ -17,14 +18,20 @@
 pub mod apng;
 pub mod codec;
 mod color;
+#[cfg(feature = "jpeg")]
+pub mod jpeg;
 mod palette;
 mod par;
+#[cfg(any(feature = "webp", feature = "jpeg"))]
+mod quality;
 mod remap;
 pub mod search;
 #[cfg(feature = "webp")]
 pub mod webp;
 
 use codec::Error;
+#[cfg(feature = "jpeg")]
+pub use jpeg::{compress_jpeg, CompressedJpeg};
 use search::{Report, Variant, DEFAULT_VARIANTS};
 #[cfg(feature = "webp")]
 pub use webp::{compress_webp, CompressedWebp};

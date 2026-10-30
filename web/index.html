@@ -136,6 +136,7 @@
   .bar .dim { color: var(--faint); }
   .bar .spacer { flex: 1; }
   .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; padding: 3px; background: var(--white); }
+  .seg[hidden] { display: none; }
   .seg button { border: 0; background: none; height: 26px; padding: 0 11px; border-radius: 999px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
   .stagewrap { position: relative; min-width: 0; }
@@ -429,7 +430,7 @@
   <div class="table rise d3" id="drop">
     <div class="marks" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <div class="empty">
-      <h2>Drop PNGs or folders here</h2>
+      <h2>Drop PNGs, JPEGs or folders here</h2>
       <p>Nothing is uploaded. Images are compressed locally.</p>
       <div class="actions">
         <button class="pill sun" type="button" data-pick>
@@ -475,7 +476,7 @@
       </div>
     </div>
     <div class="release" aria-hidden="true">Release to compress</div>
-    <input type="file" id="file" accept="image/png" multiple hidden>
+    <input type="file" id="file" accept="image/png,image/jpeg" multiple hidden>
   </div>
 
   <div class="tray" id="tray">
@@ -659,14 +660,17 @@
 const $ = (s) => document.querySelector(s);
 const SAMPLES = ["sun-poster", "kodim01", "pngdeer@2x", "cup-of-tea", "openmoji-1f431"];
 const CORES = navigator.hardwareConcurrency || 4;
-// {id, name, bytes, size, width, height, url, jobs: {png, webp}}; a job: {status, error, out, outUrl,
-// report, ms, palette}. A file that isn't a PNG has `refused`, an error job, in place of jobs.
+// {id, name, bytes, size, width, height, url, jpeg, jobs: {png, webp, jpeg}}; a job: {status, error,
+// out, outUrl, report, ms, palette}. A file that is neither a PNG nor a JPEG has `refused`, an error
+// job, in place of jobs.
 const files = [];
 let nextId = 0, active = null;
-// The output format: each file is compressed to it once, and its jobs keep both when switching.
+// The output format for PNGs: each file is compressed to it once, and its jobs keep both when
+// switching. A JPEG stays a JPEG (JPEG to WebP isn't in pngdeer yet).
 let format = "png";
 try { if (localStorage.getItem("pngdeer-format") === "webp") format = "webp"; } catch {}
-const job = (f) => f.refused ?? f.jobs[format];
+const output = (f) => (f.jpeg ? "jpeg" : format);
+const job = (f) => f.refused ?? f.jobs[output(f)];
 let skipped = ""; // what the last dropped folders held besides PNGs
 
 const size = (n) => (n < 1024 * 1024 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB" : (n / 1048576).toFixed(2) + " MB");
@@ -731,20 +735,22 @@ const run = (key, bytes, format, started) => new Promise((resolve) => {
 /* ---------- files ---------- */
 const dimensions = (blob) => createImageBitmap(blob).then((b) => [b.width, b.height]).catch(() => [0, 0]);
 
-async function add(name, bytes) {
-  const blob = new Blob([bytes], { type: "image/png" });
+async function add(name, bytes, kind) {
+  const jpeg = kind === "jpeg";
+  const blob = new Blob([bytes], { type: jpeg ? "image/jpeg" : "image/png" });
   const url = URL.createObjectURL(blob);
   const [width, height] = await dimensions(blob);
-  const f = { id: nextId++, name, bytes, size: bytes.byteLength, width, height, url, jobs: {} };
-  f.jobs[format] = { status: "queued" };
+  const f = { id: nextId++, name, bytes, size: bytes.byteLength, width, height, url, jpeg, jobs: {} };
+  f.jobs[output(f)] = { status: "queued" };
   enter(f);
-  compress(f, format);
+  compress(f, output(f));
 }
 
-/** A file that isn't a PNG: an error card, showing the file itself when the browser can draw it. */
+/** A file that is neither a PNG nor a JPEG: an error card, showing the file itself when the browser
+ * can draw it. */
 async function refuse(file) {
   const [width, height] = await dimensions(file);
-  const refused = { status: "error", error: "not a PNG file", notPng: true };
+  const refused = { status: "error", error: "not a PNG or JPEG file", notImage: true };
   enter({ id: nextId++, name: file.name, size: file.size, width, height, url: URL.createObjectURL(file), refused });
 }
 
@@ -765,7 +771,7 @@ async function compress(f, to) {
   } else {
     j.status = "done";
     j.out = data.file;
-    j.outUrl = URL.createObjectURL(new Blob([data.file], { type: `image/${to}` }));
+    j.outUrl = URL.createObjectURL(new Blob([data.file], { type: `image/${to}` })); // png, webp or jpeg
     j.report = data.report;
     j.ms = data.ms;
     j.palette = to === "png" ? paletteOf(data.file) : [];
@@ -773,13 +779,13 @@ async function compress(f, to) {
   if (f === active && to === format) show(f, true); else render();
 }
 
-/** Switches the output format, compressing to it what isn't yet. */
+/** Switches PNGs' output format, compressing to it what isn't yet. */
 function setFormat(to) {
   format = to;
   try { localStorage.setItem("pngdeer-format", to); } catch {}
   for (const x of document.querySelectorAll(".format button")) x.setAttribute("aria-pressed", x.dataset.format === to);
   // every file gets its job before any starts: starting one renders them all
-  const todo = files.filter((f) => !f.refused && !f.jobs[to]);
+  const todo = files.filter((f) => !f.refused && !f.jpeg && !f.jobs[to]);
   for (const f of todo) f.jobs[to] = { status: "queued" };
   for (const f of todo) compress(f, to);
   if (active) show(active); else render();
@@ -822,6 +828,7 @@ function show(f, intro = false) {
   $("#img-after").src = job(f).outUrl || f.url;
   $("#v-name").textContent = f.name;
   $("#v-dim").textContent = f.width ? `${f.width}×${f.height}` : "";
+  $(".bar .format").hidden = !!f.jpeg; // a JPEG stays a JPEG
   stage.hidden = !f.width;
   setSplit(50);
   layout();
@@ -912,6 +919,7 @@ addEventListener("resize", layout);
 /* ---------- rendering ---------- */
 function outcome(j) {
   const r = j.report;
+  if (r.format === "jpeg") return r.outcome === "original" ? "Already optimal" : `JPEG quality ${r.quality}`;
   if (r.format === "webp") {
     if (r.mode === "lossy") return `Lossy WebP, quality ${r.quality}`;
     return ["hit", "miss"].includes(r.png.outcome) ? `Lossless WebP, ${r.png.colors} colors` : "Lossless WebP";
@@ -938,7 +946,7 @@ function render() {
     pal.classList.toggle("wait", waiting);
     pal.classList.toggle("none", done && !j.palette.length); // a lossy WebP or a true-color PNG has none
     pal.innerHTML = done ? j.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
-    const busy = format === "webp" ? "Finding the smallest WebP…" : "Finding the smallest palette…";
+    const busy = { png: "Finding the smallest palette…", webp: "Finding the smallest WebP…", jpeg: "Finding the lowest JPEG quality…" }[output(f)];
     $("#p-label").innerHTML = done
       ? `<b>${outcome(j)}</b> · SSIMULACRA2 ${j.report.score.toFixed(1)}${j.report.frames > 1 ? ", worst frame" : ""}`
       : j.status === "error" ? `Couldn't compress: ${esc(j.error)}` : j.status === "busy" ? busy : "Waiting for the files before it…";
@@ -949,7 +957,7 @@ function render() {
   $("#cards").innerHTML = files.map((x) => {
     const j = job(x), ok = j.status === "done";
     const sub = ok ? `${size(x.size)} → ${size(j.out.byteLength)} <b>−${saving(x)}%</b>`
-      : j.status === "error" ? (j.notPng ? "Not a PNG" : "Couldn't compress") : j.status === "busy" ? "Compressing…" : "Waiting";
+      : j.status === "error" ? (j.notImage ? "Not a PNG or JPEG" : "Couldn't compress") : j.status === "busy" ? "Compressing…" : "Waiting";
     return `<button class="card" type="button" data-id="${x.id}" aria-current="${x === active}">
       ${x.width ? `<img class="thumb" src="${j.outUrl || x.url}" alt="">` : '<span class="thumb"></span>'}
       <span><div class="t" title="${esc(x.name)}">${esc(x.name)}</div><div class="s ${j.status === "error" ? "err" : ""}">${sub}</div>${ok || j.status === "error" ? "" : '<div class="meter"></div>'}</span>
@@ -965,13 +973,16 @@ function render() {
   renderNote();
   window.__pngdeer = files.map((x) => {
     const j = job(x);
-    return { name: x.name, format, before: x.size, after: j.out?.byteLength, ms: j.ms, report: j.report, status: j.status, error: j.error };
+    return { name: x.name, format: output(x), before: x.size, after: j.out?.byteLength, ms: j.ms, report: j.report, status: j.status, error: j.error };
   });
 }
 
 function renderNote() {
+  const names = { png: "PNG", webp: "WebP", jpeg: "JPEG" };
+  const outputs = [...new Set(files.filter((x) => !x.refused).map((x) => names[output(x)]))];
+  const jpegsStay = format === "webp" && files.some((x) => x.jpeg) ? " JPEGs stay JPEGs: WebP output is for PNGs, for now." : "";
   const status = files.length
-    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG's ${format === "webp" ? "WebP" : "PNG"} would be, at most 90.`
+    ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG's ${outputs.join(" and ") || names[format]} would be, at most 90.${jpegsStay}`
     : "";
   $("#note").innerHTML = (skipped ? `<span class="err">${esc(skipped)}</span> ` : "") + esc(status);
 }
@@ -979,7 +990,7 @@ function renderNote() {
 function download(f) {
   const a = document.createElement("a");
   a.href = job(f).outUrl;
-  a.download = f.name.replace(/\.png$/i, "") + `.min.${format}`;
+  a.download = f.name.replace(/\.(png|jpe?g)$/i, "") + `.min.${{ jpeg: "jpg" }[output(f)] ?? output(f)}`;
   a.click();
 }
 
@@ -1004,13 +1015,17 @@ document.querySelectorAll("[data-pick]").forEach((b) => (b.onclick = () => $("#f
 $("#file").addEventListener("change", (e) => { readFiles(e.target.files); });
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
-async function isPng(file) {
+/** "png" or "jpeg" by a file's first bytes (its name may say otherwise), else null. */
+async function kindOf(file) {
   const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
-  return head.length === 8 && head.every((b, i) => b === PNG_SIGNATURE[i]);
+  if (head.length === 8 && head.every((b, i) => b === PNG_SIGNATURE[i])) return "png";
+  return head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff ? "jpeg" : null;
 }
-/** A file the user picked or dropped by itself: compressed if it's a PNG, an error card otherwise. */
+/** A file the user picked or dropped by itself: compressed if it's a PNG or a JPEG, an error card
+ * otherwise. */
 async function readFile(file) {
-  if (await isPng(file)) await add(file.name, await file.arrayBuffer());
+  const kind = await kindOf(file);
+  if (kind) await add(file.name, await file.arrayBuffer(), kind);
   else await refuse(file);
 }
 async function readFiles(list) {
@@ -1037,8 +1052,8 @@ async function folderFiles(folder) {
   return out;
 }
 const some = (names) => names.slice(0, 3).join(", ") + (names.length > 3 ? ` and ${names.length - 3} more` : "");
-/** Dropped files and folders. A folder's PNGs are compressed and its other files only counted in
- * one line, so that a folder of assets doesn't fill the tray with errors. */
+/** Dropped files and folders. A folder's PNGs and JPEGs are compressed and its other files only
+ * counted in one line, so that a folder of assets doesn't fill the tray with errors. */
 async function readDropped(items) {
   skipped = "";
   const notes = [];
@@ -1048,29 +1063,30 @@ async function readDropped(items) {
       continue;
     }
     const others = [];
-    let pngs = 0;
+    let images = 0;
     try {
       for (const file of await folderFiles(item)) {
-        if (!(await isPng(file))) {
+        const kind = await kindOf(file);
+        if (!kind) {
           others.push(file.name);
           continue;
         }
-        pngs++;
-        await add(file.name, await file.arrayBuffer());
+        images++;
+        await add(file.name, await file.arrayBuffer(), kind);
       }
     } catch (error) {
       notes.push(`Couldn't read “${item.name}”: ${error.message || error}.`);
       continue;
     }
-    if (!pngs) notes.push(`No PNGs in “${item.name}”${others.length ? ` (${some(others)})` : ""}.`);
-    else if (others.length) notes.push(`Skipped ${others.length === 1 ? "1 file" : `${others.length} files`} in “${item.name}” that ${others.length === 1 ? "isn't a PNG" : "aren't PNGs"}: ${some(others)}.`);
+    if (!images) notes.push(`No PNGs or JPEGs in “${item.name}”${others.length ? ` (${some(others)})` : ""}.`);
+    else if (others.length) notes.push(`Skipped ${others.length === 1 ? "1 file" : `${others.length} files`} in “${item.name}” that ${others.length === 1 ? "isn't a PNG or JPEG" : "aren't PNGs or JPEGs"}: ${some(others)}.`);
   }
   skipped = notes.join(" ");
   renderNote();
 }
 $("#samples").onclick = async () => {
   $("#samples").disabled = true;
-  for (const s of SAMPLES) add(s + ".png", await fetch(`samples/${s}.png`).then((r) => r.arrayBuffer()));
+  for (const s of SAMPLES) add(s + ".png", await fetch(`samples/${s}.png`).then((r) => r.arrayBuffer()), "png");
 };
 $("#cards").onclick = (e) => {
   const c = e.target.closest(".card");

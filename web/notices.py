@@ -11,14 +11,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = ("license", "licence", "copying", "notice", "copyright", "patents")
+# Files holding a license under another name: the IJG license is in libjpeg's README.
+ALSO = ("readme.ijg",)
+# Statements a license asks binary distributions to make, by crate.
+STATEMENTS = {"pngdeer-mozjpeg": "This software is based in part on the work of the Independent JPEG Group."}
+
+
+def is_license(path: Path) -> bool:
+    return path.name.lower().startswith(NAMES) or path.name.lower() in ALSO
 
 
 def license_files(directory: Path) -> list[Path]:
     """A crate's license files; one directory down too for -sys crates (vendored C code) or when the
     top has none."""
-    found = sorted(p for p in directory.iterdir() if p.is_file() and p.name.lower().startswith(NAMES))
+    found = sorted(p for p in directory.iterdir() if p.is_file() and is_license(p))
     if not found or directory.name.split("-")[-2:-1] == ["sys"]:
-        found += sorted(p for p in directory.glob("*/*") if p.is_file() and p.name.lower().startswith(NAMES))
+        found += sorted(p for p in directory.glob("*/*") if p.is_file() and is_license(p))
     return found
 
 
@@ -50,6 +58,8 @@ def main() -> None:
             texts.setdefault(" ".join(text.split()), (text, []))[1].append(label)
     parts = ["Third-party software compiled into pngdeer's browser build (web/pkg, web/pkg-mt), and its licenses.",
              "Each license text below is followed by the crates it covers.", ""]
+    names = {packages[i]["name"] for i in seen}
+    parts += [text for crate, text in STATEMENTS.items() if crate in names] + ([""] if names & STATEMENTS.keys() else [])
     for text, crates in sorted(texts.values(), key=lambda v: v[1][0]):
         parts += ["=" * 78, *crates, "-" * 78, text, ""]
     if unfiled:

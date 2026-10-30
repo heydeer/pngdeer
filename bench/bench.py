@@ -11,7 +11,9 @@ Pipelines (pick with --pipelines):
   pqN      pngquant --quality 0-N, then oxipng (e.g. pq80)
   pqN-dD   same with dithering level D/100 (pq80-d50 = --floyd=0.5, pq80-d0 = --nofs)
   <tool>N  other open-source quantizers at N colors, then oxipng (see QUANT_TOOLS)
-  tinypng  TinyPNG API (results cached in bench/.cache/tinypng to save quota)
+  tinypng  TinyPNG API (results cached in bench/.cache/tinypng to save quota); the key is
+           TINYPNG_API_KEY in the environment or .env, with TINYPNG_API_KEY_2 and so on taking over
+           when one's monthly compressions run out
 
 WebP pipelines (outputs decoded with dwebp, as browsers decode them, then scored the same way):
   wpT      pngdeer --format webp --target T
@@ -129,42 +131,78 @@ class TinyPNGError(Exception):
 
 
 class TinyPNG:
-    def __init__(self, api_key: str, cache_dir: Path, concurrency: int = 4):
-        self.auth = "Basic " + base64.b64encode(f"api:{api_key}".encode()).decode()
+    def __init__(self, api_keys: list[str], cache_dir: Path, concurrency: int = 4):
+        # Keys are used in turn: the next takes over once one's monthly compressions run out (429).
+        self.auths = ["Basic " + base64.b64encode(f"api:{key}".encode()).decode() for key in api_keys]
+        self.key = 0
+        self.key_lock = threading.Lock()
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.slots = threading.Semaphore(concurrency)
-        self.compression_count: int | None = None
-        # Set on 401/429 so the remaining images fail fast instead of hammering the API.
+        # Each key's compressions this month, as its last response said.
+        self.compression_counts: list[int | None] = [None] * len(api_keys)
+        # Set on 401, or 429 with no key left, so the remaining images fail fast instead of hammering the API.
         self.fatal: str | None = None
 
     def validate(self) -> None:
-        """Checks the key without spending a compression: an empty upload answers 400 if the key is good."""
-        try:
-            self._request("POST", TINYPNG_SHRINK_URL, b"")
-        except TinyPNGError as e:
-            if e.status != 400:
-                raise
+        """Checks every key without spending a compression (an empty upload answers 400 for a good key,
+        429 once its month is used up) and starts from the first with compressions left."""
+        good, spent = [], None
+        for i, auth in enumerate(self.auths):
+            try:
+                self._request("POST", TINYPNG_SHRINK_URL, b"", auth=auth)
+            except TinyPNGError as e:
+                if e.status == 429:
+                    spent = e
+                    continue
+                if e.status != 400:
+                    raise TinyPNGError(f"key {i + 1}: {e}", e.status) from None
+            good.append(i)
+        if not good:
+            self.fatal = str(spent)
+            raise spent
+        self.key = good[0]
+
+    def _with_key(self, call):
+        """call(auth) with the key in use; again with the next key if this one's month runs out."""
+        while True:
+            key = self.key
+            try:
+                return call(self.auths[key])
+            except TinyPNGError as e:
+                if e.status != 429:
+                    raise
+                with self.key_lock:
+                    if self.key == key:  # not moved on by another thread already
+                        if key + 1 == len(self.auths):
+                            self.fatal = str(e)
+                            raise
+                        self.key = key + 1
+                        print(f"note: TinyPNG key {key + 1} is out of compressions; using key {key + 2}", file=sys.stderr)
 
     def compress(self, src: Path, dst: Path) -> tuple[bool, float | None]:
-        """Writes TinyPNG's output for src to dst.
+        """Writes TinyPNG's output for src (a PNG or a JPEG) to dst.
 
         Returns whether it came from the cache, and how long the API round trip took (for a cached
         result, the time measured when it was fetched, if recorded).
         """
         data = src.read_bytes()
-        cached = self.cache_dir / f"{hashlib.sha256(data).hexdigest()}.png"
+        # TinyPNG answers a JPEG with a JPEG
+        cached = self.cache_dir / f"{hashlib.sha256(data).hexdigest()}.{'jpg' if data[:3] == b'\xff\xd8\xff' else 'png'}"
         timing = cached.with_suffix(".json")
         if cached.exists():
             shutil.copyfile(cached, dst)
             return True, json.loads(timing.read_text())["seconds"] if timing.exists() else None
         if self.fatal:
             raise TinyPNGError(self.fatal)
+        def shrink(auth: str) -> bytes:
+            _, headers, body = self._request("POST", TINYPNG_SHRINK_URL, data, auth=auth)
+            url = headers.get("Location") or json.loads(body)["output"]["url"]
+            return self._request("GET", url, auth=auth)[2]
+
         with self.slots:
             start = time.perf_counter()
-            status, headers, body = self._request("POST", TINYPNG_SHRINK_URL, data)
-            url = headers.get("Location") or json.loads(body)["output"]["url"]
-            _, _, out = self._request("GET", url)
+            out = self._with_key(shrink)
             seconds = time.perf_counter() - start
         tmp = cached.with_suffix(f".{threading.get_ident()}.tmp")
         tmp.write_bytes(out)
@@ -184,11 +222,15 @@ class TinyPNG:
             return True, json.loads(timing.read_text())["seconds"] if timing.exists() else None
         if self.fatal:
             raise TinyPNGError(self.fatal)
+        def convert(auth: str) -> bytes:
+            # both steps on one key: the shrink's result belongs to its account
+            _, headers, body = self._request("POST", TINYPNG_SHRINK_URL, data, auth=auth)
+            url = headers.get("Location") or json.loads(body)["output"]["url"]
+            return self._request("POST", url, json.dumps({"convert": {"type": "image/webp"}}).encode(), "application/json", auth)[2]
+
         with self.slots:
             start = time.perf_counter()
-            _, headers, body = self._request("POST", TINYPNG_SHRINK_URL, data)
-            url = headers.get("Location") or json.loads(body)["output"]["url"]
-            _, _, out = self._request("POST", url, json.dumps({"convert": {"type": "image/webp"}}).encode(), "application/json")
+            out = self._with_key(convert)
             seconds = time.perf_counter() - start
         if out[:4] != b"RIFF" or out[8:12] != b"WEBP":
             raise TinyPNGError("TinyPNG's conversion is not a WebP file")
@@ -199,18 +241,24 @@ class TinyPNG:
         shutil.copyfile(cached, dst)
         return False, seconds
 
-    def _request(self, method: str, url: str, data: bytes | None = None, content_type: str = "application/octet-stream"):
-        req = urllib.request.Request(url, data=data, method=method, headers={"Authorization": self.auth})
+    def _request(self, method: str, url: str, data: bytes | None = None, content_type: str = "application/octet-stream", auth: str = ""):
+        auth = auth or self.auths[self.key]
+        req = urllib.request.Request(url, data=data, method=method, headers={"Authorization": auth})
         if data is not None:
             req.add_header("Content-Type", content_type)
+
+        def counted(headers) -> None:
+            count = headers.get("Compression-Count")
+            if count and count.isdigit():
+                self.compression_counts[self.auths.index(auth)] = int(count)
+
         for attempt in range(4):
             try:
                 with urllib.request.urlopen(req, timeout=120) as resp:
-                    count = resp.headers.get("Compression-Count")
-                    if count and count.isdigit():
-                        self.compression_count = int(count)
+                    counted(resp.headers)
                     return resp.status, resp.headers, resp.read()
             except urllib.error.HTTPError as e:
+                counted(e.headers)
                 body = e.read()
                 if e.code >= 500 and attempt < 3:
                     time.sleep(2**attempt)
@@ -220,7 +268,7 @@ class TinyPNG:
                 except ValueError:
                     message = body[:200].decode(errors="replace")
                 error = f"TinyPNG HTTP {e.code}: {message}"
-                if e.code in (401, 429):
+                if e.code == 401:
                     self.fatal = error
                 raise TinyPNGError(error, e.code) from None
             except (urllib.error.URLError, TimeoutError) as e:
@@ -474,16 +522,18 @@ def parse_pipelines(spec: str) -> list[Pipeline]:
     return pipelines
 
 
-def load_api_key() -> str | None:
-    if key := os.environ.get("TINYPNG_API_KEY"):
-        return key.strip()
-    for env_file in (BENCH_DIR.parent / ".env", BENCH_DIR / ".env"):
+def load_api_keys() -> list[str]:
+    """TINYPNG_API_KEY, then TINYPNG_API_KEY_2, _3 and so on, each from the environment or else the
+    first .env that sets it."""
+    names: dict[str, str] = {}
+    for env_file in (BENCH_DIR / ".env", BENCH_DIR.parent / ".env"):  # the later wins
         if env_file.exists():
             for line in env_file.read_text().splitlines():
                 name, _, value = line.partition("=")
-                if name.strip() == "TINYPNG_API_KEY" and value.strip():
-                    return value.strip().strip("'\"")
-    return None
+                names[name.strip()] = value.strip().strip("'\"")
+    names.update((name, value) for name, value in os.environ.items() if value.strip())
+    numbered = sorted((int(m[1] or 1), value.strip()) for name, value in names.items() if (m := re.fullmatch(r"TINYPNG_API_KEY(?:_(\d+))?", name)))
+    return list(dict.fromkeys(value for _, value in numbered if value))
 
 
 def find_images(root: Path) -> list[Image]:
@@ -950,9 +1000,9 @@ def main() -> None:
 
     tiny = None
     if any(p.kind in ("tinypng", "tinywebp") for p in pipelines):
-        key = load_api_key()
-        if key:
-            tiny = TinyPNG(key, BENCH_DIR / ".cache" / "tinypng")
+        keys = load_api_keys()
+        if keys:
+            tiny = TinyPNG(keys, BENCH_DIR / ".cache" / "tinypng")
             try:
                 tiny.validate()
             except TinyPNGError as e:

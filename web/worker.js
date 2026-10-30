@@ -1,4 +1,5 @@
-// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time, to PNG or WebP. On
+// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time: a PNG to PNG or
+// WebP, a JPEG to JPEG. On
 // a cross-origin isolated page (see serve.py) it loads the threaded build, whose rayon pool spreads
 // each file's quantizing, encoding, scoring and oxipng over all cores; elsewhere, or with ?single,
 // the single-threaded one.
@@ -30,6 +31,18 @@ function frames(png) {
   return 1;
 }
 
+// A JPEG's width and height, from its frame header (SOF0–SOF15 but DHT, JPG and DAC); [0, 0] if
+// none comes before the scan.
+function jpegSize(jpeg) {
+  const view = new DataView(jpeg.buffer, jpeg.byteOffset, jpeg.byteLength);
+  for (let pos = 2; pos + 9 <= jpeg.length && jpeg[pos] === 0xff; pos += 2 + view.getUint16(pos + 2)) {
+    const marker = jpeg[pos + 1];
+    if (marker === 0xda) break;
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return [view.getUint16(pos + 7), view.getUint16(pos + 5)];
+  }
+  return [0, 0];
+}
+
 const ready = (async () => {
   const mod = await import(threaded ? "./pkg-mt/pngdeer_wasm.js" : "./pkg/pngdeer_wasm.js");
   await mod.default();
@@ -45,13 +58,15 @@ const ready = (async () => {
 const WEBP_MAX_SIDE = 16383;
 
 self.onmessage = async ({ data }) => {
-  // format: "png" or "webp"; no target: automatic quality; no preview: pngdeer's default
+  // format: "png" or "webp" for a PNG, "jpeg" for a JPEG; no target: automatic quality; no
+  // preview: pngdeer's default
   const { id, bytes, format, target, preview } = data;
   try {
     const input = new Uint8Array(bytes);
-    const ihdr = new DataView(input.buffer, 16, 8);
-    const [width, height] = [ihdr.getUint32(0), ihdr.getUint32(4)];
-    const pixels = width * height, count = frames(input);
+    const jpeg = format === "jpeg";
+    const ihdr = jpeg ? null : new DataView(input.buffer, 16, 8);
+    const [width, height] = jpeg ? jpegSize(input) : [ihdr.getUint32(0), ihdr.getUint32(4)];
+    const pixels = width * height, count = jpeg ? 1 : frames(input);
     if (pixels > MAX_PIXELS) {
       // in pixels as well as megapixels: a well-compressed screenshot can be a few MB and still too big
       const size = `${width} × ${height} pixels (${(pixels / 1e6).toFixed(1)} MP)`;
@@ -66,9 +81,9 @@ self.onmessage = async ({ data }) => {
     }
     const mod = await ready;
     const start = performance.now();
-    const result = format === "webp" ? mod.compress_webp(input, target, preview) : mod.compress(input, target, preview);
+    const result = jpeg ? mod.compress_jpeg(input, target) : format === "webp" ? mod.compress_webp(input, target, preview) : mod.compress(input, target, preview);
     const ms = performance.now() - start;
-    const file = format === "webp" ? result.webp : result.png;
+    const file = jpeg ? result.jpeg : format === "webp" ? result.webp : result.png;
     const report = JSON.parse(result.report);
     result.free();
     self.postMessage({ id, file, report, ms, threaded }, [file.buffer]);

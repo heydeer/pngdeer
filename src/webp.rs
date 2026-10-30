@@ -19,12 +19,11 @@
 //! ICCP, an image in sRGB needs none, and the rest (cICP, or gAMA and cHRM that aren't sRGB's) is
 //! refused rather than shown in the wrong colors. Animated PNGs are refused too.
 
-use std::collections::BTreeMap;
-
 use rgb::{ComponentBytes, FromSlice};
 
 use crate::codec::{self, Error};
 use crate::par;
+use crate::quality::{self, Found, Tried};
 use crate::search::{Scorer, AUTO_CAP};
 use crate::{Compressed, Settings, WebpOptions, RGBA};
 
@@ -34,10 +33,6 @@ const FIRST_QUALITY: f64 = 90.0;
 /// About how many points a lossy file's score gains per quality step there, to aim from the one
 /// side of the target known so far.
 const SLOPE: f64 = 0.5;
-/// Qualities tried per round of the lossy search, their files encoded at once (`Lossies::search`).
-const ROUND: usize = 3;
-/// How far apart a round's qualities are while the target lies to one side of all tried so far.
-const SPREAD: i32 = 4;
 /// Above this many pixels the PNG searches and the lossy work take turns rather than run alongside,
 /// for memory: wasm32 has 4 GB, and each one's scoring holds much of it at these sizes. (A round's
 /// files are encoded at once at any size: a few bytes a pixel each, and never during a scoring.)
@@ -286,13 +281,6 @@ fn tuning(options: &WebpOptions) -> libwebp::Tuning {
 
 /// What a lossy search found: the file at the lowest quality reaching the target, the best-scoring
 /// file of those falling short, and how many files it encoded, in how many rounds.
-struct Found {
-    best: Option<Lossy>,
-    closest: Option<Lossy>,
-    tries: usize,
-    rounds: usize,
-}
-
 /// Lossy files of one image, with its YUV converted once, and scored as the PNG search scores.
 ///
 /// With translucent pixels, candidates store their alpha plane uncompressed: compressing it is much of
@@ -374,55 +362,24 @@ impl Lossies {
         Lossy { size: file.len(), file, raw_alpha: false, ..lossy }
     }
 
-    /// The lowest quality (0–100) whose file scores at least `target`, in rounds of ROUND files
-    /// encoded at once: around `estimate` while the target lies to one side of every file so far,
-    /// then across the range left (see `round`), until no quality between the highest falling
-    /// short and the lowest reaching it is left; `known` files count as tried. A file that falls
-    /// short and is already `limit` bytes ends it: higher qualities only make bigger files. The
-    /// qualities tried don't depend on threads, so neither does the answer.
-    fn search(&self, target: f64, limit: usize, estimate: f64, known: Vec<Lossy>, tuning: libwebp::Tuning) -> Result<Found, Error> {
-        let mut tried: BTreeMap<u32, Lossy> = known.into_iter().map(|l| (l.quality, l)).collect();
-        let (mut tries, mut rounds) = (0, 0);
-        loop {
-            let hi = tried.values().filter(|l| l.score >= target).map(|l| l.quality).min();
-            let lo = tried.values().filter(|l| l.score < target && hi.is_none_or(|h| l.quality < h)).map(|l| l.quality).max();
-            let ends = |q: Option<u32>| q.map(|q| (q as i32, Some(tried[&q].score)));
-            let (lo, hi) = (ends(lo).unwrap_or((-1, None)), ends(hi).unwrap_or((101, None)));
-            if hi.0 - lo.0 <= 1 || (lo.0 >= 0 && tried[&(lo.0 as u32)].size >= limit) {
-                break;
-            }
-            let qualities: Vec<u32> = round(lo, hi, target, estimate).into_iter().filter(|q| !tried.contains_key(q)).collect();
-            for lossy in self.tries(&qualities, tuning)? {
-                tried.insert(lossy.quality, lossy);
-            }
-            (tries, rounds) = (tries + qualities.len(), rounds + 1);
-        }
-        let hi = tried.values().filter(|l| l.score >= target).map(|l| l.quality).min();
-        let best = hi.and_then(|q| tried.remove(&q));
-        let closest = tried.into_values().filter(|l| l.score < target).max_by(|a, b| a.score.total_cmp(&b.score).then(b.quality.cmp(&a.quality)));
-        Ok(Found { best, closest, tries, rounds })
+    /// The lowest quality whose file scores at least `target` (quality::search), aiming first at
+    /// `estimate`; `known` files count as tried, and a file that falls short and is already `limit`
+    /// bytes ends it.
+    fn search(&self, target: f64, limit: usize, estimate: f64, known: Vec<Lossy>, tuning: libwebp::Tuning) -> Result<Found<Lossy>, Error> {
+        quality::search(target, limit, estimate, SLOPE, known, |qualities| self.tries(qualities, tuning))
     }
 }
 
-/// A round's qualities, strictly between `lo` (falls short) and `hi` (reaches the target), each
-/// with its score (-1 and 101: none yet): all of them when ROUND or fewer are left; while one side
-/// is unknown, ROUND qualities SPREAD apart around where the target should be (a SLOPE step from
-/// the known side, or `estimate`); otherwise spread evenly between the two.
-fn round(lo: (i32, Option<f64>), hi: (i32, Option<f64>), target: f64, estimate: f64) -> Vec<u32> {
-    let (n, span) = (ROUND as i32, (ROUND as i32 - 1) * SPREAD);
-    let evenly = || (1..=n).map(|i| (lo.0 + (hi.0 - lo.0) * i / (n + 1)) as u32).collect();
-    if hi.0 - lo.0 - 1 <= n {
-        return (lo.0 + 1..hi.0).map(|q| q as u32).collect();
+impl Tried for Lossy {
+    fn quality(&self) -> u32 {
+        self.quality
     }
-    let center = match (lo.1, hi.1) {
-        (Some(_), Some(_)) => return evenly(),
-        _ if hi.0 - lo.0 - 2 < span => return evenly(), // too few left for the spread
-        (Some(a), None) => lo.0 as f64 + (target - a) / SLOPE,
-        (None, Some(b)) => hi.0 as f64 - (b - target) / SLOPE,
-        (None, None) => estimate,
-    };
-    let center = (center.round() as i32).clamp(lo.0 + 1 + span / 2, hi.0 - 1 - span / 2);
-    (0..n).map(|i| (center + (i - n / 2) * SPREAD) as u32).collect()
+    fn score(&self) -> f64 {
+        self.score
+    }
+    fn size(&self) -> usize {
+        self.size
+    }
 }
 
 /// A RIFF chunk: type, size, contents and a pad byte to an even size.

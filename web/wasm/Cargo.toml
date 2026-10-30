@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-pngdeer = { path = "../..", default-features = false, features = ["oxipng", "freestanding", "webp"] }
+pngdeer = { path = "../..", default-features = false, features = ["oxipng", "freestanding", "webp", "jpeg"] }
 # Exactly the wasm-bindgen-cli version build.sh runs (see README).
 wasm-bindgen = "=0.2.129"
 js-sys = "0.3"

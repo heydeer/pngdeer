@@ -17,11 +17,11 @@ same bytes for the same input, as pngdeer's PNG output does.
   picture converted to YUV once), so the Rust side declares none of libwebp's structs.
 - `src/lib.rs`: the Rust API (`encode_lossy`, `encode_lossless`, `encode_near_lossless`, `decode`;
   `Source`, an image converted to YUV once for any number of lossy encodes, from any number of
-  threads; `Tuning`, WebPConfig's finer settings), and the C library functions below. libwebp, built
-  without threads, sets up its function tables on first use without a lock, so the first call of
-  any of these runs one encode and decode of each kind (`warm_up`) before any could run on several
-  threads.
-- `glue/pngdeer.h`, `glue/libc/`, `glue/libc.c`: see below.
+  threads; `Tuning`, WebPConfig's finer settings). libwebp, built without threads, sets up its
+  function tables on first use without a lock, so the first call of any of these runs one encode
+  and decode of each kind (`warm_up`) before any could run on several threads.
+
+The C library functions libwebp calls (below) are `vendor/clib`'s, which `vendor/mozjpeg` shares.
 
 ## How it is built (build.rs)
 
@@ -32,15 +32,15 @@ The same way on every target, for the same output everywhere:
    threads, which libwebp needs `WEBP_USE_THREAD` for.)
 2. **No fused multiply-add.** `-ffp-contract=off`: clang fuses `a * b + c` on targets with FMA, such
    as arm64, and a fused result can differ in the last bit.
-3. **One libm and one qsort.** `glue/pngdeer.h`, included ahead of every file, sends libwebp's
-   inexact math functions (log, log2, log10, exp, pow, logf, expf) to Rust's `libm` crate, which
-   gives the same bits on every target, and qsort to a stable sort (`src/lib.rs`): system math
-   libraries differ in the last bits, and qsort implementations order equal elements differently.
-   sqrt, floor, ceil, fabs and round are exact operations and stay as they are.
-4. **wasm32 has no C library.** For it, `glue/libc/` holds the few headers libwebp includes
+3. **One libm and one qsort.** `vendor/clib/include/pngdeer_clib.h`, included ahead of every file,
+   sends libwebp's inexact math functions (log, log2, log10, exp, pow, logf, expf) to Rust's `libm`
+   crate, which gives the same bits on every target, and qsort to a stable sort (`vendor/clib`):
+   system math libraries differ in the last bits, and qsort implementations order equal elements
+   differently. sqrt, floor, ceil, fabs and round are exact operations and stay as they are.
+4. **wasm32 has no C library.** For it, `vendor/clib/libc/` holds the few headers libwebp includes
    (declarations only; exact math functions as wasm instructions), malloc, calloc, realloc and free
-   are Rust's allocator (`src/lib.rs`), and `glue/libc.c` has abort, getenv and abs. memcpy and
-   friends come from Rust's compiler-builtins. `-ffreestanding` keeps clang from expecting more.
+   are Rust's allocator, and `vendor/clib/libc.c` has abort, getenv and abs. memcpy and friends come
+   from Rust's compiler-builtins. `-ffreestanding` keeps clang from expecting more.
 
 Checked: libwebp's output hashes the same natively (arm64) and as wasm32 (lossy at three
 qualities and their decodes, lossless at three levels), and pngdeer's `tests/webp.rs` pins the

@@ -1,4 +1,4 @@
-//! pngdeer in the browser: pngdeer::compress and compress_webp compiled to WebAssembly,
+//! pngdeer in the browser: pngdeer::compress, compress_webp and compress_jpeg compiled to WebAssembly,
 //! single-threaded or (feature `threads`) with a rayon pool on Web Workers. Same output as the
 //! command line.
 
@@ -73,4 +73,33 @@ impl CompressedWebp {
 pub fn compress_webp(input: &[u8], target: Option<f64>, preview_pixels: Option<u32>) -> Result<CompressedWebp, JsError> {
     let result = pngdeer::compress_webp(input, &settings(target, preview_pixels)).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(CompressedWebp { report: result.json(), webp: result.webp })
+}
+
+#[wasm_bindgen]
+pub struct CompressedJpeg {
+    jpeg: Vec<u8>,
+    report: String,
+}
+
+#[wasm_bindgen]
+impl CompressedJpeg {
+    /// The JPEG file.
+    #[wasm_bindgen(getter)]
+    pub fn jpeg(&self) -> Vec<u8> {
+        self.jpeg.clone()
+    }
+
+    /// JSON: target, quality, score, tries, rounds, outcome, bytes, and a time breakdown.
+    #[wasm_bindgen(getter)]
+    pub fn report(&self) -> String {
+        self.report.clone()
+    }
+}
+
+/// Compresses one JPEG file to the lowest quality JPEG scoring at least `target` (pngdeer::compress_jpeg),
+/// never bigger than the input; with no target, at a quality picked per image.
+#[wasm_bindgen]
+pub fn compress_jpeg(input: &[u8], target: Option<f64>) -> Result<CompressedJpeg, JsError> {
+    let result = pngdeer::compress_jpeg(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(CompressedJpeg { report: result.json(), jpeg: result.jpeg })
 }
