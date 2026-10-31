@@ -41,7 +41,7 @@ zune-core = { version = "0.5", optional = true }
 zune-jpeg = { version = "0.5.15", default-features = false, features = ["std"], optional = true }
 
 [workspace]
-members = [".", "web/wasm", "tools/quantlab", "tools/webplab", "vendor/mozjpeg"]
+members = [".", "web/wasm", "tools/quantlab", "tools/webplab", "tools/aviflab", "vendor/mozjpeg"]
 default-members = ["."]
 resolver = "2"
 

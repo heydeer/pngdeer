@@ -214,9 +214,16 @@ class TinyPNG:
     def convert_webp(self, src: Path, dst: Path) -> tuple[bool, float | None]:
         """Writes TinyPNG's output for src, converted to WebP, to dst (a shrink, then a conversion of
         its result: two compressions). Returns whether it came from the cache and the round trip's time."""
+        return self._convert(src, dst, "webp", lambda out: out[:4] == b"RIFF" and out[8:12] == b"WEBP")
+
+    def convert_avif(self, src: Path, dst: Path) -> tuple[bool, float | None]:
+        """As convert_webp, to AVIF."""
+        return self._convert(src, dst, "avif", lambda out: out[4:12] in (b"ftypavif", b"ftypavis"))
+
+    def _convert(self, src: Path, dst: Path, fmt: str, is_format) -> tuple[bool, float | None]:
         data = src.read_bytes()
-        cached = self.cache_dir / f"{hashlib.sha256(data).hexdigest()}.webp"
-        timing = cached.with_suffix(".webp.json")
+        cached = self.cache_dir / f"{hashlib.sha256(data).hexdigest()}.{fmt}"
+        timing = cached.with_suffix(f".{fmt}.json")
         if cached.exists():
             shutil.copyfile(cached, dst)
             return True, json.loads(timing.read_text())["seconds"] if timing.exists() else None
@@ -226,14 +233,14 @@ class TinyPNG:
             # both steps on one key: the shrink's result belongs to its account
             _, headers, body = self._request("POST", TINYPNG_SHRINK_URL, data, auth=auth)
             url = headers.get("Location") or json.loads(body)["output"]["url"]
-            return self._request("POST", url, json.dumps({"convert": {"type": "image/webp"}}).encode(), "application/json", auth)[2]
+            return self._request("POST", url, json.dumps({"convert": {"type": f"image/{fmt}"}}).encode(), "application/json", auth)[2]
 
         with self.slots:
             start = time.perf_counter()
             out = self._with_key(convert)
             seconds = time.perf_counter() - start
-        if out[:4] != b"RIFF" or out[8:12] != b"WEBP":
-            raise TinyPNGError("TinyPNG's conversion is not a WebP file")
+        if not is_format(out):
+            raise TinyPNGError(f"TinyPNG's conversion is not {fmt.upper()}")
         tmp = cached.with_suffix(f".{threading.get_ident()}.tmp")
         tmp.write_bytes(out)
         os.replace(tmp, cached)

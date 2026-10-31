@@ -1,0 +1,187 @@
+pngdeer's changes to libaom 3.15.2 (apply with patch -p1 in its source; FINDINGS.md round 7):
+
+- No SIMD for aom_hadamard_16x16 and av1_quantize_fp. From speed 8 all-intra calls these 8-bit functions on 10-bit
+  coefficients too; their C copes (32-bit sums, clamping) and their SIMD doesn't, so its bytes would differ from the C's.
+  With them in C, libaom's SIMD (CONFIG_EXCLUDE_SIMD_MISMATCH=1) wrote plain C's bytes on every encode checked.
+- PNGDEER_STILL=1 leaves the sub-pixel, compound, masked and OBMC functions, which only inter frames use, and the 8- and
+  12-bit high bit depth sets out of the encoder's function tables, so a still-image build links less code. Without the
+  define nothing changes.
+
+--- a/aom_dsp/aom_dsp_rtcd_defs.pl
++++ b/aom_dsp/aom_dsp_rtcd_defs.pl
+@@ -1284,7 +1284,7 @@
+   specialize qw/aom_hadamard_8x8 sse2 neon/;
+ 
+   add_proto qw/void aom_hadamard_16x16/, "const int16_t *src_diff, ptrdiff_t src_stride, tran_low_t *coeff";
+-  specialize qw/aom_hadamard_16x16 avx2 sse2 neon/;
++  # pngdeer: no SIMD aom_hadamard_16x16; SSE2/AVX2 add 10-bit coefficients in 16 bits, the C in 32 (allintra speed 8+)
+ 
+   add_proto qw/void aom_hadamard_32x32/, "const int16_t *src_diff, ptrdiff_t src_stride, tran_low_t *coeff";
+   specialize qw/aom_hadamard_32x32 avx2 sse2 neon/;
+--- a/av1/common/av1_rtcd_defs.pl
++++ b/av1/common/av1_rtcd_defs.pl
+@@ -291,7 +291,7 @@
+   specialize qw/av1_block_error_lp sse2 avx2 neon sve/;
+ 
+   add_proto qw/void av1_quantize_fp/, "const tran_low_t *coeff_ptr, intptr_t n_coeffs, const int16_t *zbin_ptr, const int16_t *round_ptr, const int16_t *quant_ptr, const int16_t *quant_shift_ptr, tran_low_t *qcoeff_ptr, tran_low_t *dqcoeff_ptr, const int16_t *dequant_ptr, uint16_t *eob_ptr, const int16_t *scan, const int16_t *iscan";
+-  specialize qw/av1_quantize_fp sse2 avx2 neon/;
++  # pngdeer: no SIMD av1_quantize_fp; it truncates 10-bit coefficients the C clamps (allintra speed 8+)
+ 
+   add_proto qw/void av1_quantize_lp/, "const int16_t *coeff_ptr, intptr_t n_coeffs, const int16_t *round_ptr, const int16_t *quant_ptr, int16_t *qcoeff_ptr, int16_t *dqcoeff_ptr, const int16_t *dequant_ptr, uint16_t *eob_ptr, const int16_t *scan, const int16_t *iscan";
+   specialize qw/av1_quantize_lp sse2 avx2 neon/;
+--- a/av1/encoder/encoder.c
++++ b/av1/encoder/encoder.c
+@@ -1182,14 +1182,25 @@
+     }
+   }
+ 
++#if PNGDEER_STILL
+ #define BFP(BT, SDF, SDAF, VF, SVF, SVAF, SDX4DF, SDX3DF) \
+   ppi->fn_ptr[BT].sdf = SDF;                              \
++  ppi->fn_ptr[BT].sdaf = NULL;                            \
++  ppi->fn_ptr[BT].vf = VF;                                \
++  ppi->fn_ptr[BT].svf = NULL;                             \
++  ppi->fn_ptr[BT].svaf = NULL;                            \
++  ppi->fn_ptr[BT].sdx4df = SDX4DF;                        \
++  ppi->fn_ptr[BT].sdx3df = SDX3DF;
++#else
++#define BFP(BT, SDF, SDAF, VF, SVF, SVAF, SDX4DF, SDX3DF) \
++  ppi->fn_ptr[BT].sdf = SDF;                              \
+   ppi->fn_ptr[BT].sdaf = SDAF;                            \
+   ppi->fn_ptr[BT].vf = VF;                                \
+   ppi->fn_ptr[BT].svf = SVF;                              \
+   ppi->fn_ptr[BT].svaf = SVAF;                            \
+   ppi->fn_ptr[BT].sdx4df = SDX4DF;                        \
+   ppi->fn_ptr[BT].sdx3df = SDX3DF;
++#endif
+ 
+ // Realtime mode doesn't use 4x rectangular blocks.
+ #if !CONFIG_REALTIME_ONLY
+@@ -1293,10 +1304,17 @@
+       aom_sad4x4x3d)
+ 
+ #if !CONFIG_REALTIME_ONLY
++#if PNGDEER_STILL
+ #define OBFP(BT, OSDF, OVF, OSVF) \
++  ppi->fn_ptr[BT].osdf = NULL;    \
++  ppi->fn_ptr[BT].ovf = NULL;     \
++  ppi->fn_ptr[BT].osvf = NULL;
++#else
++#define OBFP(BT, OSDF, OVF, OSVF) \
+   ppi->fn_ptr[BT].osdf = OSDF;    \
+   ppi->fn_ptr[BT].ovf = OVF;      \
+   ppi->fn_ptr[BT].osvf = OSVF;
++#endif
+ 
+   OBFP(BLOCK_128X128, aom_obmc_sad128x128, aom_obmc_variance128x128,
+        aom_obmc_sub_pixel_variance128x128)
+@@ -1344,9 +1362,15 @@
+        aom_obmc_sub_pixel_variance64x16)
+ #endif  // !CONFIG_REALTIME_ONLY
+ 
++#if PNGDEER_STILL
+ #define MBFP(BT, MCSDF, MCSVF)  \
++  ppi->fn_ptr[BT].msdf = NULL;  \
++  ppi->fn_ptr[BT].msvf = NULL;
++#else
++#define MBFP(BT, MCSDF, MCSVF)  \
+   ppi->fn_ptr[BT].msdf = MCSDF; \
+   ppi->fn_ptr[BT].msvf = MCSVF;
++#endif
+ 
+   MBFP(BLOCK_128X128, aom_masked_sad128x128,
+        aom_masked_sub_pixel_variance128x128)
+--- a/av1/encoder/encoder_utils.h
++++ b/av1/encoder/encoder_utils.h
+@@ -127,14 +127,25 @@
+   force_intpel_info->rate_size = 0;
+ }
+ 
++#if PNGDEER_STILL
+ #define HIGHBD_BFP(BT, SDF, SDAF, VF, SVF, SVAF, SDX4DF, SDX3DF) \
+   ppi->fn_ptr[BT].sdf = SDF;                                     \
++  ppi->fn_ptr[BT].sdaf = NULL;                                   \
++  ppi->fn_ptr[BT].vf = VF;                                       \
++  ppi->fn_ptr[BT].svf = NULL;                                    \
++  ppi->fn_ptr[BT].svaf = NULL;                                   \
++  ppi->fn_ptr[BT].sdx4df = SDX4DF;                               \
++  ppi->fn_ptr[BT].sdx3df = SDX3DF;
++#else
++#define HIGHBD_BFP(BT, SDF, SDAF, VF, SVF, SVAF, SDX4DF, SDX3DF) \
++  ppi->fn_ptr[BT].sdf = SDF;                                     \
+   ppi->fn_ptr[BT].sdaf = SDAF;                                   \
+   ppi->fn_ptr[BT].vf = VF;                                       \
+   ppi->fn_ptr[BT].svf = SVF;                                     \
+   ppi->fn_ptr[BT].svaf = SVAF;                                   \
+   ppi->fn_ptr[BT].sdx4df = SDX4DF;                               \
+   ppi->fn_ptr[BT].sdx3df = SDX3DF;
++#endif
+ 
+ #define HIGHBD_BFP_WRAPPER(WIDTH, HEIGHT, BD)                            \
+   HIGHBD_BFP(BLOCK_##WIDTH##X##HEIGHT,                                   \
+@@ -301,9 +312,15 @@
+ #endif
+ #endif  // CONFIG_AV1_HIGHBITDEPTH
+ 
++#if PNGDEER_STILL
+ #define HIGHBD_MBFP(BT, MCSDF, MCSVF) \
++  ppi->fn_ptr[BT].msdf = NULL;        \
++  ppi->fn_ptr[BT].msvf = NULL;
++#else
++#define HIGHBD_MBFP(BT, MCSDF, MCSVF) \
+   ppi->fn_ptr[BT].msdf = MCSDF;       \
+   ppi->fn_ptr[BT].msvf = MCSVF;
++#endif
+ 
+ #define HIGHBD_MBFP_WRAPPER(WIDTH, HEIGHT, BD)                    \
+   HIGHBD_MBFP(BLOCK_##WIDTH##X##HEIGHT,                           \
+@@ -455,10 +472,17 @@
+               aom_highbd_8_obmc_variance##WIDTH##x##HEIGHT,  \
+               aom_highbd_8_obmc_sub_pixel_variance##WIDTH##x##HEIGHT)
+ 
++#if PNGDEER_STILL
+ #define HIGHBD_OBFP(BT, OSDF, OVF, OSVF) \
++  ppi->fn_ptr[BT].osdf = NULL;           \
++  ppi->fn_ptr[BT].ovf = NULL;            \
++  ppi->fn_ptr[BT].osvf = NULL;
++#else
++#define HIGHBD_OBFP(BT, OSDF, OVF, OSVF) \
+   ppi->fn_ptr[BT].osdf = OSDF;           \
+   ppi->fn_ptr[BT].ovf = OVF;             \
+   ppi->fn_ptr[BT].osvf = OSVF;
++#endif
+ 
+ #define HIGHBD_OBFP_WRAPPER(WIDTH, HEIGHT, BD)                   \
+   HIGHBD_OBFP(BLOCK_##WIDTH##X##HEIGHT,                          \
+@@ -516,6 +540,7 @@
+   if (seq_params->use_highbitdepth) {
+     switch (seq_params->bit_depth) {
+       case AOM_BITS_8:
++#if !PNGDEER_STILL
+ #if !CONFIG_REALTIME_ONLY
+         HIGHBD_BFP_WRAPPER(64, 16, 8)
+         HIGHBD_BFP_WRAPPER(16, 64, 8)
+@@ -609,6 +634,7 @@
+         HIGHBD_SDSFP_WRAPPER(8, 32, 8)
+         HIGHBD_SDSFP_WRAPPER(4, 16, 8)
+ #endif
++#endif  // !PNGDEER_STILL
+         break;
+ 
+       case AOM_BITS_10:
+@@ -709,6 +735,7 @@
+         break;
+ 
+       case AOM_BITS_12:
++#if !PNGDEER_STILL
+ #if !CONFIG_REALTIME_ONLY
+         HIGHBD_BFP_WRAPPER(64, 16, 12)
+         HIGHBD_BFP_WRAPPER(16, 64, 12)
+@@ -803,6 +830,7 @@
+         HIGHBD_SDSFP_WRAPPER(8, 32, 12)
+         HIGHBD_SDSFP_WRAPPER(4, 16, 12)
+ #endif
++#endif  // !PNGDEER_STILL
+         break;
+ 
+       default:

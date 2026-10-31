@@ -1,0 +1,22 @@
+[package]
+name = "aviflab"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "rav1e's AVIF for measuring AVIF output: files, speed, and the same bytes natively and in wasm (experiments/avif)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ravif = { version = "0.13", default-features = false }
+png = "0.18.1"
+rgb = { version = "0.8.53", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pngdeer = { path = "../.." }
+
+[features]
+# rav1e's assembly: the same files, about twice as fast natively
+asm = ["ravif/asm"]
