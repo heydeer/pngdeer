@@ -1,6 +1,6 @@
 # pngdeer
 
-**Smaller PNGs. Same picture.** pngdeer is a lossy PNG compressor with no quality slider: for each image it searches palette sizes from 2 to 256 colors, with and without dithering, scores each result with a perceptual metric, and keeps the smallest file that still looks right. At the same quality, the median image comes out **8–12% smaller than with TinyPNG**, the best result of any open-source compressor we've measured.
+**Smaller images. Same picture.** pngdeer compresses PNG images into smaller PNG or WebP files, with no quality slider: it scores candidate images with a perceptual metric and keeps the smallest file that still looks right. For PNG output, the median image comes out **8–12% smaller than with TinyPNG** at the same quality, the best result of any open-source PNG compressor we've measured.
 
 **[Try it in your browser →](https://heydeer.ai/open-source/pngdeer)** Nothing is uploaded: images are compressed on your device.
 
@@ -9,8 +9,10 @@
 ```bash
 brew install heydeer/tap/pngdeer
 pngdeer input.png -o output.png
+pngdeer input.png -o output.webp
 ```
 
+- **PNG or WebP output**: keep PNG or write WebP, with automatic quality in either format.
 - **Picks the quality for you**: about what TinyPNG would give the image, never above 90 on SSIMULACRA2's scale, which is indistinguishable at 1:1.
 - **Same bytes everywhere**: the command line (macOS and Linux) and the browser (WebAssembly, on every core) run the same Rust code and write identical files.
 - **Big images too**: up to 40 megapixels in the browser, more on the command line.
@@ -19,6 +21,8 @@ pngdeer input.png -o output.png
 - **Free and open source**: MIT.
 
 ## Leaderboard
+
+### PNG
 
 We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored against its original with [SSIMULACRA2](https://github.com/cloudinary/ssimulacra2), a perceptual metric where 90 means indistinguishable at 1:1. TinyPNG is the yardstick:
 
@@ -99,6 +103,10 @@ pngdeer photo.jpg -o photo.min.jpg           # JPEG, automatic quality
 pngdeer photo.jpg -o photo.webp              # a JPEG as WebP
 pngdeer --help
 ```
+
+The output filename selects WebP when it ends in `.webp`; otherwise it selects PNG. Use `--format png` or `--format webp` to set the format explicitly.
+
+Input images must be PNG. Animated PNGs stay animated with PNG output; APNG-to-WebP conversion and WebP input are not supported.
 
 From source: `cargo build --release`, and the binary is `target/release/pngdeer`.
 
