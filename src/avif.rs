@@ -341,7 +341,7 @@ impl Source {
     /// one step below speed 8's quality, as speed 4's file usually lands there, stepping up while it
     /// falls short, unless it beats the target by more than a step's worth of points (the speed-8
     /// files' slope), when it searches downward from there. The first two of those qualities are
-    /// encoded at once.
+    /// encoded at once where they fit.
     fn final_search(&self, found: Found<Attempt>, target: f64, work: &mut Work) -> Result<Option<Attempt>, Error> {
         let Some(fast) = found.best else {
             // speed 8 never reaches it: speed 4's own search, for the closest it can get
@@ -352,7 +352,10 @@ impl Source {
         let per_step = slope_near(&found.scores, fast.quality);
         let start = fast.quality.saturating_sub(1);
         let mut tried: Vec<Attempt> = Vec::new();
-        let qualities: Vec<u32> = (start..=(start + 1).min(100)).collect();
+        // the next quality too where both fit at once (ENCODED_AT_ONCE); beyond, it waits to be
+        // needed, which on round 8's photos it was 17 times in 41
+        let both = ENCODED_AT_ONCE / (self.w * self.h) >= 2;
+        let qualities: Vec<u32> = (start..=(start + both as u32).min(100)).collect();
         tried.extend(self.attempts(FINAL, &qualities)?);
         (work.tries, work.rounds) = (work.tries + qualities.len(), work.rounds + 1);
         if tried[0].score >= target + per_step {
