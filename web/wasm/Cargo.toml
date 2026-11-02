@@ -19,3 +19,6 @@ wasm-bindgen-rayon = { version = "1.3.0", features = ["no-bundler"], optional = 
 # Multi-threaded build (web/pkg-mt): rayon on Web Workers for palettes, remapping, scoring and oxipng.
 # Needs nightly Rust and shared memory; see build.sh.
 threads = ["dep:wasm-bindgen-rayon", "pngdeer/parallel"]
+# AVIF output (web/pkg-avif, web/pkg-avif-mt): libaom adds about 1.1 MB gzipped, so it is a build of
+# its own, loaded only when AVIF is asked for.
+avif = ["pngdeer/avif"]

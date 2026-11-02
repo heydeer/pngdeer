@@ -15,7 +15,7 @@ pngdeer input.png -o output.png
 - **Same bytes everywhere**: the command line (macOS and Linux) and the browser (WebAssembly, on every core) run the same Rust code and write identical files.
 - **Big images too**: up to 40 megapixels in the browser, more on the command line.
 - **JPEG photos too**: re-encoded with mozjpeg at the lowest quality that keeps the target, 13% smaller in total than TinyPNG's at its quality ([details](#jpeg)).
-- **AVIF too**: from PNGs and JPEG photos, 19% smaller in total than TinyPNG's AVIF at its quality; on the command line for now ([details](#avif)).
+- **AVIF too**: from PNGs and JPEG photos, 22% smaller in total than TinyPNG's AVIF at its quality ([details](#avif)).
 - **Animated PNGs stay animated**: every frame on one palette and at the target quality, timing kept; 28% of the original size on 12 animated emoji, about even to 16% smaller than TinyPNG ([notes](experiments/apng/FINDINGS.md)).
 - **Free and open source**: MIT.
 
@@ -84,16 +84,19 @@ pngdeer also takes JPEG photos (`pngdeer photo.jpg -o smaller.jpg`, or drop them
 
 ### AVIF
 
-pngdeer also writes AVIF (an output name ending in `.avif`; on the command line for now), from PNGs and JPEG photos: libaom's lowest quality that keeps the target as Chrome shows the file. On 54 images, 30 of the photos above and 24 PNGs of every kind, against TinyPNG's AVIF (median image / in total):
+pngdeer also writes AVIF (an output name ending in `.avif`, or the switch in the browser), from PNGs and JPEG photos: libaom's lowest quality that keeps the target as Chrome shows the file. On 54 images, 30 of the photos above and 24 PNGs of every kind, every file decoded by Chrome, the size each tool needs to match TinyPNG's AVIF's quality (median image / in total), and how many images it can bring up to that quality:
 
-| Compressor | Size at TinyPNG's quality | Smaller and no worse |
+| Compressor | Size at TinyPNG's quality | Reaches |
 |---|---:|---:|
-| **pngdeer** | **79.7% / 80.5%** | **52 of 54** |
-| TinyPNG (the yardstick) | 100% | |
+| **pngdeer** | **77.3% / 77.9%** | **54** |
+| TinyPNG (the yardstick) | 100% | 54 |
+| avifenc, best of 33 settings | 89.3% / 83.3% | 54 |
+| rav1e, best of 11 qualities | 102.0% / 97.3% | 54 |
 
-- TinyPNG writes every AVIF at one fixed quantizer, so how good its files look follows the image (47 to 89 on SSIMULACRA2 here). pngdeer's automatic quality aims at TinyPNG's on the median: its files are 79% of TinyPNG's size on the median image (76% in total) and 0.7 points better, though better or worse than TinyPNG's image by image.
-- Scored as browsers show the files: pngdeer's scores match Chrome's own decoding pixel for pixel, and TinyPNG's files were decoded by Chrome too.
-- Small images are tried at four settings and the smallest file kept; large ones are searched at a fast speed, then encoded once or twice more slowly. libaom is built so that macOS and Linux, ARM and x86, write identical files.
+- **avifenc** is libavif's encoder with libaom, what Squoosh and sharp encode with; **rav1e** the Rust encoder, through ravif. Each gets its best setting per image, picked after the fact: qualities 30–90, avifenc at its default speed in 4:4:4 at 8 and 10 bits and in 4:2:0. pngdeer's files are pooled the same way (its runs at five targets around TinyPNG's quality and its automatic one); the one it writes with TinyPNG's score as the target is 79.7% / 80.5% of TinyPNG's size, smaller and no worse on 52 of the 54.
+- At TinyPNG's file size, pngdeer scores 5.9 SSIMULACRA2 points above TinyPNG on the median image, avifenc 3.5, rav1e 0.4.
+- TinyPNG writes every AVIF at one fixed quantizer, so how good its files look follows the image (47 to 89 here). pngdeer's automatic quality aims at TinyPNG's on the median: 79% of TinyPNG's size on the median image (76% in total) and 0.7 points better, though better or worse image by image. avifenc's default quality makes files 32% bigger than TinyPNG's, 9 points better.
+- In the browser AVIF is a build of its own, loaded only when picked (1.8 MB more, gzipped), and it writes the command line's files. It takes its time there: about 15 s for an icon, 30 s for a 1 MP photo, a minute for a 5 MP screenshot.
 - The [AVIF notes](experiments/avif/FINDINGS.md) have the details. TinyPNG ran through its API in October 2026.
 
 ## How it works

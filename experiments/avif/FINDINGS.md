@@ -427,12 +427,60 @@ doesn't have it yet.
   photo-like one, searched at speed 8 and finished at speed 4), and macOS arm64 (clang, NEON), Linux
   arm64 (GCC 12, NEON) and Linux x86-64 (GCC 12, plain C) reproduce them; the timing run above wrote
   the plain C build's 54 files with NEON.
-- **Still to do**: the browser (wasm32-unknown-unknown has no C library for libaom's stdio and
+- **Still to do** (round 10 did the browser): the browser (wasm32-unknown-unknown has no C library for libaom's stdio and
   `setjmp`, which vendor/clib would stand in for; round 7's SIMDe build of the NEON code; 1.1 MB
   more to load, only for AVIF); x86's SIMD on the command line (SSE2 to AVX2, chosen at run time,
   checked in round 7); a way out where AVIF loses to pngdeer's WebP, icons above all (round 3); and
   two cheap wins round 8 didn't try: monochrome AV1 for gray images, and colors under fully
   transparent pixels, which cost bits for nothing.
+
+## Round 10: in the browser, a cheaper small-image search, and the leaderboard
+
+2026-11-02.
+
+- **The browser build.** AVIF is a WebAssembly build of its own (web/pkg-avif, web/pkg-avif-mt),
+  everything the other one does and libaom, which the page moves its workers onto when AVIF is first
+  asked for (a second threaded build beside the first hangs). libaom builds for wasm32-unknown-unknown
+  with vendor/clib standing in for a C library: its stdio stubbed (messages, statistics and option
+  files pngdeer never uses), and `setjmp` returning 0 with `longjmp` aborting, as libaom jumps only on
+  an error that pngdeer's checks leave to running out of memory. Its SIMD is round 7's: the 171 NEON
+  functions 10-bit encodes spend time in, through SIMDe on SIMD128, the hot files at -O2 and the
+  rest at -Os. 1.80 MB gzipped (the threaded build 1.92 MB), against 0.62 MB without AVIF. It writes
+  the command line's files byte for byte (twemoji, a cut-out, a 1.1 MP JPEG photo, the page's five
+  samples). One thread of wasm SIMD is 2.8 times slower than one of NEON (a 0.38 MP icon, 27
+  encodes: 51 s against 18 s), and SIMD makes wasm about 1.4 times faster than plain C (a 1.1 MP
+  photo). In headless Chrome on the page, the threaded build: the 0.38 MP icon in 13 s, a 0.39 MP photo in
+  17 s, the 1.1 MP photo in 28 s, a 5.2 MP screenshot in 57 s, all the command line's files. A file over 16 MP is refused in the browser:
+  AVIF peaks at about 155 bytes a pixel (2.1 GB for a 13 MP photo), and wasm has 4 GB.
+- **Small images, searched near each other.** The four small settings were each searched alone, 9
+  to 15 encodes each, because the first guess, a photo's, is far off on icons and renders. But the
+  others land within 6 steps of 10-bit speed 4's answer (round 8's 13 small images), so it is now
+  searched first and the others in rounds of three neighbouring qualities from one step below its
+  answer. On the benchmark's 89 small images: the same files but for 6, which are 0.5–8% smaller
+  (99.93% of the bytes in total), with 45% fewer encodes (2,219 against 4,049) and 35% less time on
+  the command line. The pinned tests' files didn't change.
+- **Tried: speed 6 where speed 8 misleads.** Where speed 4's first file beats the target by more than a
+  step, its search goes down from speed 8's quality, which can be far above speed 4's on screenshots
+  (5 MP pngdeer@2x: 75 against 49, 24 encodes, 35 s). Searching there at speed 6 first, then near its
+  answer at speed 4, wrote the same files on all 105 large images tried, and pngdeer@2x in 14 s, but
+  it took 22% more encodes and more CPU on most of the others, where speed 8 is only a few steps off.
+  Left out.
+- **The leaderboard** (leaderboard.py; the site's Research tab, the README's table), on round 8's 54
+  images, each tool's files pooled into one size-quality frontier per image, every file decoded by
+  Chrome and scored by pngdeer, against TinyPNG's AVIF (scored the same way):
+
+  | Tool | Saved at TinyPNG's quality (median / total) | Reaches | Points at TinyPNG's size |
+  |---|---|---|---|
+  | **pngdeer** (its runs at TinyPNG's score −6 to +6, and automatic) | **22.7% / 22.1%** | 54 | +5.9 |
+  | avifenc (best of 33: speed 6, qualities 30–90, 4:4:4 8- and 10-bit, 4:2:0 10-bit) | 10.7% / 16.7% | 54 | +3.5 |
+  | rav1e (ravif, speed 6, best of 11 qualities) | −2.0% / 2.7% | 54 | +0.4 |
+
+  Photos: pngdeer 22.6%, avifenc 18.8%, rav1e 2.9%; PNGs: 22.7%, 6.3%, −13.3% (median). avifenc at
+  its defaults (quality 60, 4:4:4 8-bit) makes files 32% bigger than TinyPNG's on the median image,
+  8.8 points better. All tools encode the photos from the upright PNG without its color profile:
+  a profile in the file has Chrome show it color-managed, not as the photo's own pixels, which
+  TinyPNG's, without one, are scored against (pngdeer's files from the JPEGs, which keep a profile
+  that isn't sRGB's, lost 9–14 points that way on three camera originals).
 
 ## What it would take (after round 8)
 
@@ -492,6 +540,8 @@ python3 experiments/avif/product.py tiny PHOTOS bench/images TINYAVIF TINYPNGS t
 python3 experiments/avif/product.py run PHOTOS bench/images auto-tinypng-margin.csv product.csv
 python3 experiments/avif/product.py run PHOTOS bench/images auto-tinypng-margin.csv at-tinypng.csv tiny.csv
 python3 experiments/avif/product.py summary product.csv
+python3 experiments/avif/leaderboard.py sweep PHOTOS bench/images tiny.csv leaderboard.csv
+python3 experiments/avif/leaderboard.py summary tiny.csv leaderboard.csv
 node experiments/avif/chrome.mjs FILE.avif...
 experiments/avif/libaom/hashes.sh INPUTS AOMENC                       # once per build; diff the output
 ```

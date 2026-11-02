@@ -11,8 +11,8 @@
 //!   converted to RGB as Chrome converts it (`shown`), against the source.
 //! - The search: an image over SMALL_PIXELS gets the lowest quality whose speed-8 file reaches the
 //!   target, then the lowest at speed 4 from one step below that (`final_search`). A smaller image,
-//!   where encodes are cheap, gets each of SMALL_SETTINGS searched, and the smallest file reaching the
-//!   target is kept.
+//!   where encodes are cheap, gets each of SMALL_SETTINGS searched, the others near the first's
+//!   answer (`search_near`), and the smallest file reaching the target is kept.
 //! - Automatic target: about TinyPNG's AVIF's quality, which can't be predicted image by image
 //!   (TinyPNG writes every AVIF at one quantizer, so its score follows the image): a JPEG photo
 //!   PHOTO_TARGET, TinyPNG's median score on 30 photos; a PNG its PNG output's automatic target less
@@ -41,7 +41,9 @@ const PNG_GAP: f64 = 9.0;
 const SMALL_PIXELS: usize = 500_000;
 /// For small images: each setting's lowest quality reaching the target is encoded, and the smallest
 /// file wins. On round 8's 13 small images speed 2 won 11 times, screen content tools twice; 8 bits
-/// wins now and then on flat icons.
+/// wins now and then on flat icons. The first, the cheapest, is searched first, the others near its
+/// answer: on the benchmark's 89 small images that took 45% fewer encodes than searching each
+/// alone, and made the same files but for 6, 0.5–8% smaller.
 const SMALL_SETTINGS: [Setting; 4] = [
     Setting { depth: 10, screen: false, speed: 4 },
     Setting { depth: 10, screen: true, speed: 4 },
@@ -203,9 +205,19 @@ pub fn compress_avif(input: &[u8], settings: &Settings) -> Result<CompressedAvif
     let t = tick();
     let mut work = Work::default();
     let (best, search) = if small {
-        let found = par::map(&SMALL_SETTINGS, |&setting| source.search(setting, target, Vec::new()).map_err(|e| e.to_string()));
+        // the first setting, the cheapest, scouts; the others land within a few steps of its quality
+        let (scout, others) = SMALL_SETTINGS.split_first().unwrap();
+        let first = source.search(*scout, target, Vec::new())?;
+        let near = first.best.as_ref().map(|a| a.quality);
+        let found = par::map(others, |&setting| {
+            match near {
+                Some(quality) => source.search_near(setting, target, quality),
+                None => source.search(setting, target, Vec::new()),
+            }
+            .map_err(|e| e.to_string())
+        });
         let mut kept = Vec::new();
-        for found in found {
+        for found in [Ok(first)].into_iter().chain(found) {
             let found = found?;
             work.add(&found);
             kept.extend(found.best.map(|a| (a, true)).or(found.closest.map(|a| (a, false))));
@@ -312,6 +324,15 @@ impl Source {
     fn search(&self, setting: Setting, target: f64, known: Vec<Attempt>) -> Result<Found<Attempt>, Error> {
         let estimate = (FIRST_QUALITY + (target - PHOTO_TARGET) / SLOPE).clamp(10.0, 90.0);
         quality::search(target, usize::MAX, estimate, SLOPE, known, |qualities| self.attempts(setting, qualities))
+    }
+
+    /// `search` for a setting whose answer should be near `quality` (another setting's): rounds of
+    /// neighbouring qualities from one step below it, as speed 2 and 8 bits tend to land a step or
+    /// two lower than 10-bit speed 4 and screen content tools either way (round 8's 13 small images:
+    /// within 6 steps).
+    fn search_near(&self, setting: Setting, target: f64, quality: u32) -> Result<Found<Attempt>, Error> {
+        let estimate = (quality as f64 - 1.0).max(0.0);
+        quality::search_spread(target, usize::MAX, estimate, SLOPE, 1, Vec::new(), |qualities| self.attempts(setting, qualities))
     }
 
     /// Speed 4's file for an image over SMALL_PIXELS, from the speed-8 search (round 8's FINAL=margin):

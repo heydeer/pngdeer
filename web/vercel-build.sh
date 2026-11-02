@@ -25,4 +25,4 @@ LLVM_BIN=/usr/bin sh web/build.sh
 
 rm -rf dist
 mkdir dist
-cp -RL web/index.html web/worker.js web/THIRD_PARTY_LICENSES.txt web/brand web/samples web/pkg web/pkg-mt dist/
+cp -RL web/index.html web/worker.js web/THIRD_PARTY_LICENSES.txt web/brand web/samples web/pkg web/pkg-mt web/pkg-avif web/pkg-avif-mt dist/

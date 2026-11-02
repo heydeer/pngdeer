@@ -39,6 +39,22 @@ pub(crate) fn search<T: Tried, E>(
     estimate: f64,
     slope: f64,
     known: Vec<T>,
+    encode: impl FnMut(&[u32]) -> Result<Vec<T>, E>,
+) -> Result<Found<T>, E> {
+    search_spread(target, limit, estimate, slope, SPREAD, known, encode)
+}
+
+/// `search` with a round's qualities `spread` apart, rather than SPREAD, while the target lies to
+/// one side of every file so far: 1 where `estimate` is known to be close (AVIF's settings, near
+/// another setting's answer).
+#[cfg_attr(not(feature = "avif"), allow(dead_code))]
+pub(crate) fn search_spread<T: Tried, E>(
+    target: f64,
+    limit: usize,
+    estimate: f64,
+    slope: f64,
+    spread: i32,
+    known: Vec<T>,
     mut encode: impl FnMut(&[u32]) -> Result<Vec<T>, E>,
 ) -> Result<Found<T>, E> {
     let mut tried: BTreeMap<u32, T> = known.into_iter().map(|t| (t.quality(), t)).collect();
@@ -51,7 +67,7 @@ pub(crate) fn search<T: Tried, E>(
         if hi.0 - lo.0 <= 1 || (lo.0 >= 0 && tried[&(lo.0 as u32)].size() >= limit) {
             break;
         }
-        let qualities: Vec<u32> = round(lo, hi, target, estimate, slope).into_iter().filter(|q| !tried.contains_key(q)).collect();
+        let qualities: Vec<u32> = round(lo, hi, target, estimate, slope, spread).into_iter().filter(|q| !tried.contains_key(q)).collect();
         for file in encode(&qualities)? {
             tried.insert(file.quality(), file);
         }
@@ -66,10 +82,10 @@ pub(crate) fn search<T: Tried, E>(
 
 /// A round's qualities, strictly between `lo` (falls short) and `hi` (reaches the target), each
 /// with its score (-1 and 101: none yet): all of them when ROUND or fewer are left; while one side
-/// is unknown, ROUND qualities SPREAD apart around where the target should be (a `slope` step from
-/// the known side, or `estimate`); otherwise spread evenly between the two.
-fn round(lo: (i32, Option<f64>), hi: (i32, Option<f64>), target: f64, estimate: f64, slope: f64) -> Vec<u32> {
-    let (n, span) = (ROUND as i32, (ROUND as i32 - 1) * SPREAD);
+/// is unknown, ROUND qualities `spread` apart around where the target should be (a `slope` step
+/// from the known side, or `estimate`); otherwise spread evenly between the two.
+fn round(lo: (i32, Option<f64>), hi: (i32, Option<f64>), target: f64, estimate: f64, slope: f64, spread: i32) -> Vec<u32> {
+    let (n, span) = (ROUND as i32, (ROUND as i32 - 1) * spread);
     let evenly = || (1..=n).map(|i| (lo.0 + (hi.0 - lo.0) * i / (n + 1)) as u32).collect();
     if hi.0 - lo.0 - 1 <= n {
         return (lo.0 + 1..hi.0).map(|q| q as u32).collect();
@@ -82,5 +98,5 @@ fn round(lo: (i32, Option<f64>), hi: (i32, Option<f64>), target: f64, estimate: 
         (None, None) => estimate,
     };
     let center = (center.round() as i32).clamp(lo.0 + 1 + span / 2, hi.0 - 1 - span / 2);
-    (0..n).map(|i| (center + (i - n / 2) * SPREAD) as u32).collect()
+    (0..n).map(|i| (center + (i - n / 2) * spread) as u32).collect()
 }

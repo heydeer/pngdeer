@@ -9,5 +9,6 @@ void* memset(void* to, int value, size_t size);
 int memcmp(const void* a, const void* b, size_t size);
 size_t strlen(const char* s);
 int strcmp(const char* a, const char* b);
+int strncmp(const char* a, const char* b, size_t size);
 char* strncpy(char* to, const char* from, size_t size);
 #endif

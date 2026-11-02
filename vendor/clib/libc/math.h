@@ -2,6 +2,9 @@
 // exp, pow, logf and expf go to Rust (include/pngdeer_clib.h) as on every other target.
 #ifndef PNGDEER_MATH_H_
 #define PNGDEER_MATH_H_
+// wasm evaluates float in float (FLT_EVAL_METHOD 0)
+typedef float float_t;
+typedef double double_t;
 #define sqrt(x) __builtin_sqrt(x)
 #define sqrtf(x) __builtin_sqrtf(x)
 #define floor(x) __builtin_floor(x)
@@ -12,6 +15,11 @@
 #define floorf(x) __builtin_floorf(x)
 #define fabsf(x) __builtin_fabsf(x)
 #define roundf(x) __builtin_roundf(x)
+#define rint(x) __builtin_rint(x)
+#define lrint(x) ((long)__builtin_rint(x))
+#define isnan(x) __builtin_isnan(x)
+// libaom's few calls never see a NaN, where C's fmax and wasm's f64.max differ
+static inline double fmax(double a, double b) { return a > b ? a : b; }
 double log(double x);
 double log2(double x);
 double log10(double x);

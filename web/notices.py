@@ -23,16 +23,17 @@ def is_license(path: Path) -> bool:
 
 def license_files(directory: Path) -> list[Path]:
     """A crate's license files; one directory down too for -sys crates (vendored C code) or when the
-    top has none."""
+    top has none, and any depth for pngdeer's vendored C (libaom/third_party/*/LICENSE)."""
     found = sorted(p for p in directory.iterdir() if p.is_file() and is_license(p))
     if not found or directory.name.split("-")[-2:-1] == ["sys"]:
-        found += sorted(p for p in directory.glob("*/*") if p.is_file() and is_license(p))
+        pattern = "**/*" if directory.is_relative_to(ROOT / "vendor") else "*/*"
+        found += sorted(p for p in directory.glob(pattern) if p.is_file() and is_license(p))
     return found
 
 
 def main() -> None:
     meta = json.loads(subprocess.run(
-        ["cargo", "metadata", "--format-version", "1", "--filter-platform", "wasm32-unknown-unknown", "--features", "pngdeer-wasm/threads"],
+        ["cargo", "metadata", "--format-version", "1", "--filter-platform", "wasm32-unknown-unknown", "--features", "pngdeer-wasm/threads,pngdeer-wasm/avif"],
         cwd=ROOT, capture_output=True, text=True, check=True).stdout)
     packages = {p["id"]: p for p in meta["packages"]}
     nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
@@ -56,7 +57,8 @@ def main() -> None:
         for f in files:
             text = f.read_text(errors="replace").strip()
             texts.setdefault(" ".join(text.split()), (text, []))[1].append(label)
-    parts = ["Third-party software compiled into pngdeer's browser build (web/pkg, web/pkg-mt), and its licenses.",
+    parts = ["Third-party software compiled into pngdeer's browser builds (web/pkg, web/pkg-mt; web/pkg-avif and",
+             "web/pkg-avif-mt add libaom), and its licenses.",
              "Each license text below is followed by the crates it covers.", ""]
     names = {packages[i]["name"] for i in seen}
     parts += [text for crate, text in STATEMENTS.items() if crate in names] + ([""] if names & STATEMENTS.keys() else [])

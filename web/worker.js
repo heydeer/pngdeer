@@ -1,9 +1,11 @@
-// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time: a PNG to PNG or
-// WebP, a JPEG to JPEG or WebP. On
-// a cross-origin isolated page (see serve.py) it loads the threaded build, whose rayon pool spreads
-// each file's quantizing, encoding, scoring and oxipng over all cores; elsewhere, or with ?single,
-// the single-threaded one.
-const threaded = self.crossOriginIsolated === true && !new URL(self.location.href).searchParams.has("single");
+// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time: a PNG to PNG, WebP
+// or AVIF, a JPEG to JPEG, WebP or AVIF. On a cross-origin isolated page (see serve.py) it loads the
+// threaded build, whose rayon pool spreads each file's quantizing, encoding, scoring and oxipng over
+// all cores; elsewhere, or with ?single, the single-threaded one. With ?avif, the build with AVIF
+// (libaom), which does everything the other does.
+const params = new URL(self.location.href).searchParams;
+const threaded = self.crossOriginIsolated === true && !params.has("single");
+const avif = params.has("avif");
 
 // 16×16 gradient. Compressing it first proves the thread pool works: in Chromium, a page reloaded
 // while threads were running can start new ones that never pick up work, so compression would hang
@@ -19,6 +21,9 @@ const MAX_PIXELS = 40e6;
 // An animation's frames together peak at about 65 bytes a pixel (36 frames of 1000 × 640, 23 MP:
 // 1.5 GB), so it gets the same limit over all its frames, less some room.
 const MAX_ANIMATION_PIXELS = 30e6;
+// AVIF peaks at about 155 bytes a pixel (encodes at once at about 35–50 bytes each, and scoring):
+// 2.1 GB for a 13 MP photo.
+const AVIF_MAX_PIXELS = 16e6;
 
 // The number of frames of an animated PNG (its acTL chunk, ahead of the image data), else 1.
 function frames(png) {
@@ -44,7 +49,7 @@ function jpegSize(jpeg) {
 }
 
 const ready = (async () => {
-  const mod = await import(threaded ? "./pkg-mt/pngdeer_wasm.js" : "./pkg/pngdeer_wasm.js");
+  const mod = await import(`./pkg${avif ? "-avif" : ""}${threaded ? "-mt" : ""}/pngdeer_wasm.js`);
   await mod.default();
   if (threaded) {
     await mod.initThreadPool(navigator.hardwareConcurrency);
@@ -58,7 +63,7 @@ const ready = (async () => {
 const WEBP_MAX_SIDE = 16383;
 
 self.onmessage = async ({ data }) => {
-  // format: "png" or "jpeg" (a PNG's or a JPEG's own), or "webp"; no target: automatic quality;
+  // format: "png" or "jpeg" (a PNG's or a JPEG's own), "webp" or "avif"; no target: automatic quality;
   // no preview: pngdeer's default
   const { id, bytes, format, target, preview } = data;
   try {
@@ -76,15 +81,20 @@ self.onmessage = async ({ data }) => {
       const size = `${count} frames of ${width} × ${height} (${((pixels * count) / 1e6).toFixed(1)} MP)`;
       throw new Error(`animation too large for the browser version: ${size}, at most ${MAX_ANIMATION_PIXELS / 1e6} MP; use the command line`);
     }
+    if (format === "avif" && pixels > AVIF_MAX_PIXELS) {
+      const size = `${width} × ${height} pixels (${(pixels / 1e6).toFixed(1)} MP)`;
+      throw new Error(`too large for AVIF in the browser: ${size}, at most ${AVIF_MAX_PIXELS / 1e6} MP; use the command line`);
+    }
     if (format === "webp" && Math.max(width, height) > WEBP_MAX_SIDE) {
       throw new Error(`too large for WebP: ${width} × ${height} pixels, at most ${WEBP_MAX_SIDE} a side; keep it as ${jpeg ? "JPEG" : "PNG"}`);
     }
     const mod = await ready;
     const start = performance.now();
-    // compress_webp takes a JPEG too
-    const result = format === "webp" ? mod.compress_webp(input, target, preview) : jpeg ? mod.compress_jpeg(input, target) : mod.compress(input, target, preview);
+    // compress_webp and compress_avif take a JPEG too
+    const result = format === "avif" ? mod.compress_avif(input, target)
+      : format === "webp" ? mod.compress_webp(input, target, preview) : jpeg ? mod.compress_jpeg(input, target) : mod.compress(input, target, preview);
     const ms = performance.now() - start;
-    const file = format === "webp" ? result.webp : jpeg ? result.jpeg : result.png;
+    const file = format === "avif" ? result.avif : format === "webp" ? result.webp : jpeg ? result.jpeg : result.png;
     const report = JSON.parse(result.report);
     result.free();
     self.postMessage({ id, file, report, ms, threaded }, [file.buffer]);

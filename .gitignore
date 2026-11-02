@@ -4,8 +4,12 @@ bench/.cache/
 __pycache__/
 /target/
 /target-mt/
+/target-avif/
+/target-avif-mt/
 web/pkg/
 web/pkg-mt/
+web/pkg-avif/
+web/pkg-avif-mt/
 /dist/
 # Website screenshots: the sites' copyright, for internal benchmarking only (see bench/images/SOURCES.md).
 bench/images/ui/

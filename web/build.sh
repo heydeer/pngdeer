@@ -1,7 +1,8 @@
 #!/bin/sh
-# Builds the WebAssembly module and its JS glue from web/wasm, twice: web/pkg single-threaded (works
+# Builds the WebAssembly module and its JS glue from web/wasm: web/pkg single-threaded (works
 # anywhere) and web/pkg-mt with a rayon thread pool (needs a cross-origin isolated page: see
-# serve.py). Needs rustup's stable and nightly toolchains (nightly with rust-src) with the
+# serve.py), and the same two with AVIF output (libaom, 1.1 MB more gzipped), web/pkg-avif and
+# web/pkg-avif-mt, which the page loads only for AVIF. Needs rustup's stable and nightly toolchains (nightly with rust-src) with the
 # wasm32-unknown-unknown target, and wasm-bindgen-cli at the same version as the wasm-bindgen crate
 # in web/wasm/Cargo.toml.
 set -e
@@ -20,14 +21,19 @@ fi
 # is most of the time. The scalar path is patched for wasm in vendor/fast-ssim2.
 cargo build --release --target wasm32-unknown-unknown -p pngdeer-wasm
 wasm-bindgen --target web --no-typescript --out-dir web/pkg target/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
+cargo build --release --target wasm32-unknown-unknown -p pngdeer-wasm --features avif --target-dir target-avif
+wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif target-avif/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
 
 # Threads: shared memory needs atomics in std (rebuilt with build-std, hence nightly) and in the C
 # code, an imported shared memory (wasm32's 4 GiB ceiling, which MAX_PIXELS in worker.js keeps to), and
 # the TLS exports wasm-bindgen's thread start-up uses.
 LINK="--shared-memory --import-memory --max-memory=4294967296 --export=__wasm_init_tls --export=__tls_size --export=__tls_align --export=__tls_base"
-RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals $(for a in $LINK; do printf -- '-C link-arg=%s ' "$a"; done)" \
-CFLAGS_wasm32_unknown_unknown="-matomics -mbulk-memory" \
-  cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=panic_abort,std \
+export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals $(for a in $LINK; do printf -- '-C link-arg=%s ' "$a"; done)"
+export CFLAGS_wasm32_unknown_unknown="-matomics -mbulk-memory"
+cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=panic_abort,std \
   -p pngdeer-wasm --features threads --target-dir target-mt
 wasm-bindgen --target web --no-typescript --out-dir web/pkg-mt target-mt/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
-ls -l web/pkg web/pkg-mt
+cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=panic_abort,std \
+  -p pngdeer-wasm --features threads,avif --target-dir target-avif-mt
+wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif-mt target-avif-mt/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
+ls -l web/pkg web/pkg-mt web/pkg-avif web/pkg-avif-mt

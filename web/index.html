@@ -438,13 +438,13 @@
         </button>
         <button class="pill ghost" id="samples" type="button">Try sample images</button>
       </div>
-      <div class="output">Output <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="same" aria-pressed="true" title="PNGs stay PNG, JPEGs stay JPEG">Same format</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div></div>
+      <div class="output">Output <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="same" aria-pressed="true" title="PNGs stay PNG, JPEGs stay JPEG">Same format</button><button type="button" data-format="webp" aria-pressed="false">WebP</button><button type="button" data-format="avif" aria-pressed="false">AVIF</button></div></div>
     </div>
     <div class="viewer" id="viewer">
       <div class="bar">
         <span class="name" id="v-name"></span><span class="dim mono" id="v-dim"></span>
         <span class="spacer"></span>
-        <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="same" aria-pressed="true" id="v-same">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button></div>
+        <div class="seg format" role="group" aria-label="Output format"><button type="button" data-format="same" aria-pressed="true" id="v-same">PNG</button><button type="button" data-format="webp" aria-pressed="false">WebP</button><button type="button" data-format="avif" aria-pressed="false">AVIF</button></div>
         <div class="seg" role="group" aria-label="Zoom" id="zoom">
           <button type="button" data-zoom="fit" aria-pressed="true">Fit</button><button type="button" data-zoom="1" aria-pressed="false">1:1</button><button type="button" data-zoom="2" aria-pressed="false">2×</button>
         </div>
@@ -494,7 +494,7 @@
       <h2 class="big" id="r-title">The best open-source PNG compressor we've measured.</h2>
       <p class="intro" id="r-intro">We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
       <div class="switch r-format" id="r-format" role="group" aria-label="Output format">
-        <button type="button" data-kind="png" aria-pressed="true">PNG</button><button type="button" data-kind="webp" aria-pressed="false">WebP</button><button type="button" data-kind="jpeg" aria-pressed="false">JPEG</button>
+        <button type="button" data-kind="png" aria-pressed="true">PNG</button><button type="button" data-kind="webp" aria-pressed="false">WebP</button><button type="button" data-kind="jpeg" aria-pressed="false">JPEG</button><button type="button" data-kind="avif" aria-pressed="false">AVIF</button>
       </div>
     </div>
     <div class="lab reveal">
@@ -659,16 +659,16 @@
 const $ = (s) => document.querySelector(s);
 const SAMPLES = ["sun-poster", "kodim01", "pngdeer@2x", "cup-of-tea", "openmoji-1f431"];
 const CORES = navigator.hardwareConcurrency || 4;
-// {id, name, bytes, size, width, height, url, jpeg, jobs: {png, webp, jpeg}}; a job: {status, error,
+// {id, name, bytes, size, width, height, url, jpeg, jobs: {png, webp, jpeg, avif}}; a job: {status, error,
 // out, outUrl, report, ms, palette}. A file that is neither a PNG nor a JPEG has `refused`, an error
 // job, in place of jobs.
 const files = [];
 let nextId = 0, active = null;
-// The output format: "same" (a PNG stays a PNG, a JPEG a JPEG) or "webp". Each file is compressed
-// to each once, and its jobs keep both when switching.
+// The output format: "same" (a PNG stays a PNG, a JPEG a JPEG), "webp" or "avif". Each file is
+// compressed to each once, and its jobs keep them all when switching.
 let format = "same";
-try { if (localStorage.getItem("pngdeer-format") === "webp") format = "webp"; } catch {}
-const output = (f) => (format === "webp" ? "webp" : f.jpeg ? "jpeg" : "png");
+try { if (["webp", "avif"].includes(localStorage.getItem("pngdeer-format"))) format = localStorage.getItem("pngdeer-format"); } catch {}
+const output = (f) => (format !== "same" ? format : f.jpeg ? "jpeg" : "png");
 const job = (f) => f.refused ?? f.jobs[output(f)];
 let skipped = ""; // what the last dropped folders held besides PNGs
 
@@ -688,6 +688,10 @@ const change = (after, before) => {
 // per core, a few round trips each: 8 s over a slow link, where a hang never reports at all.
 const READY_MS = 15000;
 let threaded = self.crossOriginIsolated === true;
+// AVIF's build (pkg-avif, pkg-avif-mt) holds libaom, 1.1 MB more to load, and everything the other
+// one does: the pool starts on it if AVIF is the format, and moves to it when AVIF is first asked for
+// (a second threaded build beside the first would hang).
+let avif = format === "avif";
 let pool = [];
 let poolError = null;
 const queue = [];
@@ -695,7 +699,8 @@ const pending = new Map();
 function startPool() {
   const n = threaded ? 1 : Math.max(1, Math.min(4, CORES - 1));
   pool = Array.from({ length: n }, () => {
-    const slot = { worker: new Worker(threaded ? "worker.js" : "worker.js?single", { type: "module" }), busy: true };
+    const options = [threaded ? "" : "single", avif ? "avif" : ""].filter(Boolean).join("&");
+    const slot = { worker: new Worker(options ? `worker.js?${options}` : "worker.js", { type: "module" }), busy: true };
     slot.worker.onmessage = ({ data }) => {
       if (data.type === "ready") {
         clearTimeout(slot.timer);
@@ -703,9 +708,9 @@ function startPool() {
         return pump();
       }
       slot.busy = false;
-      const resolve = pending.get(data.id);
+      const job = pending.get(data.id);
       pending.delete(data.id);
-      resolve(data);
+      job.resolve(data);
       pump();
     };
     if (threaded) {
@@ -724,7 +729,7 @@ function pump() {
     if (slot.busy || !queue.length) continue;
     const job = queue.shift();
     slot.busy = true;
-    pending.set(job.key, job.resolve);
+    pending.set(job.key, job);
     slot.worker.postMessage({ id: job.key, bytes: job.bytes, format: job.format });
     job.started();
   }
@@ -732,6 +737,17 @@ function pump() {
 const run = (key, bytes, format, started) => new Promise((resolve) => {
   if (poolError) return resolve({ error: poolError });
   queue.push({ key, bytes: bytes.slice(0), format, resolve, started });
+  if (format === "avif" && !avif) {
+    // onto AVIF's build: the files being compressed start again there
+    avif = true;
+    for (const slot of pool) {
+      clearTimeout(slot.timer);
+      slot.worker.terminate();
+    }
+    queue.unshift(...pending.values());
+    pending.clear();
+    startPool();
+  }
   pump();
 });
 
@@ -774,7 +790,7 @@ async function compress(f, to) {
   } else {
     j.status = "done";
     j.out = data.file;
-    j.outUrl = URL.createObjectURL(new Blob([data.file], { type: `image/${to}` })); // png, webp or jpeg
+    j.outUrl = URL.createObjectURL(new Blob([data.file], { type: `image/${to}` })); // png, webp, jpeg or avif
     j.report = data.report;
     j.ms = data.ms;
     j.palette = to === "png" ? paletteOf(data.file) : [];
@@ -923,6 +939,7 @@ addEventListener("resize", layout);
 function outcome(j) {
   const r = j.report;
   if (r.format === "jpeg") return r.outcome === "original" ? "Already optimal" : `JPEG quality ${r.quality}`;
+  if (r.format === "avif") return `AVIF quality ${r.quality}`;
   if (r.format === "webp") {
     if (r.mode === "lossy") return `Lossy WebP, quality ${r.quality}`;
     return ["hit", "miss"].includes(r.png.outcome) ? `Lossless WebP, ${r.png.colors} colors` : "Lossless WebP";
@@ -947,9 +964,9 @@ function render() {
     $("#t-save").hidden = !done;
     const pal = $("#palette");
     pal.classList.toggle("wait", waiting);
-    pal.classList.toggle("none", done && !j.palette.length); // a lossy WebP or a true-color PNG has none
+    pal.classList.toggle("none", done && !j.palette.length); // a lossy WebP or AVIF or a true-color PNG has none
     pal.innerHTML = done ? j.palette.map((c) => `<i style="background:rgba(${c.r},${c.g},${c.b},${(c.a / 255).toFixed(3)})"></i>`).join("") : "";
-    const busy = { png: "Finding the smallest palette…", webp: "Finding the smallest WebP…", jpeg: "Finding the lowest JPEG quality…" }[output(f)];
+    const busy = { png: "Finding the smallest palette…", webp: "Finding the smallest WebP…", jpeg: "Finding the lowest JPEG quality…", avif: "Finding the smallest AVIF…" }[output(f)];
     $("#p-label").innerHTML = done
       ? `<b>${outcome(j)}</b> · SSIMULACRA2 ${j.report.score.toFixed(1)}${j.report.frames > 1 ? ", worst frame" : ""}`
       : j.status === "error" ? `Couldn't compress: ${esc(j.error)}` : j.status === "busy" ? busy : "Waiting for the files before it…";
@@ -981,7 +998,7 @@ function render() {
 }
 
 function renderNote() {
-  const names = { png: "PNG", webp: "WebP", jpeg: "JPEG" };
+  const names = { png: "PNG", webp: "WebP", jpeg: "JPEG", avif: "AVIF" };
   const outputs = [...new Set(files.filter((x) => !x.refused).map((x) => names[output(x)]))];
   const status = files.length
     ? poolError || `Compressing in WebAssembly on this device (${threaded ? `one file at a time on ${CORES} threads` : `${pool.length} parallel worker${pool.length > 1 ? "s" : ""}, one file each`}). Quality is picked per image, about what TinyPNG's ${outputs.join(" and ")} would be, at most 90.`
@@ -1104,7 +1121,9 @@ $("#all").onclick = () => files.filter((x) => job(x).status === "done").forEach(
 // automatic runs, cwebp's 27 settings and pngquant + cwebp's ten, as bytes saved at the quality of
 // TinyPNG's WebP, on the 120 images it was fetched for (experiments/webp/leaderboard.py). JPEG:
 // pngdeer's files (its encoder at qualities 50-85, and its runs), mozjpeg's 7 and jpegli's 12
-// settings, as bytes saved at the quality of TinyPNG's JPEG on 60 photos (experiments/jpeg).
+// settings, as bytes saved at the quality of TinyPNG's JPEG on 60 photos (experiments/jpeg). AVIF:
+// pngdeer's runs, avifenc's 33 and rav1e's 11 settings, every file decoded by Chrome, as bytes saved
+// at the quality of TinyPNG's AVIF on 54 images (experiments/avif/leaderboard.py).
 const RESEARCH = {
   png: {
     title: "The best open-source PNG compressor we've measured.",
@@ -1153,6 +1172,21 @@ const RESEARCH = {
     sets: {
       photos: { label: "Photos · 60", n: 60, smaller: 12, points: 3.3, reach: 60, tools: [
         ["pngdeer", 12.2, 60], ["jpegli", 10.8, 60], ["mozjpeg", 5.8, 59]] },
+    },
+  },
+  avif: {
+    title: "The best open-source AVIF compressor we've measured.",
+    intro: "We turned 54 images, 30 JPEG photos and 24 PNGs of every kind, into AVIF with pngdeer, TinyPNG, avifenc (libavif with libaom, what Squoosh and sharp encode with) and rav1e (the Rust encoder, through ravif). Every output was decoded by Chrome and scored with SSIMULACRA2.",
+    chart: "Bytes saved at TinyPNG's quality",
+    sub: "Median size against TinyPNG's AVIF when each tool's output matches its quality, and how many images each can bring up to TinyPNG's quality.",
+    column: "Saved vs TinyPNG", unit: "%", lo: -5, ticks: [-5, 0, 5, 10, 15, 20], narrow: [0, 10, 20],
+    method: [
+      ["Generous to the others", "avifenc gets its best of 33 settings per image, picked after the fact: qualities 30–90 at its default speed, 4:4:4 at 8 and 10 bits and 4:2:0. rav1e its best of 11 qualities. pngdeer's files are its own runs, at five targets around TinyPNG's quality and its automatic one."],
+      ["Out of the box", "pngdeer's automatic quality makes files 21% smaller than TinyPNG's on the median image, and 0.7 points better. avifenc's default quality makes them 32% bigger, 9 points better."],
+      ["As browsers show them", "pngdeer scores each file as Chrome decodes it, pixel for pixel, and TinyPNG's and the others' files were decoded by Chrome too. TinyPNG ran through its API in October 2026."]],
+    sets: {
+      all: { label: "Photos and PNGs · 54", n: 54, smaller: 23, points: 5.9, reach: 54, tools: [
+        ["pngdeer", 22.7, 54], ["avifenc", 10.7, 54], ["rav1e", -2.0, 54]] },
     },
   },
 };

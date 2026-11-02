@@ -1,6 +1,6 @@
 //! pngdeer in the browser: pngdeer::compress, compress_webp and compress_jpeg compiled to WebAssembly,
-//! single-threaded or (feature `threads`) with a rayon pool on Web Workers. Same output as the
-//! command line.
+//! single-threaded or (feature `threads`) with a rayon pool on Web Workers, and with feature `avif`
+//! compress_avif. Same output as the command line.
 
 use wasm_bindgen::prelude::*;
 
@@ -103,4 +103,37 @@ impl CompressedJpeg {
 pub fn compress_jpeg(input: &[u8], target: Option<f64>) -> Result<CompressedJpeg, JsError> {
     let result = pngdeer::compress_jpeg(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(CompressedJpeg { report: result.json(), jpeg: result.jpeg })
+}
+
+#[cfg(feature = "avif")]
+#[wasm_bindgen]
+pub struct CompressedAvif {
+    avif: Vec<u8>,
+    report: String,
+}
+
+#[cfg(feature = "avif")]
+#[wasm_bindgen]
+impl CompressedAvif {
+    /// The AVIF file.
+    #[wasm_bindgen(getter)]
+    pub fn avif(&self) -> Vec<u8> {
+        self.avif.clone()
+    }
+
+    /// JSON: target, setting, quality, score, tries, rounds, outcome, the speed-8 search's file,
+    /// bytes, and a time breakdown.
+    #[wasm_bindgen(getter)]
+    pub fn report(&self) -> String {
+        self.report.clone()
+    }
+}
+
+/// Compresses a PNG or a JPEG to AVIF (pngdeer::compress_avif): libaom's lowest quality whose file,
+/// as Chrome shows it, scores at least `target`; with no target, about TinyPNG's AVIF's quality.
+#[cfg(feature = "avif")]
+#[wasm_bindgen]
+pub fn compress_avif(input: &[u8], target: Option<f64>) -> Result<CompressedAvif, JsError> {
+    let result = pngdeer::compress_avif(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(CompressedAvif { report: result.json(), avif: result.avif })
 }

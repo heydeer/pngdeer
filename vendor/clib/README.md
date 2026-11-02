@@ -12,10 +12,12 @@ every target.
   implementations order equal elements differently.
   sqrt, floor, ceil, fabs and round are exact operations and stay as they are.
 - `libc/` (wasm32 only): the few headers the libraries include, declarations only, with the exact
-  math functions as wasm instructions.
-- `libc.c` (wasm32 only): abort, exit, getenv, abs, strcmp, strncpy, `errno`, and the stdio
-  functions the libraries reference but never reach in pngdeer's use (printing errors, reading
-  files) as stubs. memcpy and friends come from Rust's compiler-builtins.
+  math functions as wasm instructions, and libaom's `setjmp.h`: setjmp returns 0 and longjmp aborts
+  (libaom jumps only on an error, which pngdeer's checks leave to running out of memory).
+- `libc.c` (wasm32 only): abort, exit, getenv, abs, llabs, strcmp, strncmp, strncpy, strtol,
+  strtoul, rand, longjmp, `errno`, and the stdio functions the libraries reference but never reach
+  in pngdeer's use (printing errors, reading and writing files) as stubs. memcpy and friends come
+  from Rust's compiler-builtins.
 - `src/lib.rs`: the math functions and the sort, and on wasm32 malloc, calloc, realloc and free on
   Rust's allocator.
 
