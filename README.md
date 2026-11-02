@@ -96,7 +96,7 @@ pngdeer also writes AVIF (an output name ending in `.avif`, or the switch in the
 - **avifenc** is libavif's encoder with libaom, what Squoosh and sharp encode with; **rav1e** the Rust encoder, through ravif. Each gets its best setting per image, picked after the fact: qualities 30–90, avifenc at its default speed in 4:4:4 at 8 and 10 bits and in 4:2:0. pngdeer's files are pooled the same way (its runs at five targets around TinyPNG's quality and its automatic one); the one it writes with TinyPNG's score as the target is 79.7% / 80.5% of TinyPNG's size, smaller and no worse on 52 of the 54.
 - At TinyPNG's file size, pngdeer scores 5.9 SSIMULACRA2 points above TinyPNG on the median image, avifenc 3.5, rav1e 0.4.
 - TinyPNG writes every AVIF at one fixed quantizer, so how good its files look follows the image (47 to 89 here). pngdeer's automatic quality aims at TinyPNG's on the median: 79% of TinyPNG's size on the median image (76% in total) and 0.7 points better, though better or worse image by image. avifenc's default quality makes files 32% bigger than TinyPNG's, 9 points better.
-- In the browser AVIF is a build of its own, loaded only when picked (1.8 MB more, gzipped), and it writes the command line's files. It takes its time there: about 15 s for an icon, 30 s for a 1 MP photo, a minute for a 5 MP screenshot.
+- In the browser AVIF is a build of its own, loaded only when picked (1.8 MB more, gzipped), and it writes the command line's files. It takes its time there: about 15 s for an icon, 30 s for a 1 MP photo, a minute for a 5 MP screenshot, 3 for a 24 MP photo, the most it takes.
 - The [AVIF notes](experiments/avif/FINDINGS.md) have the details. TinyPNG ran through its API in October 2026.
 
 ## How it works

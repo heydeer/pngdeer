@@ -60,8 +60,10 @@ const FINAL: Setting = Setting { depth: 10, screen: false, speed: 4 };
 const FIRST_QUALITY: f64 = 49.0;
 const SLOPE: f64 = 0.6;
 /// A round's files are encoded at once while their pixels fit in this, in turns beyond it: an encode
-/// takes about 35 bytes a pixel at speed 8 and 50 at speed 4 (a 12 MP photo: 0.4 and 0.6 GB).
-const ENCODED_AT_ONCE: usize = 40_000_000;
+/// takes about 35 bytes a pixel at speed 8 and 50 at speed 4 (a 12 MP photo: 0.4 and 0.6 GB), and
+/// the rest of a compression about 70 (a 21.8 MP photo, one encode at a time, peaked at 2.6 GB).
+/// wasm32 has 4 GB: less at once there, so up to 24 MP stays under 3 GB. The files don't depend on it.
+const ENCODED_AT_ONCE: usize = if cfg!(target_arch = "wasm32") { 24_000_000 } else { 40_000_000 };
 /// As for JPEG output: files are scored at once while their scored pixels fit in this.
 const SCORED_AT_ONCE: usize = 8_000_000;
 

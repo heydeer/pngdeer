@@ -21,9 +21,9 @@ const MAX_PIXELS = 40e6;
 // An animation's frames together peak at about 65 bytes a pixel (36 frames of 1000 × 640, 23 MP:
 // 1.5 GB), so it gets the same limit over all its frames, less some room.
 const MAX_ANIMATION_PIXELS = 30e6;
-// AVIF peaks at about 155 bytes a pixel (encodes at once at about 35–50 bytes each, and scoring):
-// 2.1 GB for a 13 MP photo.
-const AVIF_MAX_PIXELS = 16e6;
+// AVIF's encodes take 35–50 bytes a pixel each, as many at once as fit in 24 MP (ENCODED_AT_ONCE in
+// src/avif.rs), and the rest of it about 70: at most about 2.9 GB, a 24 MP (6000 × 4000) photo's.
+const AVIF_MAX_PIXELS = 24e6;
 
 // The number of frames of an animated PNG (its acTL chunk, ahead of the image data), else 1.
 function frames(png) {
