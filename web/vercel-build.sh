@@ -5,8 +5,11 @@
 set -e
 cd "$(dirname "$0")/.."
 
-# clang and llvm-ar that target wasm32, for oxipng's libdeflate
-dnf install -y -q clang llvm
+# clang and llvm-ar that target wasm32, for the C code (libdeflate, libwebp, mozjpeg, libaom): wasi-sdk's,
+# LLVM 23 as on a Mac with Homebrew's. Amazon Linux's own, clang 15, builds libaom's SIMD (through SIMDe)
+# into code that writes other AVIF files than the command line (build.sh checks).
+wasi=34
+curl --proto '=https' -sSfL "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-$wasi/wasi-sdk-$wasi.0-x86_64-linux.tar.gz" | tar -xz -C /opt
 # The image has rustup in /rust, set to an older Rust: use current stable, as CI does.
 if ! command -v rustup >/dev/null; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal
@@ -21,7 +24,7 @@ tmp=$(mktemp -d)
 curl --proto '=https' -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$version/wasm-bindgen-$version-x86_64-unknown-linux-musl.tar.gz" | tar -xz -C "$tmp"
 cp "$tmp"/*/wasm-bindgen "$(dirname "$(command -v cargo)")/"
 
-LLVM_BIN=/usr/bin sh web/build.sh
+LLVM_BIN=/opt/wasi-sdk-$wasi.0-x86_64-linux/bin sh web/build.sh
 
 rm -rf dist
 mkdir dist

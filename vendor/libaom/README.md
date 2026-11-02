@@ -52,6 +52,10 @@ The same bytes on every target:
    C doesn't (a libaom bug). Every other target runs the plain C code. On wasm32 only the NEON
    functions that matter are kept, and the files that matter built at -O2, the rest at -Os, so the
    module is about as big as plain C's (1.8 MB gzipped with the rest of pngdeer, 0.09 MB more).
+   The compiler matters there: Amazon Linux's clang 15 builds SIMDe's NEON into code that writes
+   other files (its plain C writes the right ones), LLVM 23 doesn't; the site is built with
+   wasi-sdk 34's (web/vercel-build.sh), and web/check-avif.mjs, which web/build.sh runs last,
+   refuses a build whose file differs from the command line's.
 2. **No fused multiply-add.** `-ffp-contract=off`: compilers fuse `a * b + c` on targets with FMA,
    such as arm64, and libaom's rate control and neural networks work in floating point.
 3. **One libm and one qsort.** `vendor/clib/include/pngdeer_clib.h`, included ahead of every file,

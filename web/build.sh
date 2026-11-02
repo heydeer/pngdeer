@@ -8,8 +8,10 @@
 set -e
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.cargo/bin:$PATH"  # rustup's cargo, ahead of a system cargo without wasm32
-# oxipng's deflate (libdeflate) is C, so it needs a clang that targets wasm32: Apple's doesn't,
-# Homebrew's llvm does (brew install llvm). Set LLVM_BIN to use another one.
+# oxipng's deflate (libdeflate), libwebp, mozjpeg and libaom are C, so they need a clang that targets
+# wasm32: Apple's doesn't, Homebrew's llvm does (brew install llvm). Set LLVM_BIN to use another one.
+# Older ones may not do: Amazon Linux's clang 15 builds libaom's SIMD into code that writes other
+# AVIF files, which check-avif.mjs, last, refuses.
 LLVM_BIN="${LLVM_BIN:-$(brew --prefix llvm 2>/dev/null)/bin}"
 export CC_wasm32_unknown_unknown="$LLVM_BIN/clang" AR_wasm32_unknown_unknown="$LLVM_BIN/llvm-ar"
 if [ ! -x "$CC_wasm32_unknown_unknown" ]; then
@@ -37,3 +39,5 @@ cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=pani
   -p pngdeer-wasm --features threads,avif --target-dir target-avif-mt
 wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif-mt target-avif-mt/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
 ls -l web/pkg web/pkg-mt web/pkg-avif web/pkg-avif-mt
+# the AVIF build writes the command line's files (see check-avif.mjs)
+node web/check-avif.mjs

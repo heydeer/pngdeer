@@ -451,7 +451,11 @@ doesn't have it yet.
   encodes: 51 s against 18 s), and SIMD makes wasm about 1.4 times faster than plain C (a 1.1 MP
   photo). In headless Chrome on the page, the threaded build: the 0.38 MP icon in 13 s, a 0.39 MP photo in
   17 s, the 1.1 MP photo in 28 s, a 5.2 MP screenshot in 57 s, all the command line's files. A file over 16 MP is refused in the browser:
-  AVIF peaks at about 155 bytes a pixel (2.1 GB for a 13 MP photo), and wasm has 4 GB.
+  AVIF peaks at about 155 bytes a pixel (2.1 GB for a 13 MP photo), and wasm has 4 GB. The first
+  deployment wrote other files than the command line: Vercel built it with Amazon Linux's clang 15,
+  which compiles the SIMD (SIMDe's NEON on SIMD128) differently; its plain C, and LLVM 23's SIMD
+  (wasi-sdk 34, now on Vercel too), write the command line's files. web/check-avif.mjs now refuses
+  a build that doesn't.
 - **Small images, searched near each other.** The four small settings were each searched alone, 9
   to 15 encodes each, because the first guess, a photo's, is far off on icons and renders. But the
   others land within 6 steps of 10-bit speed 4's answer (round 8's 13 small images), so it is now
