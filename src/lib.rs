@@ -11,25 +11,30 @@
 //! - webp: WebP output, the smaller of a palette image losslessly and a lossy file of the same
 //!   quality (a JPEG photo: the lossy file)
 //! - jpeg: JPEG photos re-encoded at the lowest quality that keeps the target
+//! - avif: AVIF output, libaom's smallest file that keeps the target (a JPEG photo's too)
 //! - compress (here): the whole pipeline for one file
 
 // Index loops over a color's few coordinates read better here than zipped iterators.
 #![allow(clippy::needless_range_loop)]
 
 pub mod apng;
+#[cfg(feature = "avif")]
+pub mod avif;
 pub mod codec;
 mod color;
 #[cfg(feature = "jpeg")]
 pub mod jpeg;
 mod palette;
 mod par;
-#[cfg(any(feature = "webp", feature = "jpeg"))]
+#[cfg(any(feature = "webp", feature = "jpeg", feature = "avif"))]
 mod quality;
 mod remap;
 pub mod search;
 #[cfg(feature = "webp")]
 pub mod webp;
 
+#[cfg(feature = "avif")]
+pub use avif::{compress_avif, CompressedAvif};
 use codec::Error;
 #[cfg(feature = "jpeg")]
 pub use jpeg::{compress_jpeg, CompressedJpeg};

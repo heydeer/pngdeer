@@ -1,8 +1,9 @@
-# AVIF: a prototype measurement
+# AVIF: measured, then built
 
-2026-10-30. Should pngdeer write AVIF? Measured before building anything: how small AVIF files are
-at the same quality as pngdeer's JPEG and WebP and TinyPNG's AVIF, which encoder to use, how fast,
-and whether the same bytes come out everywhere. No product code changed.
+2026-10-30. Should pngdeer write AVIF? Measured before building anything (rounds 1 to 8, no product
+code changed): how small AVIF files are at the same quality as pngdeer's JPEG and WebP and TinyPNG's
+AVIF, which encoder to use, how fast, and whether the same bytes come out everywhere. Round 9 put it
+on the command line.
 
 **In short:** with libaom, AVIF photos are 24% smaller than pngdeer's own JPEG at the same score and
 19% smaller than TinyPNG's AVIF at TinyPNG's score. rav1e, the encoder that is easy to ship (pure
@@ -25,7 +26,11 @@ bytes, median and total); on the other two it is 100.1%, and 105.0% but 1.4 poin
 quality step short of TinyPNG's score. TinyPNG writes every AVIF at one quantizer, so its
 quality can't be predicted image by image; an automatic target aimed at it on the median gives files
 21–24% smaller, as good on the median, and one at pngdeer's own quality files about TinyPNG's size,
-7.6 points better. pngdeer's AVIF will aim at TinyPNG's AVIF's quality.
+7.6 points better. pngdeer's AVIF will aim at TinyPNG's AVIF's quality. Round 9 built it into the
+command line (libaom vendored, NEON on ARM, scored exactly as Chrome shows the file, the same bytes
+on macOS and Linux, ARM and x86): at each image's TinyPNG score its files are 80% of TinyPNG's AVIF
+(median and total), smaller and no worse on 52 of the 54, and at its automatic target 79% / 76%,
+0.7 points better on the median, in 9 s on the median image.
 
 ## Setup
 
@@ -363,7 +368,77 @@ NEON code natively, one thread, 10 images at a time.)
   files are 21–24% smaller than TinyPNG's AVIF and as good on the median; at TinyPNG's quality,
   image by image, 19% smaller.
 
-## What it would take
+## Round 9: in the product
+
+2026-11-02. AVIF output on the command line: `pngdeer IN -o OUT.avif` (or `--format avif`), from a
+PNG or a JPEG photo, by round 8's rules (src/avif.rs; libaom in vendor/libaom). The browser build
+doesn't have it yet.
+
+- **libaom vendored** as libwebp and mozjpeg are: 3.15.2 with pngdeer.patch, the encoder only, its
+  CMake's config and dispatch headers checked in (plain C, and NEON for 64-bit ARM), built by
+  build.rs without threads or fused multiply-add, its math functions and qsort sent to vendor/clib.
+  Its frame data is byte for byte that of aomenc built as plain C by libaom's own CMake: 38 encodes
+  from the plain C build and 52 from the NEON one (6 images, speeds 4 to 8, 8- and 10-bit; the 12
+  MP photo at speeds 6 and 8, where unpatched NEON differs, among them).
+- **No decoder.** libaom's own copy of the frame, with its loop filters applied, is what every AV1
+  decoder outputs, so pngdeer scores that: libavif skips applying the last filter
+  (AV1E_SET_SKIP_POSTPROC_FILTERING), which leaves the bitstream as it is, so pngdeer doesn't. It is
+  converted to RGB as Chrome converts it (libyuv's fixed-point BT.601, 10-bit chroma cut to 8 bits
+  first). Against Chrome 156's own decode (chrome.mjs) of 6 files, 8- and 10-bit, opaque and
+  translucent: every one of 5.8 million opaque pixels identical, every alpha value identical, and
+  the reports' scores Chrome's to 0.001 on opaque images. Translucent pixels differ only by Chrome's
+  canvas, which stores them premultiplied (0.01–0.06 points, the reports' lower).
+- **The file.** pngdeer writes its own container: the boxes HEIF, MIAF and AVIF require (with av1C
+  from each item's sequence header, colr nclx, the ICC profile's colr prof if any, and alpha as an
+  auxiliary item). Without avifenc's item names and optional brand, and without the temporal
+  delimiters AVIF leaves out, it takes 266 bytes for an opaque image and 416 with alpha, against
+  avifenc's 275 and 430.
+- **avifenc tiles automatically.** The product's first files differed from round 8's by up to
+  ±19% image by image (one web photo 19% bigger at the same quality, two screenshots 14–17%
+  smaller), though only 0.1% in total. avifenc 1.4.2 splits an image into as many tiles of at least
+  512 × 512 as fit, up to 8, by default (as if for 8 threads, whatever `-j` says), and tune=iq's
+  choices change with the tiling, not just at the tile boundaries: on that photo 8 tiles made a 16%
+  smaller file at the same quantizer. Tiled the same way, pngdeer reproduces round 8 (its files
+  100.0% of round 8's on the median image, 100.6% in total, the rest one quality step either side,
+  as Chrome's scoring and a target of 62.3 rather than 62.1 or 62.5 move the line); but untiled, at
+  the same target and the same median score, they are 0.5% smaller in total, and 3.6% on the PNGs.
+  pngdeer doesn't tile.
+- **Against TinyPNG's AVIF**, both scored as Chrome shows them (TinyPNG's files decoded by Chrome
+  and scored by pngdeer: product.py `tiny`; median −0.1 points from round 8's avifdec scores):
+  - At each image's TinyPNG score as the target, the leaderboards' comparison: 79.7% of TinyPNG's
+    bytes on the median image, 80.5% in total, every target reached, smaller and no worse on 52 of
+    the 54 (round 8: 81.3% / 80.9%, 52). The other two are a camera original (104.6%) and an
+    illustration (100.8%). Web photos 78.7%, camera originals 87.3%, PNGs 79.1%, icons 89.9%
+    (median).
+  - At the automatic target (photos 62.3, PNGs their PNG target less 9): 79.3% / 75.9%, smaller on
+    48, and 0.7 points better on the median (web photos +4.0, camera originals −0.7, PNGs +0.1);
+    round 8's was 79.3% / 75.8%.
+- **Time**, the whole compression at the automatic target, one image at a time, with NEON on a
+  14-core Mac (the same 54 files as the plain C build, byte for byte): 8.8 s on the median image;
+  web photos 8.3 s, camera originals 18.4 s (up to 95 s, for a photo whose speed-4 file beat the
+  target by more than a step and was searched downward: 19 encodes), PNGs 5.9 s (up to 22 s). Plain
+  C took about three times as long. Nearly all of it is speed 4, one thread per encode: libaom is
+  built without threads, for the same bytes, so pngdeer encodes a few qualities at once instead.
+- **A floor for PNGs.** Where a palette does badly, PNG output's target is low: 30 on a smooth
+  gradient, which would make a poor AVIF, though TinyPNG's, at its one quantizer, isn't. A PNG's
+  target is at least a photo's (62.3); round 8's PNG targets were all above it.
+- **The same bytes everywhere**: tests/avif.rs pins three whole compressions (a small icon and a
+  small photo-like image, both with transparency, searched over the four small settings; a 0.54 MP
+  photo-like one, searched at speed 8 and finished at speed 4), and macOS arm64 (clang, NEON), Linux
+  arm64 (GCC 12, NEON) and Linux x86-64 (GCC 12, plain C) reproduce them; the timing run above wrote
+  the plain C build's 54 files with NEON.
+- **Still to do**: the browser (wasm32-unknown-unknown has no C library for libaom's stdio and
+  `setjmp`, which vendor/clib would stand in for; round 7's SIMDe build of the NEON code; 1.1 MB
+  more to load, only for AVIF); x86's SIMD on the command line (SSE2 to AVX2, chosen at run time,
+  checked in round 7); a way out where AVIF loses to pngdeer's WebP, icons above all (round 3); and
+  two cheap wins round 8 didn't try: monochrome AV1 for gray images, and colors under fully
+  transparent pixels, which cost bits for nothing.
+
+## What it would take (after round 8)
+
+Round 9 did the scoring, the automatic target and the search, on the command line; not the way out
+to WebP, nor the browser.
+
 
 Either encoder would also need:
 
@@ -413,6 +488,10 @@ python3 experiments/avif/auto.py refs PHOTOS bench/images TINYAVIF TINYPNGS refs
 python3 experiments/avif/auto.py fit refs.csv
 [FINAL=step|margin] python3 experiments/avif/auto.py run PHOTOS bench/images TINYAVIF TINYPNGS refs.csv auto-TARGET.csv at-tinypng|tinypng|pngdeer
 python3 experiments/avif/auto.py summary auto-TARGET.csv
+python3 experiments/avif/product.py tiny PHOTOS bench/images TINYAVIF TINYPNGS tiny.csv
+python3 experiments/avif/product.py run PHOTOS bench/images auto-tinypng-margin.csv product.csv
+python3 experiments/avif/product.py run PHOTOS bench/images auto-tinypng-margin.csv at-tinypng.csv tiny.csv
+python3 experiments/avif/product.py summary product.csv
 node experiments/avif/chrome.mjs FILE.avif...
 experiments/avif/libaom/hashes.sh INPUTS AOMENC                       # once per build; diff the output
 ```

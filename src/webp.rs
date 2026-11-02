@@ -469,11 +469,11 @@ fn riff_chunks(webp: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
 
 /// The ICC profile a WebP version of this PNG needs to show the same colors: None for one in sRGB.
 fn icc_profile(png: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-    if chunks(png.get(8..).unwrap_or_default()).take_while(|(kind, _)| kind != b"IDAT").any(|(kind, _)| &kind == b"acTL") {
+    if codec::chunks(png.get(8..).unwrap_or_default()).take_while(|(kind, _)| kind != b"IDAT").any(|(kind, _)| &kind == b"acTL") {
         return Err("animated PNGs can't be written as WebP yet".into());
     }
     let color = codec::color_chunks(png);
-    let kinds: Vec<[u8; 4]> = chunks(&color).map(|(kind, _)| kind).collect();
+    let kinds: Vec<[u8; 4]> = codec::chunks(&color).map(|(kind, _)| kind).collect();
     if kinds.is_empty() {
         return Ok(None);
     }
@@ -481,7 +481,7 @@ fn icc_profile(png: &[u8]) -> Result<Option<Vec<u8>>, Error> {
     if kinds.contains(b"cICP") {
         return Err("this PNG's color space is set by cICP, which WebP can't carry; keep it as PNG".into());
     }
-    let Some((_, iccp)) = chunks(&color).find(|(kind, _)| kind == b"iCCP") else {
+    let Some((_, iccp)) = codec::chunks(&color).find(|(kind, _)| kind == b"iCCP") else {
         let names: Vec<String> = kinds.iter().map(|k| String::from_utf8_lossy(k).into_owned()).collect();
         return Err(format!("this PNG's color space is set by {} without an ICC profile, which WebP can't carry; keep it as PNG", names.join(" and ")).into());
     };
@@ -490,17 +490,6 @@ fn icc_profile(png: &[u8]) -> Result<Option<Vec<u8>>, Error> {
     let compressed = iccp.get(name + 2..).ok_or("bad iCCP chunk")?;
     let icc = miniz_oxide::inflate::decompress_to_vec_zlib(compressed).map_err(|_| "bad iCCP chunk")?;
     Ok(Some(icc))
-}
-
-/// The chunks of PNG chunk data (from after the signature, or `color_chunks`'s): type and contents.
-fn chunks(mut bytes: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
-    std::iter::from_fn(move || {
-        let len = u32::from_be_bytes(bytes.get(..4)?.try_into().unwrap()) as usize;
-        let kind: [u8; 4] = bytes.get(4..8)?.try_into().unwrap();
-        let data = bytes.get(8..8 + len)?;
-        bytes = bytes.get(12 + len..).unwrap_or_default();
-        Some((kind, data))
-    })
 }
 
 /// A WebP file with an ICC profile: the extended format's VP8X header (flagging the profile, and

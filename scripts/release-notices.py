@@ -26,7 +26,9 @@ def license_files(package: dict) -> list[Path]:
     directory = Path(package["manifest_path"]).parent
     files = {p for p in directory.iterdir() if p.is_file() and is_license(p)}
     if not files or package["name"].endswith("-sys"):
-        files.update(p for p in directory.glob("*/*") if p.is_file() and is_license(p))
+        # vendored C keeps its own third-party code's licenses deeper (libaom/third_party/*/LICENSE)
+        pattern = "**/*" if directory.is_relative_to(ROOT / "vendor") else "*/*"
+        files.update(p for p in directory.glob(pattern) if p.is_file() and is_license(p))
     if package.get("license_file"):
         files.add(directory / package["license_file"])
     return sorted(files)

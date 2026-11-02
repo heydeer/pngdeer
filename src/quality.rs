@@ -20,6 +20,9 @@ pub(crate) struct Found<T> {
     pub best: Option<T>,
     /// The best score short of it.
     pub closest: Option<T>,
+    /// Every file tried, `known` ones too: quality and score (AVIF output's final search aims by them).
+    #[cfg_attr(not(feature = "avif"), allow(dead_code))]
+    pub scores: Vec<(u32, f64)>,
     pub tries: usize,
     pub rounds: usize,
 }
@@ -54,10 +57,11 @@ pub(crate) fn search<T: Tried, E>(
         }
         (tries, rounds) = (tries + qualities.len(), rounds + 1);
     }
+    let scores = tried.values().map(|t| (t.quality(), t.score())).collect();
     let hi = tried.values().filter(|t| t.score() >= target).map(|t| t.quality()).min();
     let best = hi.and_then(|q| tried.remove(&q));
     let closest = tried.into_values().filter(|t| t.score() < target).max_by(|a, b| a.score().total_cmp(&b.score()).then(b.quality().cmp(&a.quality())));
-    Ok(Found { best, closest, tries, rounds })
+    Ok(Found { best, closest, scores, tries, rounds })
 }
 
 /// A round's qualities, strictly between `lo` (falls short) and `hi` (reaches the target), each

@@ -1,4 +1,4 @@
-//! The C library functions pngdeer's vendored C code (vendor/libwebp, vendor/mozjpeg) calls, where
+//! The C library functions pngdeer's vendored C code (vendor/libwebp, vendor/mozjpeg, vendor/libaom) calls, where
 //! they would differ between targets or wasm32 has none: the inexact math functions and qsort on
 //! every target, and the allocator on wasm32 (the rest of what wasm32 needs is libc.c). The crates
 //! that use it link it with `use pngdeer_clib as _;`.
@@ -41,6 +41,31 @@ extern "C" fn pngdeer_logf(x: f32) -> f32 {
 #[no_mangle]
 extern "C" fn pngdeer_expf(x: f32) -> f32 {
     libm::expf(x)
+}
+
+#[no_mangle]
+extern "C" fn pngdeer_exp2(x: f64) -> f64 {
+    libm::exp2(x)
+}
+
+#[no_mangle]
+extern "C" fn pngdeer_log1p(x: f64) -> f64 {
+    libm::log1p(x)
+}
+
+#[no_mangle]
+extern "C" fn pngdeer_tanh(x: f64) -> f64 {
+    libm::tanh(x)
+}
+
+#[no_mangle]
+extern "C" fn pngdeer_cos(x: f64) -> f64 {
+    libm::cos(x)
+}
+
+#[no_mangle]
+extern "C" fn pngdeer_log1pf(x: f32) -> f32 {
+    libm::log1pf(x)
 }
 
 /// qsort as a stable sort: equal elements keep their order, whatever the platform.

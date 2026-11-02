@@ -1,0 +1,19 @@
+[package]
+name = "pngdeer-libaom"
+version = "3.15.2"
+edition = "2021"
+# libaom is BSD-2-Clause with the Alliance for Open Media's patent license (libaom/LICENSE,
+# libaom/PATENTS); the Rust, glue and config code here is pngdeer's, MIT.
+license = "BSD-2-Clause AND BSD-3-Clause AND MIT"
+description = "libaom 3.15.2's AV1 encoder for pngdeer: still images encoded with the same bytes on every target"
+publish = false
+
+[lib]
+name = "aom"
+
+[dependencies]
+# the C library functions libaom calls (math, qsort, and on wasm32 the allocator), the same everywhere
+pngdeer-clib = { path = "../clib" }
+
+[build-dependencies]
+cc = "1"

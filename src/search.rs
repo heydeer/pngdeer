@@ -307,11 +307,50 @@ pub fn run_animation(pixels: &[RGBA], w: usize, h: usize, frames: usize, timing:
     run_frames(pixels, w, h, Some((frames, timing)), options)
 }
 
-fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Timing)>, options: &Settings) -> Result<(Vec<u8>, Report), BoxError> {
-    // Wu's palettes (wN) model opaque colors only
+/// The target `run` aims at without Settings::target (see the module docs), without the search
+/// itself: AVIF output's automatic target starts from it.
+pub fn auto_target(pixels: &[RGBA], w: usize, h: usize, options: &Settings) -> Result<f64, BoxError> {
+    let variants = searched_variants(pixels, options);
+    let mut full = Search::new(pixels, w, h, None, options);
+    let k = preview_factor(w, h, options.preview_pixels);
+    if k == 1 {
+        return full_auto_target(&mut full, &variants);
+    }
+    let (small, sw, sh) = downscale(pixels, w, h, k, fits_palette(pixels));
+    previewed_auto_target(&mut full, &mut Search::new(&small, sw, sh, None, options), &variants)
+}
+
+/// Auto mode's target, searching at full size.
+fn full_auto_target(search: &mut Search, variants: &[Variant]) -> Result<f64, BoxError> {
+    let plain = search.plain_score()?;
+    Ok(reference(plain, search.top(variants)?.0).min(AUTO_CAP))
+}
+
+/// Auto mode's target, searching on a preview: one full-size scoring, the plain palette's; the
+/// search's own best at 256 colors (which matters only when far above it) is estimated by their
+/// distance on the preview. Unless the plain palette copies the image: then that best is the
+/// reference, so it is scored instead.
+fn previewed_auto_target(full: &mut Search, preview: &mut Search, variants: &[Variant]) -> Result<f64, BoxError> {
+    let plain = full.plain_score()?;
+    let (preview_top, variant) = preview.top(variants)?;
+    let top = if plain < EXACT { plain + preview_top - preview.plain_score()? } else { full.evaluate(HIGH, variant)? };
+    Ok(reference(plain, top).min(AUTO_CAP))
+}
+
+/// Settings::variants, less Wu's palettes (wN) on an image with transparency: they model opaque
+/// colors only.
+fn searched_variants(pixels: &[RGBA], options: &Settings) -> Vec<Variant> {
     let opaque = pixels.iter().all(|p| p.a == 255);
     let variants: Vec<Variant> = options.variants.iter().copied().filter(|v| opaque || v.source != Source::Wu).collect();
-    let variants = if variants.is_empty() { options.variants.clone() } else { variants };
+    if variants.is_empty() {
+        options.variants.clone()
+    } else {
+        variants
+    }
+}
+
+fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Timing)>, options: &Settings) -> Result<(Vec<u8>, Report), BoxError> {
+    let variants = searched_variants(pixels, options);
     let (k, picked) = match animation {
         None => (preview_factor(w, h, options.preview_pixels), None),
         Some((frames, _)) => animation_preview(w, h, frames, options.preview_pixels),
@@ -320,10 +359,7 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
         let mut search = Search::new(pixels, w, h, animation, options);
         let target = match options.target {
             Some(target) => target,
-            None => {
-                let plain = search.plain_score()?;
-                reference(plain, search.top(&variants)?.0).min(AUTO_CAP)
-            }
+            None => full_auto_target(&mut search, &variants)?,
         };
         let ((colors, variant), miss) = search.best(target, &variants)?;
         let png = search.encoded((colors, variant)).to_vec();
@@ -375,15 +411,7 @@ fn run_frames(pixels: &[RGBA], w: usize, h: usize, animation: Option<(usize, &Ti
     let mut preview = Search::new(&small, sw, sh, picked.as_ref().map(|f| f.len()).zip(preview_timing.as_ref()), options);
     let target = match options.target {
         Some(target) => target,
-        // One full-size scoring, the plain palette's; the search's own best at 256 colors (which
-        // matters only when far above it) is estimated by their distance on the preview. Unless the
-        // plain palette copies the image: then that best is the reference, so it is scored instead.
-        None => {
-            let plain = full.plain_score()?;
-            let (preview_top, variant) = preview.top(&variants)?;
-            let top = if plain < EXACT { plain + preview_top - preview.plain_score()? } else { full.evaluate(HIGH, variant)? };
-            reference(plain, top).min(AUTO_CAP)
-        }
+        None => previewed_auto_target(&mut full, &mut preview, &variants)?,
     };
     // frames at full size hide nothing
     let margin = if k > 1 { PREVIEW_MARGIN } else { 0.0 };

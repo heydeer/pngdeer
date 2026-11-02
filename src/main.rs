@@ -1,6 +1,6 @@
 //! pngdeer on the command line, writing the same file as the browser build (web/):
 //!
-//!   pngdeer IN.png -o OUT.png [--format png|webp] [--target auto|T] [--preview-pixels N] [--variants SPEC]
+//!   pngdeer IN.png -o OUT.png [--format png|webp|avif] [--target auto|T] [--preview-pixels N] [--variants SPEC]
 //!
 //! Writes the smallest palette PNG that keeps IN's quality as SSIMULACRA2 measures it: a score
 //! chosen per image (auto, the default; see search.rs), or at least T. Prints a JSON report: the
@@ -18,6 +18,10 @@
 //!   WebP and the lossiest WebP that keeps the target. Automatic quality there is TinyPNG's WebP's:
 //!   the PNG's where the palette wins, else lossy quality 70's score (see webp.rs). Its report names
 //!   the winner, its quality and score, both candidates' sizes, and has the PNG's report.
+//! --format avif (also chosen by an OUT ending in .avif), for a PNG or a JPEG: the smallest AVIF, from
+//!   libaom, that keeps the target as Chrome shows it. Automatic quality there is about TinyPNG's
+//!   AVIF's: a JPEG photo's 62.3, a PNG's PNG target less 9 but at least 62.3 (see avif.rs). Its
+//!   report gives the setting, quality, score and searches.
 //! --webp-method N, --webp-sharp-yuv 0|1, --webp-alpha-filter N, --webp-autofilter 0|1,
 //!   --webp-large-alpha-effort N: the lossy candidates' settings;
 //!   --webp-lossless-level N: also a slower lossless level where lossless may win;
@@ -40,8 +44,8 @@ use std::{env, fs, process, sync::OnceLock, time::Instant};
 
 use pngdeer::{codec, search};
 
-const USAGE: &str = "usage: pngdeer IN.png -o OUT.png [--format png|webp] [--target auto|T] [--preview-pixels N] [--variants SPEC]
-       pngdeer IN.jpg -o OUT.jpg|OUT.webp [--target auto|T]
+const USAGE: &str = "usage: pngdeer IN.png -o OUT.png [--format png|webp|avif] [--target auto|T] [--preview-pixels N] [--variants SPEC]
+       pngdeer IN.jpg -o OUT.jpg|OUT.webp|OUT.avif [--target auto|T]
        pngdeer IN.png --score OTHER
        pngdeer IN.png -o OUT.png --upscale K";
 
@@ -109,22 +113,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         fs::write(&output, codec::encode_rgba(&big, w * k, h * k))?;
         return Ok(());
     }
+    let format = format.unwrap_or_else(|| match output.to_lowercase().rsplit_once('.') {
+        Some((_, "webp")) => "webp".into(),
+        Some((_, "avif")) => "avif".into(),
+        _ => "".into(),
+    });
     if is_jpeg(&input) {
-        return match format.as_deref() {
-            Some("webp") => write_webp(&input, &output, &settings),
-            None if output.to_lowercase().ends_with(".webp") => write_webp(&input, &output, &settings),
-            Some("jpeg") | None => write_jpeg(&input, &output, &settings),
-            Some(other) => Err(format!("a JPEG compresses to jpeg or webp, not {other}").into()),
+        return match format.as_str() {
+            "webp" => write_webp(&input, &output, &settings),
+            "avif" => write_avif(&input, &output, &settings),
+            "jpeg" | "" => write_jpeg(&input, &output, &settings),
+            other => Err(format!("a JPEG compresses to jpeg, webp or avif, not {other}").into()),
         };
     }
-    let webp = match format.as_deref() {
-        Some("webp") => true,
-        Some("png") => false,
-        Some(other) => return Err(format!("unknown --format: {other} (png or webp; jpeg for a JPEG)").into()),
-        None => output.to_lowercase().ends_with(".webp"),
-    };
-    if webp {
-        return write_webp(&input, &output, &settings);
+    match format.as_str() {
+        "webp" => return write_webp(&input, &output, &settings),
+        "avif" => return write_avif(&input, &output, &settings),
+        "png" | "" => {}
+        other => return Err(format!("unknown --format: {other} (png, webp or avif; jpeg for a JPEG)").into()),
     }
     let result = pngdeer::compress(&input, &settings)?;
     fs::write(&output, &result.png)?;
@@ -143,6 +149,19 @@ fn write_webp(input: &[u8], output: &str, settings: &pngdeer::Settings) -> Resul
 #[cfg(not(feature = "webp"))]
 fn write_webp(_: &[u8], _: &str, _: &pngdeer::Settings) -> Result<(), Box<dyn std::error::Error>> {
     Err("this pngdeer was built without the webp feature".into())
+}
+
+#[cfg(feature = "avif")]
+fn write_avif(input: &[u8], output: &str, settings: &pngdeer::Settings) -> Result<(), Box<dyn std::error::Error>> {
+    let result = pngdeer::compress_avif(input, settings)?;
+    fs::write(output, &result.avif)?;
+    println!("{}", result.json());
+    Ok(())
+}
+
+#[cfg(not(feature = "avif"))]
+fn write_avif(_: &[u8], _: &str, _: &pngdeer::Settings) -> Result<(), Box<dyn std::error::Error>> {
+    Err("this pngdeer was built without the avif feature".into())
 }
 
 #[cfg(feature = "jpeg")]

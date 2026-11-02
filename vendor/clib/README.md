@@ -1,13 +1,15 @@
 # The C library functions of pngdeer's vendored C code
 
-`vendor/libwebp` and `vendor/mozjpeg` are C, and call the C library. Some of its functions differ
-between targets, and wasm32 has no C library at all, so the command line and the browser build would
-write different files. This crate gives both libraries the same functions on every target.
+`vendor/libwebp`, `vendor/mozjpeg` and `vendor/libaom` are C, and call the C library. Some of its
+functions differ between targets, and wasm32 has no C library at all, so the command line and the
+browser build would write different files. This crate gives the libraries the same functions on
+every target.
 
-- `include/pngdeer_clib.h`: included ahead of every file of both libraries (their build.rs). It sends
-  the inexact math functions (log, log2, log10, exp, pow, logf, expf) to Rust's `libm` crate, which
-  gives the same bits on every target, and qsort to a stable sort (`src/lib.rs`): system math
-  libraries differ in the last bits, and qsort implementations order equal elements differently.
+- `include/pngdeer_clib.h`: included ahead of every file of the libraries (their build.rs). It sends
+  the inexact math functions (log, log2, log10, exp, pow, logf, expf, and libaom's exp2, log1p,
+  log1pf, tanh and cos) to Rust's `libm` crate, which gives the same bits on every target, and
+  qsort to a stable sort (`src/lib.rs`): system math libraries differ in the last bits, and qsort
+  implementations order equal elements differently.
   sqrt, floor, ceil, fabs and round are exact operations and stay as they are.
 - `libc/` (wasm32 only): the few headers the libraries include, declarations only, with the exact
   math functions as wasm instructions.

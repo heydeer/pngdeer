@@ -786,6 +786,7 @@ dependencies = [
  "miniz_oxide 0.9.1",
  "oxipng",
  "png",
+ "pngdeer-libaom",
  "pngdeer-libwebp",
  "pngdeer-mozjpeg",
  "rayon",
@@ -800,6 +801,14 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "libm",
+]
+
+[[package]]
+name = "pngdeer-libaom"
+version = "3.15.2"
+dependencies = [
+ "cc",
+ "pngdeer-clib",
 ]
 
 [[package]]

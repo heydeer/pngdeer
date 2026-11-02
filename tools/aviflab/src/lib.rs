@@ -7,11 +7,7 @@ use rgb::RGBA8;
 
 /// An AVIF file of the pixels at quality 1–100 and speed 1 (slowest) to 10.
 pub fn encode(pixels: &[RGBA8], width: usize, height: usize, quality: f32, speed: u8) -> Vec<u8> {
-    let encoder = ravif::Encoder::new()
-        .with_quality(quality)
-        .with_speed(speed)
-        .with_bit_depth(ravif::BitDepth::Ten)
-        .with_num_threads(Some(1));
+    let encoder = ravif::Encoder::new().with_quality(quality).with_speed(speed).with_bit_depth(ravif::BitDepth::Ten).with_num_threads(Some(1));
     let out = if pixels.iter().all(|p| p.a == 255) {
         let rgb: Vec<_> = pixels.iter().map(|p| p.rgb()).collect();
         encoder.encode_rgb(ravif::Img::new(&rgb[..], width, height))

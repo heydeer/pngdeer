@@ -112,6 +112,18 @@ pub fn encode_rgba(pixels: &[RGBA], w: usize, h: usize) -> Vec<u8> {
     png
 }
 
+/// The chunks of PNG chunk data (from after the signature, or `color_chunks`'s): type and contents.
+#[cfg(any(feature = "webp", feature = "avif"))]
+pub(crate) fn chunks(mut bytes: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
+    std::iter::from_fn(move || {
+        let len = u32::from_be_bytes(bytes.get(..4)?.try_into().unwrap()) as usize;
+        let kind: [u8; 4] = bytes.get(4..8)?.try_into().unwrap();
+        let data = bytes.get(8..8 + len)?;
+        bytes = bytes.get(12 + len..).unwrap_or_default();
+        Some((kind, data))
+    })
+}
+
 /// The chunks that say which color space the pixel values are in (the same ones bench.py strips).
 const COLOR_CHUNKS: [[u8; 4]; 7] = [*b"cICP", *b"iCCP", *b"sRGB", *b"gAMA", *b"cHRM", *b"mDCV", *b"cLLI"];
 

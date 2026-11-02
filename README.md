@@ -15,6 +15,7 @@ pngdeer input.png -o output.png
 - **Same bytes everywhere**: the command line (macOS and Linux) and the browser (WebAssembly, on every core) run the same Rust code and write identical files.
 - **Big images too**: up to 40 megapixels in the browser, more on the command line.
 - **JPEG photos too**: re-encoded with mozjpeg at the lowest quality that keeps the target, 13% smaller in total than TinyPNG's at its quality ([details](#jpeg)).
+- **AVIF too**: from PNGs and JPEG photos, 19% smaller in total than TinyPNG's AVIF at its quality; on the command line for now ([details](#avif)).
 - **Animated PNGs stay animated**: every frame on one palette and at the target quality, timing kept; 28% of the original size on 12 animated emoji, about even to 16% smaller than TinyPNG ([notes](experiments/apng/FINDINGS.md)).
 - **Free and open source**: MIT.
 
@@ -81,6 +82,20 @@ pngdeer also takes JPEG photos (`pngdeer photo.jpg -o smaller.jpg`, or drop them
 - **WebP from a JPEG** (`pngdeer photo.jpg -o photo.webp`, or the switch in the browser): turned upright, at the same automatic quality. At TinyPNG's WebP quality it needs 95.3% / 91.3% of TinyPNG's WebP size; cwebp, given its best of 13 settings per photo, about the same. At equal quality it is no smaller than pngdeer's own JPEG (99% on the median photo), so it is there for sites that want WebP.
 - The [JPEG notes](experiments/jpeg/FINDINGS.md) have the details. TinyPNG ran through its API in October 2026.
 
+### AVIF
+
+pngdeer also writes AVIF (an output name ending in `.avif`; on the command line for now), from PNGs and JPEG photos: libaom's lowest quality that keeps the target as Chrome shows the file. On 54 images, 30 of the photos above and 24 PNGs of every kind, against TinyPNG's AVIF (median image / in total):
+
+| Compressor | Size at TinyPNG's quality | Smaller and no worse |
+|---|---:|---:|
+| **pngdeer** | **79.7% / 80.5%** | **52 of 54** |
+| TinyPNG (the yardstick) | 100% | |
+
+- TinyPNG writes every AVIF at one fixed quantizer, so how good its files look follows the image (47 to 89 on SSIMULACRA2 here). pngdeer's automatic quality aims at TinyPNG's on the median: its files are 79% of TinyPNG's size on the median image (76% in total) and 0.7 points better, though better or worse than TinyPNG's image by image.
+- Scored as browsers show the files: pngdeer's scores match Chrome's own decoding pixel for pixel, and TinyPNG's files were decoded by Chrome too.
+- Small images are tried at four settings and the smallest file kept; large ones are searched at a fast speed, then encoded once or twice more slowly. libaom is built so that macOS and Linux, ARM and x86, write identical files.
+- The [AVIF notes](experiments/avif/FINDINGS.md) have the details. TinyPNG ran through its API in October 2026.
+
 ## How it works
 
 - **Searches the palette**: palette sizes from 2 to 256 colors, each tried a few ways (with and without Floyd–Steinberg dithering, with neighbour smoothing, with a second palette builder), and the smallest file that reaches the target wins.
@@ -97,6 +112,7 @@ pngdeer input.png -o output.png --target 85  # a fixed SSIMULACRA2 quality
 pngdeer input.png -o output.webp             # WebP, automatic quality
 pngdeer photo.jpg -o photo.min.jpg           # JPEG, automatic quality
 pngdeer photo.jpg -o photo.webp              # a JPEG as WebP
+pngdeer input.png -o output.avif             # AVIF, from a PNG or a JPEG
 pngdeer --help
 ```
 
@@ -113,4 +129,4 @@ python3 web/serve.py   # http://localhost:8770
 
 ## License
 
-[MIT](LICENSE). Dependencies keep their own licenses ([web/THIRD_PARTY_LICENSES.txt](web/THIRD_PARTY_LICENSES.txt)), as do the test and sample images (the `SOURCES.md` next to them). JPEG output is encoded with [mozjpeg](vendor/mozjpeg): this software is based in part on the work of the Independent JPEG Group.
+[MIT](LICENSE). Dependencies keep their own licenses ([web/THIRD_PARTY_LICENSES.txt](web/THIRD_PARTY_LICENSES.txt)), as do the test and sample images (the `SOURCES.md` next to them). JPEG output is encoded with [mozjpeg](vendor/mozjpeg): this software is based in part on the work of the Independent JPEG Group. AVIF output is encoded with [libaom](vendor/libaom).
