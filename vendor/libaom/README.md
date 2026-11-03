@@ -22,8 +22,9 @@ scores that (experiments/avif/FINDINGS.md, rounds 5 to 9).
   -DCONFIG_EXCLUDE_SIMD_MISMATCH=1 -DENABLE_NEON_DOTPROD=0 -DENABLE_NEON_I8MM=0 -DENABLE_SVE=0
   -DENABLE_SVE2=0`, both with `-DCONFIG_AV1_DECODER=0 -DCONFIG_MULTITHREAD=0
   -DCONFIG_RUNTIME_CPU_DETECT=0 -DCONFIG_WEBM_IO=0`, the dispatch from pngdeer.patch's
-  `*_rtcd_defs.pl`. Then set by hand for every target: `HAVE_PTHREAD_H`, `HAVE_UNISTD_H` and
-  `CONFIG_OS_SUPPORT` (only the encoder's timers, which change nothing) to 0. `wasm/config` is
+  `*_rtcd_defs.pl`. Then set by hand for every target: `CONFIG_MULTITHREAD` to 1, and
+  `HAVE_PTHREAD_H` (only `aom_once`'s lock), `HAVE_UNISTD_H` and `CONFIG_OS_SUPPORT` (only the
+  encoder's timers, which change nothing) to 0. `wasm/config` is
   arm64's with ARM's CRC32 off and every NEON function back in C but the 171 that round 7 of
   experiments/avif/FINDINGS.md found 10-bit encodes spending time in (its `simd.json`);
   `wasm/hot.txt` lists the 87 files that took at least 0.1% of an encode there (its `files.json`).
@@ -34,8 +35,10 @@ scores that (experiments/avif/FINDINGS.md, rounds 5 to 9).
   or an alpha plane) the way libavif's `codec_aom.c` does, and hands back the frame as decoded;
   `glue/aom_config.c` stands in for CMake's.
 - `src/lib.rs`: the Rust API (`encode`, `Options`), which checks what libaom would refuse, and sets
-  up libaom's tables once (`av1_initialize_enc`, which libaom runs through an unlocked `aom_once` in
-  a build without threads) before encoders can run on several threads.
+  up libaom's tables once (`av1_initialize_enc`, which libaom runs through `aom_once`, unlocked
+  without `HAVE_PTHREAD_H`) before encoders can run on several threads.
+- `src/workers.rs`: libaom's worker interface (`aom_util/aom_thread.h`) on rayon's threads, in place
+  of libaom's own (see 4 below).
 
 The C library functions libaom calls are `vendor/clib`'s, shared with `vendor/libwebp` and
 `vendor/mozjpeg`.
@@ -61,8 +64,17 @@ The same bytes on every target:
 3. **One libm and one qsort.** `vendor/clib/include/pngdeer_clib.h`, included ahead of every file,
    sends the inexact math functions (libaom calls `exp`, `exp2`, `log`, `log1p`, `log1pf`, `log2`,
    `log10`, `pow`, `expf`, `tanh` and `cos`) to Rust's `libm` crate, and `qsort` to a stable sort.
-4. **No threads.** `CONFIG_MULTITHREAD=0`; pngdeer encodes several files at once instead, each on
-   one thread.
+4. **Threads, but never one.** libaom's encoder with one thread and with several write different
+   files, but with any number from 2 the same one: it hands its rows out to its workers as they ask
+   for them (row multithreading), and what one worker learns doesn't carry to the next row. So
+   every encoder has at least 2 workers (as many as rayon has threads), and `src/workers.rs` runs
+   them as jobs on rayon's threads, which whichever thread is free takes, or the encoder's own when
+   it waits for one nobody has started: encoders running at once never wait on each other for a
+   thread, and the browser, which has no threads of its own to give libaom, runs them on rayon's
+   Web Workers. Without rayon (the browser's single-threaded build), the workers run one after
+   another, one doing all the rows, and the file is the same. On wasm32, vendor/clib's `pthread.h`
+   gives libaom its locks: futexes on wasm's atomic wait and notify, or nothing where there is one
+   thread.
 5. **wasm32 has no C library.** `vendor/clib`'s headers and functions stand in for one: libaom's
    stdio (its messages, statistics and option files, never used here), and `setjmp`, which returns
    0, with `longjmp` aborting (libaom jumps only on an error, which pngdeer's checks leave to running

@@ -16,6 +16,7 @@ typedef struct {
   int speed;      // libaom's cpu-used, 0-9
   int tune;       // an aom_tune_metric, or -1 for libaom's default
   int screen;     // libaom's screen content tools (tune-content=screen)
+  int threads;    // workers, 2 or more (src/workers.rs)
   // tile rows and columns, log2
   int tile_rows_log2;
   int tile_cols_log2;
@@ -26,8 +27,8 @@ typedef struct {
 } PngdeerAomOptions;
 
 // libaom sets up its function tables and lookup tables on its first encoder, through aom_once,
-// which in a build without threads has no lock: src/lib.rs calls this once, before encoders can
-// run on several threads.
+// which without HAVE_PTHREAD_H has no lock: src/lib.rs calls this once, before encoders can run on
+// several threads.
 void pngdeer_aom_init(void) { av1_initialize_enc(ALLINTRA, AOM_Q); }
 
 static int append(uint8_t** out, size_t* size, size_t* capacity, const void* data, size_t n) {
@@ -73,6 +74,7 @@ int pngdeer_aom_encode(const uint16_t* const* planes, int count, int width, int 
   cfg.monochrome = alpha;
   cfg.rc_min_quantizer = 0;
   cfg.rc_max_quantizer = 63;
+  cfg.g_threads = options->threads;
   if (aom_codec_enc_init(&encoder, iface, &cfg, depth > 8 ? AOM_CODEC_USE_HIGHBITDEPTH : 0) !=
       AOM_CODEC_OK) {
     snprintf(message, message_size, "%s", aom_codec_error(&encoder));
@@ -81,6 +83,7 @@ int pngdeer_aom_encode(const uint16_t* const* planes, int count, int width, int 
   aom_codec_control(&encoder, AOME_SET_CQ_LEVEL, options->quantizer);
   if (options->quantizer == 0) aom_codec_control(&encoder, AV1E_SET_LOSSLESS, 1);
   aom_codec_control(&encoder, AOME_SET_CPUUSED, options->speed);
+  aom_codec_control(&encoder, AV1E_SET_ROW_MT, 1);
   aom_codec_control(&encoder, AV1E_SET_COLOR_RANGE, AOM_CR_FULL_RANGE);
   if (!alpha) {
     aom_codec_control(&encoder, AV1E_SET_COLOR_PRIMARIES, options->color_primaries);

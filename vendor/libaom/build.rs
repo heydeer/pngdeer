@@ -1,7 +1,8 @@
-//! Builds the vendored libaom's AV1 encoder to write the same bytes on every target: no threads, no
-//! fused multiply-add, and the inexact math functions and qsort routed to one implementation in Rust
-//! (vendor/clib: pngdeer_clib.h, included ahead of every file). 64-bit ARM gets libaom's NEON code
-//! (arm64/config, as libaom's CMake generates it for AOM_TARGET_CPU=arm64 with
+//! Builds the vendored libaom's AV1 encoder to write the same bytes on every target: no fused
+//! multiply-add, the inexact math functions and qsort routed to one implementation in Rust
+//! (vendor/clib: pngdeer_clib.h, included ahead of every file), and its multithreaded encoder, whose
+//! workers src/workers.rs runs (on wasm32, vendor/clib's pthread.h locks for them). 64-bit ARM gets
+//! libaom's NEON code (arm64/config, as libaom's CMake generates it for AOM_TARGET_CPU=arm64 with
 //! CONFIG_EXCLUDE_SIMD_MISMATCH and pngdeer.patch, which leave out the SIMD whose results differ from
 //! the C's); wasm32 the NEON functions that matter, on its SIMD128 through SIMDe (wasm/config, simde/);
 //! every other target plain C (generic/config, for AOM_TARGET_CPU=generic). The command line and the

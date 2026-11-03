@@ -317,9 +317,10 @@ fn command_line_picks_avif_from_the_name() {
 
 /// The bytes on every platform: libaom is built without fused multiply-add and with its math
 /// functions routed to one implementation, its SIMD (NEON on 64-bit ARM) left out wherever it
-/// differs from its C, and the YUV conversions are pngdeer's own, so the command line and the
-/// browser build write the same files. A change that alters pngdeer's output on purpose updates
-/// these.
+/// differs from its C, its multithreaded encoder run with any number of threads (the same bytes
+/// from 2 up, and one after another), and the YUV conversions are pngdeer's own, so the command line
+/// and both browser builds write the same files. A change that alters pngdeer's output on purpose
+/// updates these.
 #[test]
 fn same_bytes_everywhere() {
     let digest = |input: &[u8], target| {
@@ -331,5 +332,24 @@ fn same_bytes_everywhere() {
         digest(&png(&photo(96, 80, true), 96, 80), None),
         digest(&png(&photo(900, 600, false), 900, 600), Some(70.0)),
     ];
-    assert_eq!(digests, [(896, 1914741381), (2354, 1179717447), (1376, 1429802458)]);
+    assert_eq!(digests, [(896, 1914741381), (2354, 1179717447), (1463, 2267430545)]);
+}
+
+/// libaom's multithreaded encoder writes the same file with any number of threads to run its
+/// workers, one included (when they run one after another, as in the browser's single-threaded
+/// build): same_bytes_everywhere's photo, whose encodes have several workers.
+#[cfg(feature = "parallel")]
+#[test]
+fn any_number_of_threads_writes_the_same_file() {
+    let input = png(&photo(900, 600, false), 900, 600);
+    let digests: Vec<(usize, u32)> = [1, 2, 5]
+        .iter()
+        .map(|&threads| {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let out = pool.install(|| compress_avif(&input, &Settings { target: Some(70.0), ..Default::default() }).map_err(|e| e.to_string()));
+            let avif = out.unwrap().avif;
+            (avif.len(), crc32fast::hash(&avif))
+        })
+        .collect();
+    assert_eq!(digests, [(1463, 2267430545); 3]);
 }

@@ -1182,11 +1182,11 @@ const RESEARCH = {
     column: "Saved vs TinyPNG", unit: "%", lo: -5, ticks: [-5, 0, 5, 10, 15, 20], narrow: [0, 10, 20],
     method: [
       ["Generous to the others", "avifenc gets its best of 33 settings per image, picked after the fact: qualities 30–90 at its default speed, 4:4:4 at 8 and 10 bits and 4:2:0. rav1e its best of 11 qualities. pngdeer's files are its own runs, at five targets around TinyPNG's quality and its automatic one."],
-      ["Out of the box", "pngdeer's automatic quality makes files 21% smaller than TinyPNG's on the median image, and 0.7 points better. avifenc's default quality makes them 32% bigger, 9 points better."],
+      ["Out of the box", "pngdeer's automatic quality makes files 20% smaller than TinyPNG's on the median image, and 0.5 points better. avifenc's default quality makes them 32% bigger, 9 points better."],
       ["As browsers show them", "pngdeer scores each file as Chrome decodes it, pixel for pixel, and TinyPNG's and the others' files were decoded by Chrome too. TinyPNG ran through its API in October 2026."]],
     sets: {
-      all: { label: "Photos and PNGs · 54", n: 54, smaller: 23, points: 5.9, reach: 54, tools: [
-        ["pngdeer", 22.7, 54], ["avifenc", 10.7, 54], ["rav1e", -2.0, 54]] },
+      all: { label: "Photos and PNGs · 54", n: 54, smaller: 23, points: 5.7, reach: 54, tools: [
+        ["pngdeer", 22.6, 54], ["avifenc", 10.7, 54], ["rav1e", -2.0, 54]] },
     },
   },
 };

@@ -14,6 +14,11 @@ name = "aom"
 [dependencies]
 # the C library functions libaom calls (math, qsort, and on wasm32 the allocator), the same everywhere
 pngdeer-clib = { path = "../clib" }
+rayon = { version = "1", optional = true }
+
+[features]
+# libaom's workers on rayon's threads (src/workers.rs); without, one after another. The same bytes.
+parallel = ["dep:rayon"]
 
 [build-dependencies]
 cc = "1"

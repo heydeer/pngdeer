@@ -11,9 +11,9 @@ include = ["/src", "/tests", "/README.md", "/LICENSE"]
 
 [features]
 default = ["parallel", "oxipng", "webp", "jpeg", "avif"]
-# Threads for palettes, remapping, scoring and oxipng (web/'s threaded build turns it on too).
+# Threads for palettes, remapping, scoring, oxipng and libaom (web/'s threaded build turns it on too).
 # Results don't depend on the number of threads.
-parallel = ["dep:rayon", "fast-ssim2/rayon", "oxipng?/parallel"]
+parallel = ["dep:rayon", "fast-ssim2/rayon", "oxipng?/parallel", "aom?/parallel"]
 # compress() recompresses its final file with oxipng -o 2.
 oxipng = ["dep:oxipng"]
 # WebP output (pngdeer::compress_webp), with the vendored libwebp (vendor/libwebp).

@@ -6,6 +6,8 @@ use std::ffi::{c_char, c_int, c_void, CStr};
 use std::fmt;
 use std::sync::Once;
 
+mod workers;
+
 // the C library functions libaom calls, the same on every target
 use pngdeer_clib as _;
 
@@ -76,6 +78,7 @@ struct COptions {
     speed: c_int,
     tune: c_int,
     screen: c_int,
+    threads: c_int,
     tile_rows_log2: c_int,
     tile_cols_log2: c_int,
     color_primaries: c_int,
@@ -105,7 +108,8 @@ extern "C" {
 /// Encodes one still image: `planes` holds 3 planes (Y, U and V, 4:4:4) or 1 (an alpha plane,
 /// encoded as monochrome) of `height` rows of `width` samples of `depth` bits (8 or 10), as
 /// libavif's encoder encodes a still AVIF's color or alpha (all-intra, one frame, full range).
-/// Checks everything libaom would refuse. Any number can run at once, each on one thread.
+/// Checks everything libaom would refuse. Any number can run at once, each on rayon's threads with
+/// the parallel feature (src/workers.rs).
 pub fn encode(planes: &[&[u16]], width: usize, height: usize, depth: u8, options: &Options) -> Result<Encoded, Error> {
     if !(1..=MAX_SIDE).contains(&width) || !(1..=MAX_SIDE).contains(&height) {
         return Err(Error(format!("AV1 can't hold {width} × {height} pixels: at most {MAX_SIDE} a side")));
@@ -126,13 +130,17 @@ pub fn encode(planes: &[&[u16]], width: usize, height: usize, depth: u8, options
         return Err(Error(format!("no such AV1 quantizer or speed: {options:?}")));
     }
     static INIT: Once = Once::new();
-    // SAFETY: sets up libaom's tables, once, before any encoder runs
-    INIT.call_once(|| unsafe { pngdeer_aom_init() });
+    // SAFETY: sets up libaom's workers and tables, once, before any encoder runs
+    INIT.call_once(|| unsafe {
+        workers::install();
+        pngdeer_aom_init();
+    });
     let c = COptions {
         quantizer: options.quantizer as c_int,
         speed: options.speed as c_int,
         tune: options.tune.map_or(-1, |t| t as c_int),
         screen: options.screen as c_int,
+        threads: workers::count() as c_int,
         tile_rows_log2: options.tiles_log2.0 as c_int,
         tile_cols_log2: options.tiles_log2.1 as c_int,
         color_primaries: options.cicp.color_primaries as c_int,

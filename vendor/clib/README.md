@@ -12,8 +12,12 @@ every target.
   implementations order equal elements differently.
   sqrt, floor, ceil, fabs and round are exact operations and stay as they are.
 - `libc/` (wasm32 only): the few headers the libraries include, declarations only, with the exact
-  math functions as wasm instructions, and libaom's `setjmp.h`: setjmp returns 0 and longjmp aborts
-  (libaom jumps only on an error, which pngdeer's checks leave to running out of memory).
+  math functions as wasm instructions; libaom's `setjmp.h`: setjmp returns 0 and longjmp aborts
+  (libaom jumps only on an error, which pngdeer's checks leave to running out of memory); and its
+  `pthread.h`: mutexes and condition variables as futexes on wasm's atomic wait and notify in a
+  build with atomics, doing nothing in one without (one thread, where libaom's workers run one
+  after another and nothing waits), and a `pthread_create` that fails, as libaom's workers run on
+  rayon's threads (`vendor/libaom/src/workers.rs`).
 - `libc.c` (wasm32 only): abort, exit, getenv, abs, llabs, strcmp, strncmp, strncpy, strtol,
   strtoul, rand, longjmp, `errno`, and the stdio functions the libraries reference but never reach
   in pngdeer's use (printing errors, reading and writing files) as stubs. memcpy and friends come

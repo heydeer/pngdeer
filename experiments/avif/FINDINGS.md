@@ -488,6 +488,66 @@ doesn't have it yet.
   TinyPNG's, without one, are scored against (pngdeer's files from the JPEGs, which keep a profile
   that isn't sRGB's, lost 9–14 points that way on three camera originals).
 
+## Round 11: libaom's threads
+
+2026-11-03.
+
+- **Two threads or twenty, the same file.** libaom writes different files with one thread and with
+  several, but with row multithreading, any number from 2 writes one file: aomenc 3.15.2
+  (Homebrew, NEON) on an icon, a screenshot, an 8-bit web photo and a 12 MP photo, at speeds 2, 4
+  and 6, with and without screen content tools, wrote the same file at 2, 5 and 12 threads (24 of
+  24). libaom hands rows out to its workers as they ask for them, and what a worker learns in one
+  row doesn't carry to the next, so which worker does which row doesn't matter. The 12 MP photo at
+  speed 4 and a fixed quantizer: 0.26% bigger than with one thread, in 2.7 s at 14 threads against
+  17.4 s at one.
+- **Built in.** libaom is now built with `CONFIG_MULTITHREAD`, and every encoder gets at least 2
+  workers, as many as rayon has threads. libaom's own pthreads are replaced by its worker
+  interface on rayon (vendor/libaom/src/workers.rs): a worker is a job that whichever of rayon's
+  threads is free takes, or the encoder's own thread when it waits for one that nobody has
+  started. Encoders running at once (a small image's settings, a large one's qualities) never wait
+  for each other's threads, and in the browser, which has no threads to give libaom, the jobs run
+  on rayon's Web Workers. Without rayon (the browser's single-threaded build) they run one after
+  another, the first doing all the rows. On wasm32, vendor/clib's `pthread.h` gives libaom futex
+  locks on wasm's atomic wait and notify, or none in the single-threaded build. A worker costs about
+  0.5 MB on a 21.8 MP photo (2.62 GB at 1, 2.64 GB at 32).
+- **The same bytes.** libaom's own pthreads at 2, 3, 4, 8 and 16 threads, rayon's pools of 1, 2, 4
+  and 14 threads, and the jobs one after another wrote the same files on five images (an icon, a
+  photo, a cut-out, a screenshot, an illustration); the threaded command line and the one without
+  threads, the same files on all 109 of the benchmark's images, and on 18 of them at targets 100,
+  95 and 40 (54 files more). Images too small for a second worker don't change (row
+  multithreading gets at most half the superblock columns: a 72 × 72 icon has one); every
+  256 × 256 render does.
+  tests/avif.rs's 900 × 600 photo is re-pinned (1,463 bytes, was 1,376), and a new test writes it
+  with rayon pools of 1, 2 and 5 threads; macOS arm64, Linux arm64 (GCC 12, NEON) and Linux x86-64
+  (GCC 12, plain C) pass. In the browser, the single-threaded build wrote the command line's files
+  (web/check-avif.mjs now pins a 256 × 256 icon too, for several workers run one after another), and
+  the threaded build, in headless Chrome, the command line's files byte for byte (six images, the
+  five above and a 256 × 256 render).
+- **Files.** At a fixed quantizer the multithreaded encoder's files are a little bigger (0.26% on
+  the 12 MP photo), and the search's answers move both ways: the 21.8 MP photo's quality 41 came out
+  at 284 KB, 0.03 points short of the target, so the search took 42 (328 KB), where one thread's 41
+  had reached it at 294 KB. On the leaderboard's 54 images (leaderboard.py, pngdeer's files made
+  again): at TinyPNG's score, 81.1% / 81.2% of TinyPNG's size (was 79.6% / 80.4%), smaller and no
+  worse on 53 (52); at the automatic target 79.8% / 76.1% (79.3% / 75.9%), 0.5 points better on the
+  median (0.7); pooled, 22.6% / 21.9% saved at TinyPNG's quality (22.7% / 22.1%; photos 22.5%, PNGs
+  22.7%) and 5.7 points at its size (5.9), which the README and the site now give.
+- **Time**, the whole compression, on a 14-core Mac (the command line, libaom with one thread
+  against threads; the threaded browser build in headless Chrome, round 10 against now):
+
+  | Image | Command line | Browser |
+  |---|---|---|
+  | 0.38 MP icon (openmoji) | 4.4 s → 3.7 s | 13 s → 11 s |
+  | 0.39 MP photo (kodim01) | 8.4 s → 4.3 s | 17 s → 10 s |
+  | 1.1 MP web photo | 10.6 s → 3.9 s | 28 s → 11 s |
+  | 5.2 MP screenshot (pngdeer@2x, 24 encodes) | 21.8 s → 14.0 s | 57 s → 40 s |
+  | 21.8 MP photo | 37.9 s → 19.2 s | 91 s → 45 s |
+  | 24 MP photo | 65.5 s → 17.1 s | about 3 minutes → 49 s |
+
+  Small images gain least: their settings already ran at once, and only the scout's rounds and the
+  last stragglers waited on one thread. The 24 MP browser time before is round 10's, before the
+  second speed-4 encode waited to be needed. The single-threaded browser build takes about as long
+  as before (a 256 × 256 icon: 9.7 s of CPU against 9.5 s).
+
 ## What it would take (after round 8)
 
 Round 9 did the scoring, the automatic target and the search, on the command line; not the way out
