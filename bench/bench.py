@@ -457,7 +457,7 @@ class Scorer:
 def run_pngdeer(cfg: Config, src: Path, dst: Path, target: int | None, webp: bool = False) -> tuple[str, float]:
     """pngdeer's whole pipeline (search, oxipng -o 2, lossless fallbacks), as the CLI and the browser
     run it, or its WebP output. Returns what it picked and the time it took."""
-    cmd = [cfg.pngdeer, str(src), "-o", str(dst), "--target", "auto" if target is None else str(target), *cfg.pd_args]
+    cmd = [cfg.pngdeer, str(src), "-o", str(dst), "--json", "--target", "auto" if target is None else str(target), *cfg.pd_args]
     if webp:
         cmd += ["--format", "webp"]
     if cfg.pd_variants:

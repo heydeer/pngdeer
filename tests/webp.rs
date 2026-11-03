@@ -157,7 +157,7 @@ fn command_line_picks_webp_from_the_name() {
     std::fs::create_dir_all(&dir).unwrap();
     let (input, output) = (dir.join("in.png"), dir.join("out.webp"));
     std::fs::write(&input, png(&photo(false))).unwrap();
-    let run = std::process::Command::new(env!("CARGO_BIN_EXE_pngdeer")).arg(&input).arg("-o").arg(&output).args(["--target", "70"]).output().unwrap();
+    let run = std::process::Command::new(env!("CARGO_BIN_EXE_pngdeer")).arg(&input).arg("-o").arg(&output).args(["--target", "70", "--json"]).output().unwrap();
     assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
     let report = String::from_utf8(run.stdout).unwrap();
     assert!(report.starts_with(r#"{"format": "webp", "target": 70.00"#), "{report}");

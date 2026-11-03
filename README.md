@@ -8,7 +8,7 @@
 
 ```bash
 brew install heydeer/tap/pngdeer
-pngdeer input.png -o output.png
+pngdeer logo.png photo.jpg    # writes logo.min.png and photo.min.jpg
 ```
 
 - **Picks the quality for you**: about what TinyPNG would give the image, never above 90 on SSIMULACRA2's scale, which is indistinguishable at 1:1.
@@ -110,14 +110,16 @@ The [research notes](experiments/palette-feedback/FINDINGS.md) follow every step
 ## Command line
 
 ```bash
-pngdeer input.png -o output.png              # automatic quality
-pngdeer input.png -o output.png --target 85  # a fixed SSIMULACRA2 quality
-pngdeer input.png -o output.webp             # WebP, automatic quality
-pngdeer photo.jpg -o photo.min.jpg           # JPEG, automatic quality
-pngdeer photo.jpg -o photo.webp              # a JPEG as WebP
-pngdeer input.png -o output.avif             # AVIF, from a PNG or a JPEG
+pngdeer photo.jpg                 # photo.min.jpg, at a quality picked for it
+pngdeer *.png -d dist             # dist/NAME.png for each
+pngdeer logo.png --format webp    # logo.min.webp (also avif; from a PNG or a JPEG)
+pngdeer in.png -o out.avif        # out.avif, the format as its name says
+pngdeer shot.png --target 90      # a fixed SSIMULACRA2 score: 90 looks lossless, 70 is high quality
+pngdeer - < in.png > out.png      # stdin to stdout
 pngdeer --help
 ```
+
+Like `cp`, it says nothing unless something goes wrong: `-v` says what each file came to, and `--json` prints each file's report, a JSON line per file. A file that fails doesn't stop the others (pngdeer then exits 1). A name it makes up never replaces an input; `-o` can.
 
 From source: `cargo build --release`, and the binary is `target/release/pngdeer`.
 

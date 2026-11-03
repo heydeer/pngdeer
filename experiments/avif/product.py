@@ -80,7 +80,7 @@ def run(photos: Path, pngs: Path, auto: Path, out: Path, tiny_scores: Path | Non
             with tempfile.TemporaryDirectory() as t:
                 src = source(path, photo, Path(t))
                 start = time.perf_counter()
-                report = subprocess.run([PNGDEER, src, "-o", Path(t) / "out.avif", *target], check=True, capture_output=True, text=True).stdout
+                report = subprocess.run([PNGDEER, src, "-o", Path(t) / "out.avif", "--json", *target], check=True, capture_output=True, text=True).stdout
                 ms = round(1000 * (time.perf_counter() - start))
             r, p = json.loads(report.strip().splitlines()[-1]), dict(proto[name])
             if at:

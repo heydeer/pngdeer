@@ -91,7 +91,7 @@ def base_target(path: Path, photo: bool, mp: float, t: Path) -> float:
     """pngdeer's automatic target as it stands: src/jpeg.rs's auto_target for a photo, PNG output's for a PNG."""
     if photo:
         return round(min(72.3 - 3.2 * math.log(mp), 90.0), 3)
-    report = subprocess.run([PNGDEER, path, "-o", t / "pngdeer.png"], check=True, capture_output=True, text=True).stdout
+    report = subprocess.run([PNGDEER, path, "-o", t / "pngdeer.png", "--json"], check=True, capture_output=True, text=True).stdout
     return json.loads(report.strip().splitlines()[-1])["target"]
 
 

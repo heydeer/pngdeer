@@ -45,7 +45,7 @@ def score(photo: Path, file: Path) -> float:
 
 
 def pngdeer(photo: Path, out: Path, target: float | None) -> dict:
-    args = [PNGDEER, photo, "-o", out] + (["--target", f"{target:.3f}"] if target is not None else [])
+    args = [PNGDEER, photo, "-o", out, "--json"] + (["--target", f"{target:.3f}"] if target is not None else [])
     return json.loads(subprocess.run(args, capture_output=True, text=True, check=True).stdout.strip().splitlines()[-1])
 
 
