@@ -113,7 +113,7 @@ impl Command {
                         return Err(format!("{} is already {owner}'s output; give one of them another name or folder", path.display()).into());
                     }
                     match files.inputs.get(&id) {
-                        Some(owner) if *checked && *owner == input.name() => {
+                        Some(_) if *checked && file_id(&input.path).as_ref() == Some(&id) => {
                             return Err(format!("{} would replace the input; name another with -o", path.display()).into());
                         }
                         Some(_) if *checked => return Err(format!("{} is another input, which this would replace", path.display()).into()),

@@ -239,6 +239,10 @@ fn an_output_never_replaces_another_input() {
     assert_eq!(run.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&run.stderr).contains("assets/icons/b.png is another input"));
     assert_eq!(fs::read(dir.join("assets/icons/b.png")).unwrap(), sample());
+    // one file given twice, spelt two ways, is each time its own input
+    fs::write(dir.join("a.png"), sample()).unwrap();
+    let said = String::from_utf8(slimdeer(&dir, &["-d", ".", "a.png", "./a.png"]).stderr).unwrap();
+    assert_eq!(said.matches("would replace the input").count(), 2, "{said}");
     fs::remove_dir_all(&dir).unwrap();
 }
 
