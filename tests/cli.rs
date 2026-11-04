@@ -132,3 +132,50 @@ fn a_command_it_cant_run_exits_2() {
     assert!(!dir.join("a.min.png").exists() && !dir.join("x.png").exists());
     fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn recurses_into_folders_with_r() {
+    let dir = folder("recursive", &[]);
+    for name in ["assets/a.png", "assets/icons/b.PNG", "assets/icons/small/c.png", "assets/.cache/d.png"] {
+        fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
+        fs::write(dir.join(name), sample()).unwrap();
+    }
+    fs::write(dir.join("assets/icons/notes.txt"), "not an image").unwrap();
+    // a folder needs -r
+    let run = slimdeer(&dir, &["assets"]);
+    assert_eq!(run.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&run.stderr).contains("assets: a folder; -r"));
+    // beside each image, hidden folders and other files left alone, in the folders' order
+    let run = slimdeer(&dir, &["-r", "assets", "--json"]);
+    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
+    let outputs: Vec<String> = String::from_utf8(run.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| line.split(r#""output": ""#).nth(1).unwrap().split('"').next().unwrap().to_string())
+        .collect();
+    assert_eq!(outputs, ["assets/a.min.png", "assets/icons/b.min.PNG", "assets/icons/small/c.min.png"]);
+    assert!(!dir.join("assets/.cache/d.min.png").exists());
+    // again: the outputs aren't compressed a second time
+    let run = slimdeer(&dir, &["-r", "assets", "--json"]);
+    assert_eq!(String::from_utf8(run.stdout).unwrap().lines().count(), 3);
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn copies_the_tree_into_d_and_keeps_its_images() {
+    let dir = folder("tree", &[]);
+    for name in ["assets/a.png", "assets/icons/b.png"] {
+        fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
+        fs::write(dir.join(name), sample()).unwrap();
+    }
+    let run = slimdeer(&dir, &["-r", "assets", "-d", "dist"]);
+    assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
+    assert!(is_png(&dir.join("dist/a.png")) && is_png(&dir.join("dist/icons/b.png")));
+    // -d can't be the folder -r reads, whose images it would replace
+    let run = slimdeer(&dir, &["-r", "assets", "-d", "assets"]);
+    assert_eq!(run.status.code(), Some(2));
+    assert_eq!(fs::read(dir.join("assets/icons/b.png")).unwrap(), sample());
+    // nor does -r go with -o's one output
+    assert_eq!(slimdeer(&dir, &["-r", "assets", "-o", "x.png"]).status.code(), Some(2));
+    fs::remove_dir_all(&dir).unwrap();
+}

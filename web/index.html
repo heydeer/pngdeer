@@ -588,12 +588,14 @@
         <div class="kicker"><i></i>Command line</div>
         <h2 class="big">Same bytes in your build.</h2>
         <p>The browser and the command line run the same Rust code, down to the math library, so a file compressed here and in your pipeline comes out identical.</p>
-        <p>Pass <span class="mono">--target 85</span> for a fixed quality instead of the automatic one.</p>
+        <p>Give it a folder with <span class="mono">-r</span> to compress every image in it, and <span class="mono">--target 85</span> for a fixed quality instead of the automatic one.</p>
       </div>
-      <div class="term reveal" role="img" aria-label="Terminal: installing slimdeer with Homebrew and compressing a photo"><div class="dots"><i></i><i></i><i></i></div><span class="p">$</span> <span class="k">brew install heydeer/tap/slimdeer</span>
-<span class="p">$</span> <span class="k">slimdeer kodim01.png -o kodim01.min.png</span>
-<span class="c">{"target": 86.26, "colors": 212, "variant": "d50",
- "score": 87.271, …, "outcome": "hit", "bytes": 254373}</span></div>
+      <div class="term reveal" role="img" aria-label="Terminal: installing slimdeer with Homebrew and compressing a folder of images"><div class="dots"><i></i><i></i><i></i></div><span class="p">$</span> <span class="k">brew install heydeer/tap/slimdeer</span>
+<span class="p">$</span> <span class="k">slimdeer -r assets -d dist -v</span>
+<span class="c">assets/icons/trophy.png → dist/icons/trophy.png:
+  31.9 KB → 9.3 KB (−71%), 0.3 s
+assets/kodim01.png → dist/kodim01.png:
+  736.5 KB → 254.4 KB (−65%), 0.9 s</span></div>
     </div>
   </section>
 

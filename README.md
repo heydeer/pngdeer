@@ -112,6 +112,7 @@ The [research notes](experiments/palette-feedback/FINDINGS.md) follow every step
 ```bash
 slimdeer photo.jpg                 # photo.min.jpg, at a quality picked for it
 slimdeer *.png -d dist             # dist/NAME.png for each
+slimdeer -r assets -d dist         # every PNG and JPEG under assets, into the same folders under dist
 slimdeer logo.png --format webp    # logo.min.webp (also avif; from a PNG or a JPEG)
 slimdeer in.png -o out.avif        # out.avif, the format as its name says
 slimdeer shot.png --target 90      # a fixed SSIMULACRA2 score: 90 looks lossless, 70 is high quality
@@ -119,7 +120,7 @@ slimdeer - < in.png > out.png      # stdin to stdout
 slimdeer --help
 ```
 
-Like `cp`, it says nothing unless something goes wrong: `-v` says what each file came to, and `--json` prints each file's report, a JSON line per file. A file that fails doesn't stop the others (slimdeer then exits 1). A name it makes up never replaces an input; `-o` can.
+Like `cp`, it says nothing unless something goes wrong: `-v` says what each file came to, and `--json` prints each file's report, a JSON line per file. A file that fails doesn't stop the others (slimdeer then exits 1). A name it makes up never replaces an input; `-o` can. With `-r`, a folder stands for the PNGs and JPEGs in it and every folder below it, hidden ones and earlier `NAME.min.EXT` outputs left out, so running it again on the same folder doesn't compress them twice.
 
 From source: `cargo build --release`, and the binary is `target/release/slimdeer`.
 
