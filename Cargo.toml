@@ -1,6 +1,6 @@
 [package]
 name = "slimdeer"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 description = "Smaller PNG and JPEG images, or WebP and AVIF, that keep a SSIMULACRA2 quality picked per image. The same code runs on the command line and in the browser (web/)."
