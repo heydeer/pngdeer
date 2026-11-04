@@ -1,7 +1,7 @@
 //! Running a command: each file read, compressed, written and reported.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     io::{self, IsTerminal, Read, Write},
     path::{Path, PathBuf},
@@ -46,10 +46,8 @@ impl Command {
             }
         }
         let (inputs, mut failed) = self.inputs();
-        let mut files = Files {
-            inputs: inputs.iter().filter(|input| !input.is_stdin()).filter_map(|input| Some((file_id(&input.path)?, input.name()))).collect(),
-            outputs: HashMap::new(),
-        };
+        let mut files =
+            Files { inputs: inputs.iter().filter(|input| !input.is_stdin()).filter_map(|input| file_id(&input.path)).collect(), outputs: HashMap::new() };
         for input in &inputs {
             if let Err(e) = self.compress(input, &mut files) {
                 eprintln!("slimdeer: {}: {e}", input.name());
@@ -112,12 +110,11 @@ impl Command {
                     if let Some(owner) = files.outputs.get(&id) {
                         return Err(format!("{} is already {owner}'s output; give one of them another name or folder", path.display()).into());
                     }
-                    match files.inputs.get(&id) {
-                        Some(_) if *checked && file_id(&input.path).as_ref() == Some(&id) => {
+                    if *checked && files.inputs.contains(&id) {
+                        if file_id(&input.path).as_ref() == Some(&id) {
                             return Err(format!("{} would replace the input; name another with -o", path.display()).into());
                         }
-                        Some(_) if *checked => return Err(format!("{} is another input, which this would replace", path.display()).into()),
-                        _ => {}
+                        return Err(format!("{} is another input, which this would replace", path.display()).into());
                     }
                 }
             }
@@ -150,11 +147,11 @@ impl Command {
     }
 }
 
-/// The files a run reads and writes, and whose they are: a name slimdeer makes up mustn't replace an
-/// input, nor any output another input's (x.png from two folders -r reads into one -d, X.png and
+/// The files a run reads, and those it has written and whose they are: a name slimdeer makes up
+/// mustn't replace an input, nor any output another input's (x.png from two folders -r reads into one -d, X.png and
 /// x.png where a volume ignores case, logo.png and logo.jpg as WebP).
 struct Files {
-    inputs: HashMap<FileId, String>,
+    inputs: HashSet<FileId>,
     outputs: HashMap<FileId, String>,
 }
 
