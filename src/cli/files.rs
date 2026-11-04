@@ -54,27 +54,53 @@ impl Destination {
     }
 }
 
-/// The PNG and JPEG files under `root`, by their extension, in order: every folder below it, but
-/// not hidden files or folders, nor slimdeer's own NAME.min.EXT outputs, so that running it on a
-/// folder again doesn't compress those too.
-pub fn images_under(root: &Path) -> io::Result<Vec<PathBuf>> {
-    let mut found = Vec::new();
+/// The PNG and JPEG files under `root`, by their extension, in order, and each folder below it that
+/// couldn't be read, with why. Every folder below is read, but not hidden files or folders, nor
+/// slimdeer's own NAME.min.EXT outputs, so that running it on a folder again doesn't compress those
+/// too; nor `skip` (-d's folder, whose outputs keep the inputs' names, where it is in the tree);
+/// nor linked folders, which can lead out of the tree, or back up it and round again.
+pub fn images_under(root: &Path, skip: Option<&Path>) -> (Vec<PathBuf>, Vec<(PathBuf, io::Error)>) {
+    let (mut found, mut unread) = (Vec::new(), Vec::new());
     let mut folders = vec![root.to_path_buf()];
     while let Some(folder) = folders.pop() {
-        for entry in fs::read_dir(&folder)? {
-            let path = entry?.path();
+        let entries = match fs::read_dir(&folder) {
+            Ok(entries) => entries,
+            Err(e) => {
+                unread.push((folder, e));
+                continue;
+            }
+        };
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(e) => {
+                    unread.push((folder.clone(), e));
+                    continue;
+                }
+            };
+            let path = entry.path();
             if path.file_name().is_some_and(|name| name.to_string_lossy().starts_with('.')) {
                 continue;
             }
-            if path.is_dir() {
-                folders.push(path);
-            } else if is_image(&path) && !is_output(&path) {
-                found.push(path);
+            // the entry's own type: a link to a folder isn't a folder here, nor a file to compress
+            match entry.file_type() {
+                Ok(kind) if kind.is_dir() => {
+                    if !skip.is_some_and(|skip| fs::canonicalize(&path).is_ok_and(|real| real == skip)) {
+                        folders.push(path);
+                    }
+                }
+                Ok(kind) if kind.is_symlink() && path.is_dir() => {}
+                Ok(_) => {
+                    if is_image(&path) && !is_output(&path) {
+                        found.push(path);
+                    }
+                }
+                Err(e) => unread.push((path, e)),
             }
         }
     }
     found.sort();
-    Ok(found)
+    (found, unread)
 }
 
 fn is_image(path: &Path) -> bool {
@@ -103,11 +129,9 @@ pub fn destination(input: &Input, output: Option<&str>, dir: Option<&Path>, form
         _ => format.extension().into(),
     };
     match (dir, &input.root) {
-        // Command::run has checked that -d's folder isn't the one -r reads, so a file from it can't
-        // land on itself, and needn't be checked again one at a time
         (Some(dir), Some(root)) => {
             let folder = path.parent().and_then(|parent| parent.strip_prefix(root).ok()).unwrap_or(Path::new(""));
-            Destination::File(dir.join(folder).join(format!("{stem}.{extension}")), false)
+            Destination::File(dir.join(folder).join(format!("{stem}.{extension}")), true)
         }
         (Some(dir), None) => Destination::File(dir.join(format!("{stem}.{extension}")), true),
         (None, _) => Destination::File(path.with_file_name(format!("{stem}.min.{extension}")), true),

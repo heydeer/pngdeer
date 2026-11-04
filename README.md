@@ -120,7 +120,7 @@ slimdeer - < in.png > out.png      # stdin to stdout
 slimdeer --help
 ```
 
-Like `cp`, it says nothing unless something goes wrong: `-v` says what each file came to, and `--json` prints each file's report, a JSON line per file. A file that fails doesn't stop the others (slimdeer then exits 1). A name it makes up never replaces an input; `-o` can. With `-r`, a folder stands for the PNGs and JPEGs in it and every folder below it, hidden ones and earlier `NAME.min.EXT` outputs left out, so running it again on the same folder doesn't compress them twice.
+Like `cp`, it says nothing unless something goes wrong: `-v` says what each file came to, and `--json` prints each file's report, a JSON line per file. A file that fails doesn't stop the others (slimdeer then exits 1). A name it makes up never replaces an input; `-o` can. With `-r`, a folder stands for the PNGs and JPEGs in it and every folder below it: hidden ones, linked folders, earlier `NAME.min.EXT` outputs and a `-d` folder inside it are left out, so running it again on the same folder doesn't compress them twice. Two inputs that would get the same output name are reported, not written over each other.
 
 From source: `cargo build --release`, and the binary is `target/release/slimdeer`.
 

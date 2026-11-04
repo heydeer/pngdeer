@@ -171,11 +171,59 @@ fn copies_the_tree_into_d_and_keeps_its_images() {
     let run = slimdeer(&dir, &["-r", "assets", "-d", "dist"]);
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
     assert!(is_png(&dir.join("dist/a.png")) && is_png(&dir.join("dist/icons/b.png")));
-    // -d can't be the folder -r reads, whose images it would replace
-    let run = slimdeer(&dir, &["-r", "assets", "-d", "assets"]);
-    assert_eq!(run.status.code(), Some(2));
+    // -d can't be the folder -r reads, whose images it would replace, however it is spelt
+    for same in ["assets", "./assets", "assets/../assets", dir.join("assets").to_str().unwrap()] {
+        let run = slimdeer(&dir, &["-r", "assets", "-d", same]);
+        assert_eq!(run.status.code(), Some(2), "{same}");
+    }
     assert_eq!(fs::read(dir.join("assets/icons/b.png")).unwrap(), sample());
+    // -d inside the tree: its outputs aren't read as inputs on the next run
+    for _ in 0..2 {
+        assert_eq!(slimdeer(&dir, &["-r", "assets", "-d", "assets/min"]).status.code(), Some(0));
+    }
+    assert!(is_png(&dir.join("assets/min/icons/b.png")) && !dir.join("assets/min/min").exists());
     // nor does -r go with -o's one output
     assert_eq!(slimdeer(&dir, &["-r", "assets", "-o", "x.png"]).status.code(), Some(2));
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn two_inputs_with_one_output_name_dont_overwrite_each_other() {
+    let dir = folder("collide", &[]);
+    for name in ["a/x.png", "b/x.png"] {
+        fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
+        fs::write(dir.join(name), sample()).unwrap();
+    }
+    let run = slimdeer(&dir, &["-r", "a", "b", "-d", "dist", "--json"]);
+    assert_eq!(run.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&run.stderr).contains("dist/x.png is already a/x.png's output"));
+    assert_eq!(String::from_utf8(run.stdout).unwrap().lines().count(), 1);
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn folder_links_arent_followed_and_unreadable_folders_dont_stop_the_rest() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let dir = folder("links", &[]);
+    for name in ["tree/a.png", "tree/locked/b.png", "elsewhere/c.png"] {
+        fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
+        fs::write(dir.join(name), sample()).unwrap();
+    }
+    // out of the tree, and back up it
+    symlink("../elsewhere", dir.join("tree/linked")).unwrap();
+    symlink("..", dir.join("tree/up")).unwrap();
+    fs::set_permissions(dir.join("tree/locked"), fs::Permissions::from_mode(0o000)).unwrap();
+    let locked = fs::read_dir(dir.join("tree/locked")).is_err(); // not as root, which reads it anyway
+    let run = slimdeer(&dir, &["-r", "tree", "--json"]);
+    fs::set_permissions(dir.join("tree/locked"), fs::Permissions::from_mode(0o755)).unwrap();
+    let outputs = String::from_utf8(run.stdout).unwrap();
+    assert!(outputs.contains(r#""output": "tree/a.min.png""#), "{outputs}");
+    assert!(!dir.join("elsewhere/c.min.png").exists());
+    if locked {
+        assert_eq!(run.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&run.stderr).contains("tree/locked: permission denied"));
+        assert_eq!(outputs.lines().count(), 1);
+    }
     fs::remove_dir_all(&dir).unwrap();
 }
