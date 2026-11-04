@@ -1,9 +1,9 @@
-//! End-to-end checks of pngdeer::compress_avif on synthetic images. pngdeer has no AV1 decoder, so
+//! End-to-end checks of slimdeer::compress_avif on synthetic images. slimdeer has no AV1 decoder, so
 //! the files are checked as containers here; that they decode to what their reports scored, in dav1d
 //! and in Chrome, is experiments/avif/FINDINGS.md round 9.
 #![cfg(feature = "avif")]
 
-use pngdeer::{codec, compress, compress_avif, Settings, RGBA};
+use slimdeer::{codec, compress, compress_avif, Settings, RGBA};
 
 /// A photo-like test image: smooth gradients, a soft disc and a little noise, optionally with a
 /// translucent disc of its own.
@@ -303,11 +303,12 @@ mod photos {
 
 #[test]
 fn command_line_picks_avif_from_the_name() {
-    let dir = std::env::temp_dir().join(format!("pngdeer-avif-test-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("slimdeer-avif-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let (input, output) = (dir.join("in.png"), dir.join("out.avif"));
     std::fs::write(&input, png(&photo(96, 80, false), 96, 80)).unwrap();
-    let run = std::process::Command::new(env!("CARGO_BIN_EXE_pngdeer")).arg(&input).arg("-o").arg(&output).args(["--target", "70", "--json"]).output().unwrap();
+    let run =
+        std::process::Command::new(env!("CARGO_BIN_EXE_slimdeer")).arg(&input).arg("-o").arg(&output).args(["--target", "70", "--json"]).output().unwrap();
     assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
     let report = String::from_utf8(run.stdout).unwrap();
     assert!(report.starts_with(r#"{"format": "avif", "target": 70.00"#), "{report}");
@@ -318,8 +319,8 @@ fn command_line_picks_avif_from_the_name() {
 /// The bytes on every platform: libaom is built without fused multiply-add and with its math
 /// functions routed to one implementation, its SIMD (NEON on 64-bit ARM) left out wherever it
 /// differs from its C, its multithreaded encoder run with any number of threads (the same bytes
-/// from 2 up, and one after another), and the YUV conversions are pngdeer's own, so the command line
-/// and both browser builds write the same files. A change that alters pngdeer's output on purpose
+/// from 2 up, and one after another), and the YUV conversions are slimdeer's own, so the command line
+/// and both browser builds write the same files. A change that alters slimdeer's output on purpose
 /// updates these.
 #[test]
 fn same_bytes_everywhere() {

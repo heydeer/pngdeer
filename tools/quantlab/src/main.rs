@@ -7,7 +7,7 @@
 use std::{env, fs, process};
 
 use exoquant::{ditherer, optimizer, Remapper, SimpleColorSpace};
-use pngdeer::{codec, RGBA};
+use slimdeer::{codec, RGBA};
 
 type Error = Box<dyn std::error::Error>;
 

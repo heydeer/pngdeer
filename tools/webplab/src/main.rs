@@ -1,20 +1,20 @@
-//! webplab LIST SETTINGS [--fine] > OUT.tsv: libwebp settings for pngdeer's WebP output, compared by
+//! webplab LIST SETTINGS [--fine] > OUT.tsv: libwebp settings for slimdeer's WebP output, compared by
 //! the bytes each needs to reach the same score (experiments/webp).
 //!
 //! LIST is a TSV of images and target scores (path, target). For each image and each setting in
 //! SETTINGS (comma-separated names, see `setting`), the lowest lossy quality whose file scores at
-//! least the target as pngdeer scores (whole steps, searched as pngdeer does; with --fine, then
+//! least the target as slimdeer scores (whole steps, searched as slimdeer does; with --fine, then
 //! quarter steps below it), and near-lossless files (`nearN`, N in NEAR) with their scores.
 //! Prints: image, setting, quality (-1: none reaches the target; near-lossless: N), bytes, score,
-//! files scored. Bytes are the file's as pngdeer ships it, with the alpha plane compressed: that
+//! files scored. Bytes are the file's as slimdeer ships it, with the alpha plane compressed: that
 //! plane is the same at every lossy setting, so it is compressed once per image and added.
 
 use std::{env, fs, process};
 
 use libwebp::{Lossy, Tuning};
-use pngdeer::{codec, search::Scorer, RGBA};
 use rayon::prelude::*;
 use rgb::{ComponentBytes, FromSlice};
+use slimdeer::{codec, search::Scorer, RGBA};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -88,7 +88,7 @@ impl Image {
     }
 }
 
-/// The lowest whole quality reaching `target` (pngdeer's search: from 70, aimed by the scores so
+/// The lowest whole quality reaching `target` (slimdeer's search: from 70, aimed by the scores so
 /// far, halving when that stalls), then with `fine` quarter steps below it: quality, bytes, score
 /// (quality -1: none reaches it; then quality 100's bytes and score), and files scored.
 fn search(image: &Image, setting: (u8, bool, Tuning), target: f64, fine: bool) -> Result<(f32, usize, f64, usize), Error> {

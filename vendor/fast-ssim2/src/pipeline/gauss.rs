@@ -25,7 +25,7 @@
 /// Lane j of each `mul_*` array is the coefficient for the unrolled
 /// recurrence term j steps back (JXL_GAUSS_MAX_LANES = 4).
 #[allow(unused_imports)]
-use super::Fma; // pngdeer patch
+use super::Fma; // slimdeer patch
 pub struct RecursiveGaussian {
     pub radius: i32,
     /// `n2[i]` for i in {0,1,2} (oscillator terms 1,3,5).
@@ -264,7 +264,7 @@ impl RecursiveGaussian {
     }
 
     /// [`Self::fast_gaussian_vertical_1d`] for the columns `start..end` only: each column's
-    /// recursion is its own, so column ranges can run on separate threads (pngdeer patch).
+    /// recursion is its own, so column ranges can run on separate threads (slimdeer patch).
     pub fn fast_gaussian_vertical_columns(
         &self,
         start: usize,
@@ -274,7 +274,7 @@ impl RecursiveGaussian {
         put: &mut impl FnMut(usize, usize, f32),
     ) {
         let n_rad = self.radius as i64;
-        // pngdeer patch: columns in blocks, walked row by row, instead of one whole column at a
+        // slimdeer patch: columns in blocks, walked row by row, instead of one whole column at a
         // time (a stride-`width` walk per column that thrashes the cache: ~40% of all scoring time
         // in wasm). The arithmetic per column is unchanged, so results are bit-identical.
         const BLOCK: usize = 64;

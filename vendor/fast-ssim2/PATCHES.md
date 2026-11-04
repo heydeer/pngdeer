@@ -1,6 +1,6 @@
-# fast-ssim2 0.9.0, patched for pngdeer's WebAssembly build
+# fast-ssim2 0.9.0, patched for slimdeer's WebAssembly build
 
-Vendored from crates.io (BSD-2-Clause, https://github.com/imazen/fast-ssim2); every pngdeer build uses
+Vendored from crates.io (BSD-2-Clause, https://github.com/imazen/fast-ssim2); every slimdeer build uses
 it (`[patch.crates-io]` in the root `Cargo.toml`). Examples, tests, benches and dev-dependencies
 are left out. The first three changes are in the scalar kernels that the wasm build runs; scores are
 unchanged (checked against the native build to 4 decimals on 5 MP screenshots). The fourth cuts
@@ -32,7 +32,7 @@ bit-identical scores:
      never uses, encoded images of at least 8×8 are no longer copied for padding, and an opaque
      comparison frees its copy of the image once linearized.
 
-   pngdeer's outputs are byte-identical with and without this change, on its 180 benchmark images
+   slimdeer's outputs are byte-identical with and without this change, on its 180 benchmark images
    at automatic and fixed quality, with the lean reference used for every image and for none.
 5. `pipeline/precompute.rs` `scalar_blur`, `gauss.rs` `fast_gaussian_vertical_columns`: the scalar
    kernel's blur (the one the wasm builds run, lean comparisons included) multiplies two planes a
@@ -49,4 +49,4 @@ bit-identical scores:
    byte's `b * (1/255)` is computed as before. In the threaded browser build a 24 MP cut-out's PNG
    search spent 44 s scoring (5.5 s natively), now 12 s, and its PNG output takes 23 s instead of
    56 s. Scores are bit-identical (natively, on 96 image pairs with alpha, the 24 MP one included) and
-   so are pngdeer's files (its tests, the web samples and the cut-out, browser against native).
+   so are slimdeer's files (its tests, the web samples and the cut-out, browser against native).

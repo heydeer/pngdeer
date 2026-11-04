@@ -1,9 +1,9 @@
 //! Builds the vendored libaom's AV1 encoder to write the same bytes on every target: no fused
 //! multiply-add, the inexact math functions and qsort routed to one implementation in Rust
-//! (vendor/clib: pngdeer_clib.h, included ahead of every file), and its multithreaded encoder, whose
+//! (vendor/clib: slimdeer_clib.h, included ahead of every file), and its multithreaded encoder, whose
 //! workers src/workers.rs runs (on wasm32, vendor/clib's pthread.h locks for them). 64-bit ARM gets
 //! libaom's NEON code (arm64/config, as libaom's CMake generates it for AOM_TARGET_CPU=arm64 with
-//! CONFIG_EXCLUDE_SIMD_MISMATCH and pngdeer.patch, which leave out the SIMD whose results differ from
+//! CONFIG_EXCLUDE_SIMD_MISMATCH and slimdeer.patch, which leave out the SIMD whose results differ from
 //! the C's); wasm32 the NEON functions that matter, on its SIMD128 through SIMDe (wasm/config, simde/);
 //! every other target plain C (generic/config, for AOM_TARGET_CPU=generic). The command line and the
 //! browser build then write the same bytes.
@@ -35,25 +35,25 @@ fn main() {
     } else {
         "generic"
     });
-    let clib = PathBuf::from(env::var("DEP_PNGDEER_CLIB_INCLUDE").unwrap());
+    let clib = PathBuf::from(env::var("DEP_SLIMDEER_CLIB_INCLUDE").unwrap());
     let mut build = cc::Build::new();
     build
         .include(&aom)
         .include(&config)
         .define("NDEBUG", None)
-        // pngdeer.patch: leave the functions only inter frames use out of the encoder's tables
-        .define("PNGDEER_STILL", "1")
+        // slimdeer.patch: leave the functions only inter frames use out of the encoder's tables
+        .define("SLIMDEER_STILL", "1")
         // libaom at -O0 (a debug build's) is tens of times slower; the bytes are the same at any level
         .opt_level(3)
         // clang fuses a * b + c where the target has FMA (arm64), and a fused result differs
         .flag("-ffp-contract=off")
         .flag("-include")
-        .flag(clib.join("pngdeer_clib.h").to_str().unwrap())
+        .flag(clib.join("slimdeer_clib.h").to_str().unwrap())
         .warnings(false);
     if wasm {
         // no C library: vendor/clib's headers and functions stand in for one; and SIMDe's arm_neon.h
         // for the compiler's, on SIMD128
-        build.include(env::var("DEP_PNGDEER_CLIB_LIBC").unwrap()).include(root.join("simde")).flag("-ffreestanding").flag("-msimd128");
+        build.include(env::var("DEP_SLIMDEER_CLIB_LIBC").unwrap()).include(root.join("simde")).flag("-ffreestanding").flag("-msimd128");
     }
     // every C file here is one libaom's CMake compiles into its library (with the configuration
     // above), and none is included by another
@@ -70,7 +70,7 @@ fn main() {
         files.extend(neon);
     }
     files.push(root.join("glue/aom_config.c"));
-    files.push(root.join("glue/pngdeer_aom.c"));
+    files.push(root.join("glue/slimdeer_aom.c"));
     files.sort();
     if wasm {
         // to download: the files that took at least 0.1% of an encode (wasm/hot.txt, from round 7's

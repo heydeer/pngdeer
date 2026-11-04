@@ -15,7 +15,7 @@ png = "0.18.1"
 rgb = { version = "0.8.53", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-pngdeer = { path = "../.." }
+slimdeer = { path = "../.." }
 
 [features]
 # rav1e's assembly: the same files, about twice as fast natively

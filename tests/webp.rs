@@ -1,7 +1,7 @@
-//! End-to-end checks of pngdeer::compress_webp on small synthetic images.
+//! End-to-end checks of slimdeer::compress_webp on small synthetic images.
 #![cfg(feature = "webp")]
 
-use pngdeer::{codec, compress_webp, search, webp, Settings, RGBA};
+use slimdeer::{codec, compress_webp, search, webp, Settings, RGBA};
 
 /// A 96×80 test image: smooth gradients with a little noise (where lossy WebP wins), and optionally
 /// a translucent disc.
@@ -82,8 +82,8 @@ fn automatic_quality_follows_tinypngs_webp() {
 }
 
 /// The bytes on every platform: libwebp is built as plain C without fused multiply-add, and its math
-/// functions and qsort are pngdeer's own (vendor/libwebp), so the command line and the browser build
-/// write the same files. A change that alters pngdeer's output on purpose updates these.
+/// functions and qsort are slimdeer's own (vendor/libwebp), so the command line and the browser build
+/// write the same files. A change that alters slimdeer's output on purpose updates these.
 #[test]
 fn same_bytes_everywhere() {
     let digest = |input: &[u8], target| {
@@ -153,18 +153,19 @@ fn refuses_what_webp_cant_show() {
 
 #[test]
 fn command_line_picks_webp_from_the_name() {
-    let dir = std::env::temp_dir().join(format!("pngdeer-webp-test-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("slimdeer-webp-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let (input, output) = (dir.join("in.png"), dir.join("out.webp"));
     std::fs::write(&input, png(&photo(false))).unwrap();
-    let run = std::process::Command::new(env!("CARGO_BIN_EXE_pngdeer")).arg(&input).arg("-o").arg(&output).args(["--target", "70", "--json"]).output().unwrap();
+    let run =
+        std::process::Command::new(env!("CARGO_BIN_EXE_slimdeer")).arg(&input).arg("-o").arg(&output).args(["--target", "70", "--json"]).output().unwrap();
     assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
     let report = String::from_utf8(run.stdout).unwrap();
     assert!(report.starts_with(r#"{"format": "webp", "target": 70.00"#), "{report}");
     let file = std::fs::read(&output).unwrap();
     assert_eq!(&file[8..12], b"WEBP");
     // --score reads it back, and gets the report's score
-    let score = std::process::Command::new(env!("CARGO_BIN_EXE_pngdeer")).arg(&input).arg("--score").arg(&output).output().unwrap();
+    let score = std::process::Command::new(env!("CARGO_BIN_EXE_slimdeer")).arg(&input).arg("--score").arg(&output).output().unwrap();
     let score: f64 = String::from_utf8(score.stdout).unwrap().trim().parse().unwrap();
     let reported: f64 = report.split(r#""score": "#).nth(1).unwrap().split(',').next().unwrap().parse().unwrap();
     assert!(score >= 70.0 && (score - reported).abs() < 1e-3, "{score} vs {reported}");

@@ -1,4 +1,4 @@
-Third-party software compiled into pngdeer's browser builds (web/pkg, web/pkg-mt; web/pkg-avif and
+Third-party software compiled into slimdeer's browser builds (web/pkg, web/pkg-mt; web/pkg-avif and
 web/pkg-avif-mt add libaom), and its licenses.
 Each license text below is followed by the crates it covers.
 
@@ -2911,686 +2911,6 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
-pngdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-Copyright (c) 2016, Alliance for Open Media. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in
-   the documentation and/or other materials provided with the
-   distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-pngdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-Alliance for Open Media Patent License 1.0
-
-1. License Terms.
-
-1.1. Patent License. Subject to the terms and conditions of this License, each
-     Licensor, on behalf of itself and successors in interest and assigns,
-     grants Licensee a non-sublicensable, perpetual, worldwide, non-exclusive,
-     no-charge, royalty-free, irrevocable (except as expressly stated in this
-     License) patent license to its Necessary Claims to make, use, sell, offer
-     for sale, import or distribute any Implementation.
-
-1.2. Conditions.
-
-1.2.1. Availability. As a condition to the grant of rights to Licensee to make,
-       sell, offer for sale, import or distribute an Implementation under
-       Section 1.1, Licensee must make its Necessary Claims available under
-       this License, and must reproduce this License with any Implementation
-       as follows:
-
-       a. For distribution in source code, by including this License in the
-          root directory of the source code with its Implementation.
-
-       b. For distribution in any other form (including binary, object form,
-          and/or hardware description code (e.g., HDL, RTL, Gate Level Netlist,
-          GDSII, etc.)), by including this License in the documentation, legal
-          notices, and/or other written materials provided with the
-          Implementation.
-
-1.2.2. Additional Conditions. This license is directly from Licensor to
-       Licensee.  Licensee acknowledges as a condition of benefiting from it
-       that no rights from Licensor are received from suppliers, distributors,
-       or otherwise in connection with this License.
-
-1.3. Defensive Termination. If any Licensee, its Affiliates, or its agents
-     initiates patent litigation or files, maintains, or voluntarily
-     participates in a lawsuit against another entity or any person asserting
-     that any Implementation infringes Necessary Claims, any patent licenses
-     granted under this License directly to the Licensee are immediately
-     terminated as of the date of the initiation of action unless 1) that suit
-     was in response to a corresponding suit regarding an Implementation first
-     brought against an initiating entity, or 2) that suit was brought to
-     enforce the terms of this License (including intervention in a third-party
-     action by a Licensee).
-
-1.4. Disclaimers. The Reference Implementation and Specification are provided
-     "AS IS" and without warranty. The entire risk as to implementing or
-     otherwise using the Reference Implementation or Specification is assumed
-     by the implementer and user. Licensor expressly disclaims any warranties
-     (express, implied, or otherwise), including implied warranties of
-     merchantability, non-infringement, fitness for a particular purpose, or
-     title, related to the material. IN NO EVENT WILL LICENSOR BE LIABLE TO
-     ANY OTHER PARTY FOR LOST PROFITS OR ANY FORM OF INDIRECT, SPECIAL,
-     INCIDENTAL, OR CONSEQUENTIAL DAMAGES OF ANY CHARACTER FROM ANY CAUSES OF
-     ACTION OF ANY KIND WITH RESPECT TO THIS LICENSE, WHETHER BASED ON BREACH
-     OF CONTRACT, TORT (INCLUDING NEGLIGENCE), OR OTHERWISE, AND WHETHER OR
-     NOT THE OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-2. Definitions.
-
-2.1. Affiliate.  "Affiliate" means an entity that directly or indirectly
-     Controls, is Controlled by, or is under common Control of that party.
-
-2.2. Control. "Control" means direct or indirect control of more than 50% of
-     the voting power to elect directors of that corporation, or for any other
-     entity, the power to direct management of such entity.
-
-2.3. Decoder.  "Decoder" means any decoder that conforms fully with all
-     non-optional portions of the Specification.
-
-2.4. Encoder.  "Encoder" means any encoder that produces a bitstream that can
-     be decoded by a Decoder only to the extent it produces such a bitstream.
-
-2.5. Final Deliverable.  "Final Deliverable" means the final version of a
-     deliverable approved by the Alliance for Open Media as a Final
-     Deliverable.
-
-2.6. Implementation.  "Implementation" means any implementation, including the
-     Reference Implementation, that is an Encoder and/or a Decoder. An
-     Implementation also includes components of an Implementation only to the
-     extent they are used as part of an Implementation.
-
-2.7. License. "License" means this license.
-
-2.8. Licensee. "Licensee" means any person or entity who exercises patent
-     rights granted under this License.
-
-2.9. Licensor.  "Licensor" means (i) any Licensee that makes, sells, offers
-     for sale, imports or distributes any Implementation, or (ii) a person
-     or entity that has a licensing obligation to the Implementation as a
-     result of its membership and/or participation in the Alliance for Open
-     Media working group that developed the Specification.
-
-2.10. Necessary Claims.  "Necessary Claims" means all claims of patents or
-      patent applications, (a) that currently or at any time in the future,
-      are owned or controlled by the Licensor, and (b) (i) would be an
-      Essential Claim as defined by the W3C Policy as of February 5, 2004
-      (https://www.w3.org/Consortium/Patent-Policy-20040205/#def-essential)
-      as if the Specification was a W3C Recommendation; or (ii) are infringed
-      by the Reference Implementation.
-
-2.11. Reference Implementation. "Reference Implementation" means an Encoder
-      and/or Decoder released by the Alliance for Open Media as a Final
-      Deliverable.
-
-2.12. Specification. "Specification" means the specification designated by
-      the Alliance for Open Media as a Final Deliverable for which this
-      License was issued.
-
-==============================================================================
-pngdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-Copyright (c) 2006, 2008 Edward Rosten
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-
-	*Redistributions of source code must retain the above copyright
-	 notice, this list of conditions and the following disclaimer.
-
-	*Redistributions in binary form must reproduce the above copyright
-	 notice, this list of conditions and the following disclaimer in the
-	 documentation and/or other materials provided with the distribution.
-
-	*Neither the name of the University of Cambridge nor the names of
-	 its contributors may be used to endorse or promote products derived
-	 from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-pngdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-The MIT License (MIT)
-Copyright (c) 2016 Peter Goldsborough
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-==============================================================================
-pngdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-Copyright (c) 2017 Evan Nemerson <evan@nemerson.com>
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-==============================================================================
-pngdeer-libwebp 1.6.0 (BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-Copyright (c) 2010, Google Inc. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-  * Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
-
-  * Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in
-    the documentation and/or other materials provided with the
-    distribution.
-
-  * Neither the name of Google nor the names of its contributors may
-    be used to endorse or promote products derived from this software
-    without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-==============================================================================
-pngdeer-libwebp 1.6.0 (BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-Additional IP Rights Grant (Patents)
-------------------------------------
-
-"These implementations" means the copyrightable works that implement the WebM
-codecs distributed by Google as part of the WebM Project.
-
-Google hereby grants to you a perpetual, worldwide, non-exclusive, no-charge,
-royalty-free, irrevocable (except as stated in this section) patent license to
-make, have made, use, offer to sell, sell, import, transfer, and otherwise
-run, modify and propagate the contents of these implementations of WebM, where
-such license applies only to those patent claims, both currently owned by
-Google and acquired in the future, licensable by Google that are necessarily
-infringed by these implementations of WebM. This grant does not include claims
-that would be infringed only as a consequence of further modification of these
-implementations. If you or your agent or exclusive licensee institute or order
-or agree to the institution of patent litigation or any other patent
-enforcement activity against any entity (including a cross-claim or
-counterclaim in a lawsuit) alleging that any of these implementations of WebM
-or any code incorporated within any of these implementations of WebM
-constitute direct or contributory patent infringement, or inducement of
-patent infringement, then any patent rights granted to you under this License
-for these implementations of WebM shall terminate as of the date such
-litigation is filed.
-
-==============================================================================
-pngdeer-mozjpeg 4.1.5 (IJG AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-libjpeg-turbo Licenses
-======================
-
-libjpeg-turbo is covered by three compatible BSD-style open source licenses:
-
-- The IJG (Independent JPEG Group) License, which is listed in
-  [README.ijg](README.ijg)
-
-  This license applies to the libjpeg API library and associated programs
-  (any code inherited from libjpeg, and any modifications to that code.)
-
-- The Modified (3-clause) BSD License, which is listed below
-
-  This license covers the TurboJPEG API library and associated programs, as
-  well as the build system.
-
-- The [zlib License](https://opensource.org/licenses/Zlib)
-
-  This license is a subset of the other two, and it covers the libjpeg-turbo
-  SIMD extensions.
-
-
-Complying with the libjpeg-turbo Licenses
-=========================================
-
-This section provides a roll-up of the libjpeg-turbo licensing terms, to the
-best of our understanding.
-
-1.  If you are distributing a modified version of the libjpeg-turbo source,
-    then:
-
-    1.  You cannot alter or remove any existing copyright or license notices
-        from the source.
-
-        **Origin**
-        - Clause 1 of the IJG License
-        - Clause 1 of the Modified BSD License
-        - Clauses 1 and 3 of the zlib License
-
-    2.  You must add your own copyright notice to the header of each source
-        file you modified, so others can tell that you modified that file (if
-        there is not an existing copyright header in that file, then you can
-        simply add a notice stating that you modified the file.)
-
-        **Origin**
-        - Clause 1 of the IJG License
-        - Clause 2 of the zlib License
-
-    3.  You must include the IJG README file, and you must not alter any of the
-        copyright or license text in that file.
-
-        **Origin**
-        - Clause 1 of the IJG License
-
-2.  If you are distributing only libjpeg-turbo binaries without the source, or
-    if you are distributing an application that statically links with
-    libjpeg-turbo, then:
-
-    1.  Your product documentation must include a message stating:
-
-        This software is based in part on the work of the Independent JPEG
-        Group.
-
-        **Origin**
-        - Clause 2 of the IJG license
-
-    2.  If your binary distribution includes or uses the TurboJPEG API, then
-        your product documentation must include the text of the Modified BSD
-        License (see below.)
-
-        **Origin**
-        - Clause 2 of the Modified BSD License
-
-3.  You cannot use the name of the IJG or The libjpeg-turbo Project or the
-    contributors thereof in advertising, publicity, etc.
-
-    **Origin**
-    - IJG License
-    - Clause 3 of the Modified BSD License
-
-4.  The IJG and The libjpeg-turbo Project do not warrant libjpeg-turbo to be
-    free of defects, nor do we accept any liability for undesirable
-    consequences resulting from your use of the software.
-
-    **Origin**
-    - IJG License
-    - Modified BSD License
-    - zlib License
-
-
-The Modified (3-clause) BSD License
-===================================
-
-Copyright (C)2009-2023 D. R. Commander.  All Rights Reserved.<br>
-Copyright (C)2015 Viktor Szathmáry.  All Rights Reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-- Redistributions of source code must retain the above copyright notice,
-  this list of conditions and the following disclaimer.
-- Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-- Neither the name of the libjpeg-turbo Project nor the names of its
-  contributors may be used to endorse or promote products derived from this
-  software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS",
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
-
-
-Why Three Licenses?
-===================
-
-The zlib License could have been used instead of the Modified (3-clause) BSD
-License, and since the IJG License effectively subsumes the distribution
-conditions of the zlib License, this would have effectively placed
-libjpeg-turbo binary distributions under the IJG License.  However, the IJG
-License specifically refers to the Independent JPEG Group and does not extend
-attribution and endorsement protections to other entities.  Thus, it was
-desirable to choose a license that granted us the same protections for new code
-that were granted to the IJG for code derived from their software.
-
-==============================================================================
-pngdeer-mozjpeg 4.1.5 (IJG AND BSD-3-Clause AND MIT)
-------------------------------------------------------------------------------
-libjpeg-turbo note:  This file has been modified by The libjpeg-turbo Project
-to include only information relevant to libjpeg-turbo, to wordsmith certain
-sections, and to remove impolitic language that existed in the libjpeg v8
-README.  It is included only for reference.  Please see README.md for
-information specific to libjpeg-turbo.
-
-
-The Independent JPEG Group's JPEG software
-==========================================
-
-This distribution contains a release of the Independent JPEG Group's free JPEG
-software.  You are welcome to redistribute this software and to use it for any
-purpose, subject to the conditions under LEGAL ISSUES, below.
-
-This software is the work of Tom Lane, Guido Vollbeding, Philip Gladstone,
-Bill Allombert, Jim Boucher, Lee Crocker, Bob Friesenhahn, Ben Jackson,
-Julian Minguillon, Luis Ortiz, George Phillips, Davide Rossi, Ge' Weijers,
-and other members of the Independent JPEG Group.
-
-IJG is not affiliated with the ISO/IEC JTC1/SC29/WG1 standards committee
-(also known as JPEG, together with ITU-T SG16).
-
-
-DOCUMENTATION ROADMAP
-=====================
-
-This file contains the following sections:
-
-OVERVIEW            General description of JPEG and the IJG software.
-LEGAL ISSUES        Copyright, lack of warranty, terms of distribution.
-REFERENCES          Where to learn more about JPEG.
-ARCHIVE LOCATIONS   Where to find newer versions of this software.
-FILE FORMAT WARS    Software *not* to get.
-TO DO               Plans for future IJG releases.
-
-Other documentation files in the distribution are:
-
-User documentation:
-  usage.txt         Usage instructions for cjpeg, djpeg, jpegtran,
-                    rdjpgcom, and wrjpgcom.
-  *.1               Unix-style man pages for programs (same info as usage.txt).
-  wizard.txt        Advanced usage instructions for JPEG wizards only.
-  change.log        Version-to-version change highlights.
-Programmer and internal documentation:
-  libjpeg.txt       How to use the JPEG library in your own programs.
-  example.txt       Sample code for calling the JPEG library.
-  structure.txt     Overview of the JPEG library's internal structure.
-  coderules.txt     Coding style rules --- please read if you contribute code.
-
-Please read at least usage.txt.  Some information can also be found in the JPEG
-FAQ (Frequently Asked Questions) article.  See ARCHIVE LOCATIONS below to find
-out where to obtain the FAQ article.
-
-If you want to understand how the JPEG code works, we suggest reading one or
-more of the REFERENCES, then looking at the documentation files (in roughly
-the order listed) before diving into the code.
-
-
-OVERVIEW
-========
-
-This package contains C software to implement JPEG image encoding, decoding,
-and transcoding.  JPEG (pronounced "jay-peg") is a standardized compression
-method for full-color and grayscale images.  JPEG's strong suit is compressing
-photographic images or other types of images that have smooth color and
-brightness transitions between neighboring pixels.  Images with sharp lines or
-other abrupt features may not compress well with JPEG, and a higher JPEG
-quality may have to be used to avoid visible compression artifacts with such
-images.
-
-JPEG is lossy, meaning that the output pixels are not necessarily identical to
-the input pixels.  However, on photographic content and other "smooth" images,
-very good compression ratios can be obtained with no visible compression
-artifacts, and extremely high compression ratios are possible if you are
-willing to sacrifice image quality (by reducing the "quality" setting in the
-compressor.)
-
-This software implements JPEG baseline, extended-sequential, and progressive
-compression processes.  Provision is made for supporting all variants of these
-processes, although some uncommon parameter settings aren't implemented yet.
-We have made no provision for supporting the hierarchical or lossless
-processes defined in the standard.
-
-We provide a set of library routines for reading and writing JPEG image files,
-plus two sample applications "cjpeg" and "djpeg", which use the library to
-perform conversion between JPEG and some other popular image file formats.
-The library is intended to be reused in other applications.
-
-In order to support file conversion and viewing software, we have included
-considerable functionality beyond the bare JPEG coding/decoding capability;
-for example, the color quantization modules are not strictly part of JPEG
-decoding, but they are essential for output to colormapped file formats or
-colormapped displays.  These extra functions can be compiled out of the
-library if not required for a particular application.
-
-We have also included "jpegtran", a utility for lossless transcoding between
-different JPEG processes, and "rdjpgcom" and "wrjpgcom", two simple
-applications for inserting and extracting textual comments in JFIF files.
-
-The emphasis in designing this software has been on achieving portability and
-flexibility, while also making it fast enough to be useful.  In particular,
-the software is not intended to be read as a tutorial on JPEG.  (See the
-REFERENCES section for introductory material.)  Rather, it is intended to
-be reliable, portable, industrial-strength code.  We do not claim to have
-achieved that goal in every aspect of the software, but we strive for it.
-
-We welcome the use of this software as a component of commercial products.
-No royalty is required, but we do ask for an acknowledgement in product
-documentation, as described under LEGAL ISSUES.
-
-
-LEGAL ISSUES
-============
-
-In plain English:
-
-1. We don't promise that this software works.  (But if you find any bugs,
-   please let us know!)
-2. You can use this software for whatever you want.  You don't have to pay us.
-3. You may not pretend that you wrote this software.  If you use it in a
-   program, you must acknowledge somewhere in your documentation that
-   you've used the IJG code.
-
-In legalese:
-
-The authors make NO WARRANTY or representation, either express or implied,
-with respect to this software, its quality, accuracy, merchantability, or
-fitness for a particular purpose.  This software is provided "AS IS", and you,
-its user, assume the entire risk as to its quality and accuracy.
-
-This software is copyright (C) 1991-2020, Thomas G. Lane, Guido Vollbeding.
-All Rights Reserved except as specified below.
-
-Permission is hereby granted to use, copy, modify, and distribute this
-software (or portions thereof) for any purpose, without fee, subject to these
-conditions:
-(1) If any part of the source code for this software is distributed, then this
-README file must be included, with this copyright and no-warranty notice
-unaltered; and any additions, deletions, or changes to the original files
-must be clearly indicated in accompanying documentation.
-(2) If only executable code is distributed, then the accompanying
-documentation must state that "this software is based in part on the work of
-the Independent JPEG Group".
-(3) Permission for use of this software is granted only if the user accepts
-full responsibility for any undesirable consequences; the authors accept
-NO LIABILITY for damages of any kind.
-
-These conditions apply to any software derived from or based on the IJG code,
-not just to the unmodified library.  If you use our work, you ought to
-acknowledge us.
-
-Permission is NOT granted for the use of any IJG author's name or company name
-in advertising or publicity relating to this software or products derived from
-it.  This software may be referred to only as "the Independent JPEG Group's
-software".
-
-We specifically permit and encourage the use of this software as the basis of
-commercial products, provided that all warranty or liability claims are
-assumed by the product vendor.
-
-
-REFERENCES
-==========
-
-We recommend reading one or more of these references before trying to
-understand the innards of the JPEG software.
-
-The best short technical introduction to the JPEG compression algorithm is
-        Wallace, Gregory K.  "The JPEG Still Picture Compression Standard",
-        Communications of the ACM, April 1991 (vol. 34 no. 4), pp. 30-44.
-(Adjacent articles in that issue discuss MPEG motion picture compression,
-applications of JPEG, and related topics.)  If you don't have the CACM issue
-handy, a PDF file containing a revised version of Wallace's article is
-available at http://www.ijg.org/files/Wallace.JPEG.pdf.  The file (actually
-a preprint for an article that appeared in IEEE Trans. Consumer Electronics)
-omits the sample images that appeared in CACM, but it includes corrections
-and some added material.  Note: the Wallace article is copyright ACM and IEEE,
-and it may not be used for commercial purposes.
-
-A somewhat less technical, more leisurely introduction to JPEG can be found in
-"The Data Compression Book" by Mark Nelson and Jean-loup Gailly, published by
-M&T Books (New York), 2nd ed. 1996, ISBN 1-55851-434-1.  This book provides
-good explanations and example C code for a multitude of compression methods
-including JPEG.  It is an excellent source if you are comfortable reading C
-code but don't know much about data compression in general.  The book's JPEG
-sample code is far from industrial-strength, but when you are ready to look
-at a full implementation, you've got one here...
-
-The best currently available description of JPEG is the textbook "JPEG Still
-Image Data Compression Standard" by William B. Pennebaker and Joan L.
-Mitchell, published by Van Nostrand Reinhold, 1993, ISBN 0-442-01272-1.
-Price US$59.95, 638 pp.  The book includes the complete text of the ISO JPEG
-standards (DIS 10918-1 and draft DIS 10918-2).
-
-The original JPEG standard is divided into two parts, Part 1 being the actual
-specification, while Part 2 covers compliance testing methods.  Part 1 is
-titled "Digital Compression and Coding of Continuous-tone Still Images,
-Part 1: Requirements and guidelines" and has document numbers ISO/IEC IS
-10918-1, ITU-T T.81.  Part 2 is titled "Digital Compression and Coding of
-Continuous-tone Still Images, Part 2: Compliance testing" and has document
-numbers ISO/IEC IS 10918-2, ITU-T T.83.
-
-The JPEG standard does not specify all details of an interchangeable file
-format.  For the omitted details, we follow the "JFIF" conventions, revision
-1.02.  JFIF version 1 has been adopted as ISO/IEC 10918-5 (05/2013) and
-Recommendation ITU-T T.871 (05/2011): Information technology - Digital
-compression and coding of continuous-tone still images: JPEG File Interchange
-Format (JFIF).  It is available as a free download in PDF file format from
-https://www.iso.org/standard/54989.html and http://www.itu.int/rec/T-REC-T.871.
-A PDF file of the older JFIF 1.02 specification is available at
-http://www.w3.org/Graphics/JPEG/jfif3.pdf.
-
-The TIFF 6.0 file format specification can be obtained from
-http://mirrors.ctan.org/graphics/tiff/TIFF6.ps.gz.  The JPEG incorporation
-scheme found in the TIFF 6.0 spec of 3-June-92 has a number of serious
-problems.  IJG does not recommend use of the TIFF 6.0 design (TIFF Compression
-tag 6).  Instead, we recommend the JPEG design proposed by TIFF Technical Note
-#2 (Compression tag 7).  Copies of this Note can be obtained from
-http://www.ijg.org/files/.  It is expected that the next revision
-of the TIFF spec will replace the 6.0 JPEG design with the Note's design.
-Although IJG's own code does not support TIFF/JPEG, the free libtiff library
-uses our library to implement TIFF/JPEG per the Note.
-
-
-ARCHIVE LOCATIONS
-=================
-
-The "official" archive site for this software is www.ijg.org.
-The most recent released version can always be found there in
-directory "files".
-
-The JPEG FAQ (Frequently Asked Questions) article is a source of some
-general information about JPEG.  It is available at
-http://www.faqs.org/faqs/jpeg-faq.
-
-
-FILE FORMAT COMPATIBILITY
-=========================
-
-This software implements ITU T.81 | ISO/IEC 10918 with some extensions from
-ITU T.871 | ISO/IEC 10918-5 (JPEG File Interchange Format-- see REFERENCES).
-Informally, the term "JPEG image" or "JPEG file" most often refers to JFIF or
-a subset thereof, but there are other formats containing the name "JPEG" that
-are incompatible with the DCT-based JPEG standard or with JFIF (for instance,
-JPEG 2000 and JPEG XR).  This software therefore does not support these
-formats.  Indeed, one of the original reasons for developing this free software
-was to help force convergence on a common, interoperable format standard for
-JPEG files.
-
-JFIF is a minimal or "low end" representation.  TIFF/JPEG (TIFF revision 6.0 as
-modified by TIFF Technical Note #2) can be used for "high end" applications
-that need to record a lot of additional data about an image.
-
-
-TO DO
-=====
-
-Please send bug reports, offers of help, etc. to jpeg-info@jpegclub.org.
-
-==============================================================================
 rayon 1.12.0 (MIT OR Apache-2.0)
 rayon-core 1.13.0 (MIT OR Apache-2.0)
 ------------------------------------------------------------------------------
@@ -3906,6 +3226,686 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
+slimdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+Copyright (c) 2016, Alliance for Open Media. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in
+   the documentation and/or other materials provided with the
+   distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+==============================================================================
+slimdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+Alliance for Open Media Patent License 1.0
+
+1. License Terms.
+
+1.1. Patent License. Subject to the terms and conditions of this License, each
+     Licensor, on behalf of itself and successors in interest and assigns,
+     grants Licensee a non-sublicensable, perpetual, worldwide, non-exclusive,
+     no-charge, royalty-free, irrevocable (except as expressly stated in this
+     License) patent license to its Necessary Claims to make, use, sell, offer
+     for sale, import or distribute any Implementation.
+
+1.2. Conditions.
+
+1.2.1. Availability. As a condition to the grant of rights to Licensee to make,
+       sell, offer for sale, import or distribute an Implementation under
+       Section 1.1, Licensee must make its Necessary Claims available under
+       this License, and must reproduce this License with any Implementation
+       as follows:
+
+       a. For distribution in source code, by including this License in the
+          root directory of the source code with its Implementation.
+
+       b. For distribution in any other form (including binary, object form,
+          and/or hardware description code (e.g., HDL, RTL, Gate Level Netlist,
+          GDSII, etc.)), by including this License in the documentation, legal
+          notices, and/or other written materials provided with the
+          Implementation.
+
+1.2.2. Additional Conditions. This license is directly from Licensor to
+       Licensee.  Licensee acknowledges as a condition of benefiting from it
+       that no rights from Licensor are received from suppliers, distributors,
+       or otherwise in connection with this License.
+
+1.3. Defensive Termination. If any Licensee, its Affiliates, or its agents
+     initiates patent litigation or files, maintains, or voluntarily
+     participates in a lawsuit against another entity or any person asserting
+     that any Implementation infringes Necessary Claims, any patent licenses
+     granted under this License directly to the Licensee are immediately
+     terminated as of the date of the initiation of action unless 1) that suit
+     was in response to a corresponding suit regarding an Implementation first
+     brought against an initiating entity, or 2) that suit was brought to
+     enforce the terms of this License (including intervention in a third-party
+     action by a Licensee).
+
+1.4. Disclaimers. The Reference Implementation and Specification are provided
+     "AS IS" and without warranty. The entire risk as to implementing or
+     otherwise using the Reference Implementation or Specification is assumed
+     by the implementer and user. Licensor expressly disclaims any warranties
+     (express, implied, or otherwise), including implied warranties of
+     merchantability, non-infringement, fitness for a particular purpose, or
+     title, related to the material. IN NO EVENT WILL LICENSOR BE LIABLE TO
+     ANY OTHER PARTY FOR LOST PROFITS OR ANY FORM OF INDIRECT, SPECIAL,
+     INCIDENTAL, OR CONSEQUENTIAL DAMAGES OF ANY CHARACTER FROM ANY CAUSES OF
+     ACTION OF ANY KIND WITH RESPECT TO THIS LICENSE, WHETHER BASED ON BREACH
+     OF CONTRACT, TORT (INCLUDING NEGLIGENCE), OR OTHERWISE, AND WHETHER OR
+     NOT THE OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+2. Definitions.
+
+2.1. Affiliate.  "Affiliate" means an entity that directly or indirectly
+     Controls, is Controlled by, or is under common Control of that party.
+
+2.2. Control. "Control" means direct or indirect control of more than 50% of
+     the voting power to elect directors of that corporation, or for any other
+     entity, the power to direct management of such entity.
+
+2.3. Decoder.  "Decoder" means any decoder that conforms fully with all
+     non-optional portions of the Specification.
+
+2.4. Encoder.  "Encoder" means any encoder that produces a bitstream that can
+     be decoded by a Decoder only to the extent it produces such a bitstream.
+
+2.5. Final Deliverable.  "Final Deliverable" means the final version of a
+     deliverable approved by the Alliance for Open Media as a Final
+     Deliverable.
+
+2.6. Implementation.  "Implementation" means any implementation, including the
+     Reference Implementation, that is an Encoder and/or a Decoder. An
+     Implementation also includes components of an Implementation only to the
+     extent they are used as part of an Implementation.
+
+2.7. License. "License" means this license.
+
+2.8. Licensee. "Licensee" means any person or entity who exercises patent
+     rights granted under this License.
+
+2.9. Licensor.  "Licensor" means (i) any Licensee that makes, sells, offers
+     for sale, imports or distributes any Implementation, or (ii) a person
+     or entity that has a licensing obligation to the Implementation as a
+     result of its membership and/or participation in the Alliance for Open
+     Media working group that developed the Specification.
+
+2.10. Necessary Claims.  "Necessary Claims" means all claims of patents or
+      patent applications, (a) that currently or at any time in the future,
+      are owned or controlled by the Licensor, and (b) (i) would be an
+      Essential Claim as defined by the W3C Policy as of February 5, 2004
+      (https://www.w3.org/Consortium/Patent-Policy-20040205/#def-essential)
+      as if the Specification was a W3C Recommendation; or (ii) are infringed
+      by the Reference Implementation.
+
+2.11. Reference Implementation. "Reference Implementation" means an Encoder
+      and/or Decoder released by the Alliance for Open Media as a Final
+      Deliverable.
+
+2.12. Specification. "Specification" means the specification designated by
+      the Alliance for Open Media as a Final Deliverable for which this
+      License was issued.
+
+==============================================================================
+slimdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+Copyright (c) 2006, 2008 Edward Rosten
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+
+	*Redistributions of source code must retain the above copyright
+	 notice, this list of conditions and the following disclaimer.
+
+	*Redistributions in binary form must reproduce the above copyright
+	 notice, this list of conditions and the following disclaimer in the
+	 documentation and/or other materials provided with the distribution.
+
+	*Neither the name of the University of Cambridge nor the names of
+	 its contributors may be used to endorse or promote products derived
+	 from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+==============================================================================
+slimdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+The MIT License (MIT)
+Copyright (c) 2016 Peter Goldsborough
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+==============================================================================
+slimdeer-libaom 3.15.2 (BSD-2-Clause AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+Copyright (c) 2017 Evan Nemerson <evan@nemerson.com>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+==============================================================================
+slimdeer-libwebp 1.6.0 (BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+Copyright (c) 2010, Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+
+  * Neither the name of Google nor the names of its contributors may
+    be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+==============================================================================
+slimdeer-libwebp 1.6.0 (BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+Additional IP Rights Grant (Patents)
+------------------------------------
+
+"These implementations" means the copyrightable works that implement the WebM
+codecs distributed by Google as part of the WebM Project.
+
+Google hereby grants to you a perpetual, worldwide, non-exclusive, no-charge,
+royalty-free, irrevocable (except as stated in this section) patent license to
+make, have made, use, offer to sell, sell, import, transfer, and otherwise
+run, modify and propagate the contents of these implementations of WebM, where
+such license applies only to those patent claims, both currently owned by
+Google and acquired in the future, licensable by Google that are necessarily
+infringed by these implementations of WebM. This grant does not include claims
+that would be infringed only as a consequence of further modification of these
+implementations. If you or your agent or exclusive licensee institute or order
+or agree to the institution of patent litigation or any other patent
+enforcement activity against any entity (including a cross-claim or
+counterclaim in a lawsuit) alleging that any of these implementations of WebM
+or any code incorporated within any of these implementations of WebM
+constitute direct or contributory patent infringement, or inducement of
+patent infringement, then any patent rights granted to you under this License
+for these implementations of WebM shall terminate as of the date such
+litigation is filed.
+
+==============================================================================
+slimdeer-mozjpeg 4.1.5 (IJG AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+libjpeg-turbo Licenses
+======================
+
+libjpeg-turbo is covered by three compatible BSD-style open source licenses:
+
+- The IJG (Independent JPEG Group) License, which is listed in
+  [README.ijg](README.ijg)
+
+  This license applies to the libjpeg API library and associated programs
+  (any code inherited from libjpeg, and any modifications to that code.)
+
+- The Modified (3-clause) BSD License, which is listed below
+
+  This license covers the TurboJPEG API library and associated programs, as
+  well as the build system.
+
+- The [zlib License](https://opensource.org/licenses/Zlib)
+
+  This license is a subset of the other two, and it covers the libjpeg-turbo
+  SIMD extensions.
+
+
+Complying with the libjpeg-turbo Licenses
+=========================================
+
+This section provides a roll-up of the libjpeg-turbo licensing terms, to the
+best of our understanding.
+
+1.  If you are distributing a modified version of the libjpeg-turbo source,
+    then:
+
+    1.  You cannot alter or remove any existing copyright or license notices
+        from the source.
+
+        **Origin**
+        - Clause 1 of the IJG License
+        - Clause 1 of the Modified BSD License
+        - Clauses 1 and 3 of the zlib License
+
+    2.  You must add your own copyright notice to the header of each source
+        file you modified, so others can tell that you modified that file (if
+        there is not an existing copyright header in that file, then you can
+        simply add a notice stating that you modified the file.)
+
+        **Origin**
+        - Clause 1 of the IJG License
+        - Clause 2 of the zlib License
+
+    3.  You must include the IJG README file, and you must not alter any of the
+        copyright or license text in that file.
+
+        **Origin**
+        - Clause 1 of the IJG License
+
+2.  If you are distributing only libjpeg-turbo binaries without the source, or
+    if you are distributing an application that statically links with
+    libjpeg-turbo, then:
+
+    1.  Your product documentation must include a message stating:
+
+        This software is based in part on the work of the Independent JPEG
+        Group.
+
+        **Origin**
+        - Clause 2 of the IJG license
+
+    2.  If your binary distribution includes or uses the TurboJPEG API, then
+        your product documentation must include the text of the Modified BSD
+        License (see below.)
+
+        **Origin**
+        - Clause 2 of the Modified BSD License
+
+3.  You cannot use the name of the IJG or The libjpeg-turbo Project or the
+    contributors thereof in advertising, publicity, etc.
+
+    **Origin**
+    - IJG License
+    - Clause 3 of the Modified BSD License
+
+4.  The IJG and The libjpeg-turbo Project do not warrant libjpeg-turbo to be
+    free of defects, nor do we accept any liability for undesirable
+    consequences resulting from your use of the software.
+
+    **Origin**
+    - IJG License
+    - Modified BSD License
+    - zlib License
+
+
+The Modified (3-clause) BSD License
+===================================
+
+Copyright (C)2009-2023 D. R. Commander.  All Rights Reserved.<br>
+Copyright (C)2015 Viktor Szathmáry.  All Rights Reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+- Neither the name of the libjpeg-turbo Project nor the names of its
+  contributors may be used to endorse or promote products derived from this
+  software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS",
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+
+Why Three Licenses?
+===================
+
+The zlib License could have been used instead of the Modified (3-clause) BSD
+License, and since the IJG License effectively subsumes the distribution
+conditions of the zlib License, this would have effectively placed
+libjpeg-turbo binary distributions under the IJG License.  However, the IJG
+License specifically refers to the Independent JPEG Group and does not extend
+attribution and endorsement protections to other entities.  Thus, it was
+desirable to choose a license that granted us the same protections for new code
+that were granted to the IJG for code derived from their software.
+
+==============================================================================
+slimdeer-mozjpeg 4.1.5 (IJG AND BSD-3-Clause AND MIT)
+------------------------------------------------------------------------------
+libjpeg-turbo note:  This file has been modified by The libjpeg-turbo Project
+to include only information relevant to libjpeg-turbo, to wordsmith certain
+sections, and to remove impolitic language that existed in the libjpeg v8
+README.  It is included only for reference.  Please see README.md for
+information specific to libjpeg-turbo.
+
+
+The Independent JPEG Group's JPEG software
+==========================================
+
+This distribution contains a release of the Independent JPEG Group's free JPEG
+software.  You are welcome to redistribute this software and to use it for any
+purpose, subject to the conditions under LEGAL ISSUES, below.
+
+This software is the work of Tom Lane, Guido Vollbeding, Philip Gladstone,
+Bill Allombert, Jim Boucher, Lee Crocker, Bob Friesenhahn, Ben Jackson,
+Julian Minguillon, Luis Ortiz, George Phillips, Davide Rossi, Ge' Weijers,
+and other members of the Independent JPEG Group.
+
+IJG is not affiliated with the ISO/IEC JTC1/SC29/WG1 standards committee
+(also known as JPEG, together with ITU-T SG16).
+
+
+DOCUMENTATION ROADMAP
+=====================
+
+This file contains the following sections:
+
+OVERVIEW            General description of JPEG and the IJG software.
+LEGAL ISSUES        Copyright, lack of warranty, terms of distribution.
+REFERENCES          Where to learn more about JPEG.
+ARCHIVE LOCATIONS   Where to find newer versions of this software.
+FILE FORMAT WARS    Software *not* to get.
+TO DO               Plans for future IJG releases.
+
+Other documentation files in the distribution are:
+
+User documentation:
+  usage.txt         Usage instructions for cjpeg, djpeg, jpegtran,
+                    rdjpgcom, and wrjpgcom.
+  *.1               Unix-style man pages for programs (same info as usage.txt).
+  wizard.txt        Advanced usage instructions for JPEG wizards only.
+  change.log        Version-to-version change highlights.
+Programmer and internal documentation:
+  libjpeg.txt       How to use the JPEG library in your own programs.
+  example.txt       Sample code for calling the JPEG library.
+  structure.txt     Overview of the JPEG library's internal structure.
+  coderules.txt     Coding style rules --- please read if you contribute code.
+
+Please read at least usage.txt.  Some information can also be found in the JPEG
+FAQ (Frequently Asked Questions) article.  See ARCHIVE LOCATIONS below to find
+out where to obtain the FAQ article.
+
+If you want to understand how the JPEG code works, we suggest reading one or
+more of the REFERENCES, then looking at the documentation files (in roughly
+the order listed) before diving into the code.
+
+
+OVERVIEW
+========
+
+This package contains C software to implement JPEG image encoding, decoding,
+and transcoding.  JPEG (pronounced "jay-peg") is a standardized compression
+method for full-color and grayscale images.  JPEG's strong suit is compressing
+photographic images or other types of images that have smooth color and
+brightness transitions between neighboring pixels.  Images with sharp lines or
+other abrupt features may not compress well with JPEG, and a higher JPEG
+quality may have to be used to avoid visible compression artifacts with such
+images.
+
+JPEG is lossy, meaning that the output pixels are not necessarily identical to
+the input pixels.  However, on photographic content and other "smooth" images,
+very good compression ratios can be obtained with no visible compression
+artifacts, and extremely high compression ratios are possible if you are
+willing to sacrifice image quality (by reducing the "quality" setting in the
+compressor.)
+
+This software implements JPEG baseline, extended-sequential, and progressive
+compression processes.  Provision is made for supporting all variants of these
+processes, although some uncommon parameter settings aren't implemented yet.
+We have made no provision for supporting the hierarchical or lossless
+processes defined in the standard.
+
+We provide a set of library routines for reading and writing JPEG image files,
+plus two sample applications "cjpeg" and "djpeg", which use the library to
+perform conversion between JPEG and some other popular image file formats.
+The library is intended to be reused in other applications.
+
+In order to support file conversion and viewing software, we have included
+considerable functionality beyond the bare JPEG coding/decoding capability;
+for example, the color quantization modules are not strictly part of JPEG
+decoding, but they are essential for output to colormapped file formats or
+colormapped displays.  These extra functions can be compiled out of the
+library if not required for a particular application.
+
+We have also included "jpegtran", a utility for lossless transcoding between
+different JPEG processes, and "rdjpgcom" and "wrjpgcom", two simple
+applications for inserting and extracting textual comments in JFIF files.
+
+The emphasis in designing this software has been on achieving portability and
+flexibility, while also making it fast enough to be useful.  In particular,
+the software is not intended to be read as a tutorial on JPEG.  (See the
+REFERENCES section for introductory material.)  Rather, it is intended to
+be reliable, portable, industrial-strength code.  We do not claim to have
+achieved that goal in every aspect of the software, but we strive for it.
+
+We welcome the use of this software as a component of commercial products.
+No royalty is required, but we do ask for an acknowledgement in product
+documentation, as described under LEGAL ISSUES.
+
+
+LEGAL ISSUES
+============
+
+In plain English:
+
+1. We don't promise that this software works.  (But if you find any bugs,
+   please let us know!)
+2. You can use this software for whatever you want.  You don't have to pay us.
+3. You may not pretend that you wrote this software.  If you use it in a
+   program, you must acknowledge somewhere in your documentation that
+   you've used the IJG code.
+
+In legalese:
+
+The authors make NO WARRANTY or representation, either express or implied,
+with respect to this software, its quality, accuracy, merchantability, or
+fitness for a particular purpose.  This software is provided "AS IS", and you,
+its user, assume the entire risk as to its quality and accuracy.
+
+This software is copyright (C) 1991-2020, Thomas G. Lane, Guido Vollbeding.
+All Rights Reserved except as specified below.
+
+Permission is hereby granted to use, copy, modify, and distribute this
+software (or portions thereof) for any purpose, without fee, subject to these
+conditions:
+(1) If any part of the source code for this software is distributed, then this
+README file must be included, with this copyright and no-warranty notice
+unaltered; and any additions, deletions, or changes to the original files
+must be clearly indicated in accompanying documentation.
+(2) If only executable code is distributed, then the accompanying
+documentation must state that "this software is based in part on the work of
+the Independent JPEG Group".
+(3) Permission for use of this software is granted only if the user accepts
+full responsibility for any undesirable consequences; the authors accept
+NO LIABILITY for damages of any kind.
+
+These conditions apply to any software derived from or based on the IJG code,
+not just to the unmodified library.  If you use our work, you ought to
+acknowledge us.
+
+Permission is NOT granted for the use of any IJG author's name or company name
+in advertising or publicity relating to this software or products derived from
+it.  This software may be referred to only as "the Independent JPEG Group's
+software".
+
+We specifically permit and encourage the use of this software as the basis of
+commercial products, provided that all warranty or liability claims are
+assumed by the product vendor.
+
+
+REFERENCES
+==========
+
+We recommend reading one or more of these references before trying to
+understand the innards of the JPEG software.
+
+The best short technical introduction to the JPEG compression algorithm is
+        Wallace, Gregory K.  "The JPEG Still Picture Compression Standard",
+        Communications of the ACM, April 1991 (vol. 34 no. 4), pp. 30-44.
+(Adjacent articles in that issue discuss MPEG motion picture compression,
+applications of JPEG, and related topics.)  If you don't have the CACM issue
+handy, a PDF file containing a revised version of Wallace's article is
+available at http://www.ijg.org/files/Wallace.JPEG.pdf.  The file (actually
+a preprint for an article that appeared in IEEE Trans. Consumer Electronics)
+omits the sample images that appeared in CACM, but it includes corrections
+and some added material.  Note: the Wallace article is copyright ACM and IEEE,
+and it may not be used for commercial purposes.
+
+A somewhat less technical, more leisurely introduction to JPEG can be found in
+"The Data Compression Book" by Mark Nelson and Jean-loup Gailly, published by
+M&T Books (New York), 2nd ed. 1996, ISBN 1-55851-434-1.  This book provides
+good explanations and example C code for a multitude of compression methods
+including JPEG.  It is an excellent source if you are comfortable reading C
+code but don't know much about data compression in general.  The book's JPEG
+sample code is far from industrial-strength, but when you are ready to look
+at a full implementation, you've got one here...
+
+The best currently available description of JPEG is the textbook "JPEG Still
+Image Data Compression Standard" by William B. Pennebaker and Joan L.
+Mitchell, published by Van Nostrand Reinhold, 1993, ISBN 0-442-01272-1.
+Price US$59.95, 638 pp.  The book includes the complete text of the ISO JPEG
+standards (DIS 10918-1 and draft DIS 10918-2).
+
+The original JPEG standard is divided into two parts, Part 1 being the actual
+specification, while Part 2 covers compliance testing methods.  Part 1 is
+titled "Digital Compression and Coding of Continuous-tone Still Images,
+Part 1: Requirements and guidelines" and has document numbers ISO/IEC IS
+10918-1, ITU-T T.81.  Part 2 is titled "Digital Compression and Coding of
+Continuous-tone Still Images, Part 2: Compliance testing" and has document
+numbers ISO/IEC IS 10918-2, ITU-T T.83.
+
+The JPEG standard does not specify all details of an interchangeable file
+format.  For the omitted details, we follow the "JFIF" conventions, revision
+1.02.  JFIF version 1 has been adopted as ISO/IEC 10918-5 (05/2013) and
+Recommendation ITU-T T.871 (05/2011): Information technology - Digital
+compression and coding of continuous-tone still images: JPEG File Interchange
+Format (JFIF).  It is available as a free download in PDF file format from
+https://www.iso.org/standard/54989.html and http://www.itu.int/rec/T-REC-T.871.
+A PDF file of the older JFIF 1.02 specification is available at
+http://www.w3.org/Graphics/JPEG/jfif3.pdf.
+
+The TIFF 6.0 file format specification can be obtained from
+http://mirrors.ctan.org/graphics/tiff/TIFF6.ps.gz.  The JPEG incorporation
+scheme found in the TIFF 6.0 spec of 3-June-92 has a number of serious
+problems.  IJG does not recommend use of the TIFF 6.0 design (TIFF Compression
+tag 6).  Instead, we recommend the JPEG design proposed by TIFF Technical Note
+#2 (Compression tag 7).  Copies of this Note can be obtained from
+http://www.ijg.org/files/.  It is expected that the next revision
+of the TIFF spec will replace the 6.0 JPEG design with the Note's design.
+Although IJG's own code does not support TIFF/JPEG, the free libtiff library
+uses our library to implement TIFF/JPEG per the Note.
+
+
+ARCHIVE LOCATIONS
+=================
+
+The "official" archive site for this software is www.ijg.org.
+The most recent released version can always be found there in
+directory "files".
+
+The JPEG FAQ (Frequently Asked Questions) article is a source of some
+general information about JPEG.  It is available at
+http://www.faqs.org/faqs/jpeg-faq.
+
+
+FILE FORMAT COMPATIBILITY
+=========================
+
+This software implements ITU T.81 | ISO/IEC 10918 with some extensions from
+ITU T.871 | ISO/IEC 10918-5 (JPEG File Interchange Format-- see REFERENCES).
+Informally, the term "JPEG image" or "JPEG file" most often refers to JFIF or
+a subset thereof, but there are other formats containing the name "JPEG" that
+are incompatible with the DCT-based JPEG standard or with JFIF (for instance,
+JPEG 2000 and JPEG XR).  This software therefore does not support these
+formats.  Indeed, one of the original reasons for developing this free software
+was to help force convergence on a common, interoperable format standard for
+JPEG files.
+
+JFIF is a minimal or "low end" representation.  TIFF/JPEG (TIFF revision 6.0 as
+modified by TIFF Technical Note #2) can be used for "high end" applications
+that need to record a lot of additional data about an image.
+
+
+TO DO
+=====
+
+Please send bug reports, offers of help, etc. to jpeg-info@jpegclub.org.
+
+==============================================================================
 unicode-ident 1.0.27 ((MIT OR Apache-2.0) AND Unicode-3.0)
 ------------------------------------------------------------------------------
 UNICODE LICENSE V3
@@ -4049,7 +4049,7 @@ freely, subject to the following restrictions:
 ==============================================================================
 Published without a license file (license as declared):
 enough 0.4.5 (MIT OR Apache-2.0)
-pngdeer-clib 0.1.0 (MIT)
+slimdeer-clib 0.1.0 (MIT)
 wasm_sync 0.1.2 (MIT OR Apache-2.0)
 zenpixels 0.2.16 (Apache-2.0 OR MIT)
 

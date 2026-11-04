@@ -1,13 +1,13 @@
-//! mozjpeg 4.1.5's encoder (mozjpeg/, IJG and BSD-3-Clause) for pngdeer: RGB or gray pixels to a
+//! mozjpeg 4.1.5's encoder (mozjpeg/, IJG and BSD-3-Clause) for slimdeer: RGB or gray pixels to a
 //! JPEG file. Built the same way on every target (build.rs), so the command line and the browser
-//! build write the same bytes. Decoding is pngdeer's (a pure Rust decoder): libjpeg ends on corrupt
+//! build write the same bytes. Decoding is slimdeer's (a pure Rust decoder): libjpeg ends on corrupt
 //! input through a longjmp, which the browser build can't make.
 
 use std::ffi::{c_int, c_uchar, c_void};
 use std::fmt;
 
 // the C library functions mozjpeg calls, the same on every target
-use pngdeer_clib as _;
+use slimdeer_clib as _;
 
 /// libjpeg's limit on either side.
 pub const MAX_SIDE: usize = 65500;
@@ -52,7 +52,7 @@ struct COptions {
 
 extern "C" {
     #[allow(clippy::too_many_arguments)]
-    fn pngdeer_jpeg_encode(
+    fn slimdeer_jpeg_encode(
         pixels: *const c_uchar,
         width: c_int,
         height: c_int,
@@ -64,7 +64,7 @@ extern "C" {
         exif_size: usize,
         out: *mut *mut c_uchar,
     ) -> usize;
-    fn pngdeer_jpeg_free(pointer: *mut c_void);
+    fn slimdeer_jpeg_free(pointer: *mut c_void);
 }
 
 /// A JPEG file of `pixels`: `height` rows of `width` pixels of `components` bytes (1: gray, 3: RGB),
@@ -107,7 +107,7 @@ pub fn encode(
     // SAFETY: the arguments are checked above; mozjpeg reads `pixels` and the metadata, and
     // allocates the file with malloc, freed here with its own free.
     unsafe {
-        let size = pngdeer_jpeg_encode(
+        let size = slimdeer_jpeg_encode(
             pixels.as_ptr(),
             width as c_int,
             height as c_int,
@@ -120,7 +120,7 @@ pub fn encode(
             &mut out,
         );
         let file = std::slice::from_raw_parts(out, size).to_vec();
-        pngdeer_jpeg_free(out.cast());
+        slimdeer_jpeg_free(out.cast());
         Ok(file)
     }
 }

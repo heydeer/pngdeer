@@ -1,19 +1,19 @@
-# libwebp 1.6.0, built for pngdeer
+# libwebp 1.6.0, built for slimdeer
 
-pngdeer's WebP output (`pngdeer::compress_webp`, `src/webp.rs`) encodes and decodes with libwebp,
+slimdeer's WebP output (`slimdeer::compress_webp`, `src/webp.rs`) encodes and decodes with libwebp,
 Google's WebP library (BSD-3-Clause with a patent grant: `libwebp/COPYING`, `libwebp/PATENTS`). This
 crate builds it from source so that every target, the browser's WebAssembly included, writes the
-same bytes for the same input, as pngdeer's PNG output does.
+same bytes for the same input, as slimdeer's PNG output does.
 
 ## What is here
 
 - `libwebp/`: from the libwebp v1.6.0 release (github.com/webmproject/libwebp, tag v1.6.0; the
   tarball's SHA-256 is 93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136), unmodified:
-  `src/dec`, `src/dsp`, `src/enc`, `src/utils`, the public headers pngdeer's code includes from
+  `src/dec`, `src/dsp`, `src/enc`, `src/utils`, the public headers slimdeer's code includes from
   `src/webp`, `sharpyuv`, and AUTHORS, COPYING and PATENTS. Left out: the SIMD files (`*_sse2.c`,
   `*_sse41.c`, `*_avx2.c`, `*_neon.c`, `*_msa.c`, `*_mips*.c`, never built here), mux, demux, the
   tools and the build files. Added: an empty `src/webp/config.h` (below).
-- `glue/pngdeer_webp.c`: entry points with plain arguments (encode, decode, free, and a source
+- `glue/slimdeer_webp.c`: entry points with plain arguments (encode, decode, free, and a source
   picture converted to YUV once), so the Rust side declares none of libwebp's structs.
 - `src/lib.rs`: the Rust API (`encode_lossy`, `encode_lossless`, `encode_near_lossless`, `decode`;
   `Source`, an image converted to YUV once for any number of lossy encodes, from any number of
@@ -32,7 +32,7 @@ The same way on every target, for the same output everywhere:
    threads, which libwebp needs `WEBP_USE_THREAD` for.)
 2. **No fused multiply-add.** `-ffp-contract=off`: clang fuses `a * b + c` on targets with FMA, such
    as arm64, and a fused result can differ in the last bit.
-3. **One libm and one qsort.** `vendor/clib/include/pngdeer_clib.h`, included ahead of every file,
+3. **One libm and one qsort.** `vendor/clib/include/slimdeer_clib.h`, included ahead of every file,
    sends libwebp's inexact math functions (log, log2, log10, exp, pow, logf, expf) to Rust's `libm`
    crate, which gives the same bits on every target, and qsort to a stable sort (`vendor/clib`):
    system math libraries differ in the last bits, and qsort implementations order equal elements
@@ -43,7 +43,7 @@ The same way on every target, for the same output everywhere:
    from Rust's compiler-builtins. `-ffreestanding` keeps clang from expecting more.
 
 Checked: libwebp's output hashes the same natively (arm64) and as wasm32 (lossy at three
-qualities and their decodes, lossless at three levels), and pngdeer's `tests/webp.rs` pins the
+qualities and their decodes, lossless at three levels), and slimdeer's `tests/webp.rs` pins the
 bytes of four whole compressions, which a wasm32 build reproduces and the release workflow runs on
 all four release targets.
 Plain C turned out to give the same files as Homebrew's cwebp 1.6.0 with its NEON code (lossy and

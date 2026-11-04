@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect licenses for the dependencies shipped in a native pngdeer release."""
+"""Collect licenses for the dependencies shipped in a native slimdeer release."""
 
 import argparse
 import json
@@ -11,7 +11,7 @@ NAMES = ("license", "licence", "copying", "notice", "copyright", "patents")
 # Files holding a license under another name: the IJG license is in libjpeg's README.
 ALSO = ("readme.ijg",)
 # Statements a license asks binary distributions to make, by crate.
-STATEMENTS = {"pngdeer-mozjpeg": "This software is based in part on the work of the Independent JPEG Group."}
+STATEMENTS = {"slimdeer-mozjpeg": "This software is based in part on the work of the Independent JPEG Group."}
 
 
 def cargo(*args: str) -> str:
@@ -45,7 +45,7 @@ def main() -> None:
     nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
     # Metadata unifies features across the workspace, even with --filter-platform.
     # cargo tree selects only the CLI's default features, without wasm/quantlab extras.
-    tree = cargo("tree", "--locked", "--package", "pngdeer", "--target", args.target,
+    tree = cargo("tree", "--locked", "--package", "slimdeer", "--target", args.target,
                  "--edges", "normal,no-proc-macro", "--prefix", "none", "--format", "{p}", "--color", "never")
     active = {(line.split()[0], line.split()[1].removeprefix("v")) for line in tree.splitlines() if line.strip()}
     key = lambda p: (p["name"], p["version"])
@@ -62,7 +62,7 @@ def main() -> None:
 
     texts: dict[str, tuple[str, list[str]]] = {}
     unfiled = []
-    dependencies = sorted((packages[i] for i in seen if packages[i]["name"] != "pngdeer"), key=key)
+    dependencies = sorted((packages[i] for i in seen if packages[i]["name"] != "slimdeer"), key=key)
     for package in dependencies:
         label = f"{package['name']} {package['version']} ({package.get('license') or 'see its source'})"
         files = license_files(package)
@@ -78,7 +78,7 @@ def main() -> None:
             if label not in labels:
                 labels.append(label)
 
-    parts = [f"Third-party software compiled into pngdeer's native CLI ({args.target}), and its licenses.",
+    parts = [f"Third-party software compiled into slimdeer's native CLI ({args.target}), and its licenses.",
              "Each license text below is preceded by the crates it covers.", ""]
     names = {package["name"] for package in dependencies}
     parts += [text for crate, text in STATEMENTS.items() if crate in names] + ([""] if names & STATEMENTS.keys() else [])

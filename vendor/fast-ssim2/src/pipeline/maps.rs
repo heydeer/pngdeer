@@ -15,7 +15,7 @@
 //! reproducing that split is required for bit-identical scores.
 
 #[allow(unused_imports)]
-use super::Fma; // pngdeer patch
+use super::Fma; // slimdeer patch
 use enough::Stop;
 
 pub(crate) const K_C2: f32 = 0.0009;
@@ -206,7 +206,7 @@ pub(crate) fn maps_fused_stop(
     Ok((ssim_out, edge_out))
 }
 
-/// One channel of [`maps_fused_stop`]: its `SSIMMap` pair and `EdgeDiffMap` quad. pngdeer patch:
+/// One channel of [`maps_fused_stop`]: its `SSIMMap` pair and `EdgeDiffMap` quad. slimdeer patch:
 /// split out so the low-memory comparison, which scores channel by channel, runs this same code.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn maps_channel_stop(

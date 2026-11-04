@@ -1,5 +1,5 @@
-/* pngdeer: mozjpeg 4.1.5's jconfig.h as its CMake build generates it, for every target: 8-bit
- * samples, the in-memory destination, and no arithmetic coding (pngdeer writes Huffman-coded
+/* slimdeer: mozjpeg 4.1.5's jconfig.h as its CMake build generates it, for every target: 8-bit
+ * samples, the in-memory destination, and no arithmetic coding (slimdeer writes Huffman-coded
  * files, which every viewer reads) or SIMD. */
 
 #define JPEG_LIB_VERSION  62

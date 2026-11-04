@@ -7,7 +7,7 @@ use std::{
     process::{Command, Output, Stdio},
 };
 
-use pngdeer::{codec, RGBA};
+use slimdeer::{codec, RGBA};
 
 /// A 96×80 PNG of flat blocks with fine noise, which a palette makes much smaller.
 fn sample() -> Vec<u8> {
@@ -28,7 +28,7 @@ fn sample() -> Vec<u8> {
 
 /// A fresh folder holding sample PNGs under `names`.
 fn folder(test: &str, names: &[&str]) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("pngdeer-cli-{test}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("slimdeer-cli-{test}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     for name in names {
@@ -37,8 +37,8 @@ fn folder(test: &str, names: &[&str]) -> PathBuf {
     dir
 }
 
-fn pngdeer(dir: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_pngdeer")).current_dir(dir).args(args).output().unwrap()
+fn slimdeer(dir: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_slimdeer")).current_dir(dir).args(args).output().unwrap()
 }
 
 fn is_png(path: &Path) -> bool {
@@ -48,7 +48,7 @@ fn is_png(path: &Path) -> bool {
 #[test]
 fn writes_each_file_beside_it_and_says_nothing() {
     let dir = folder("beside", &["a.png", "b.png"]);
-    let run = pngdeer(&dir, &["a.png", "b.png"]);
+    let run = slimdeer(&dir, &["a.png", "b.png"]);
     assert_eq!(run.status.code(), Some(0));
     assert!(run.stdout.is_empty() && run.stderr.is_empty(), "{}", String::from_utf8_lossy(&run.stderr));
     for name in ["a.min.png", "b.min.png"] {
@@ -61,11 +61,11 @@ fn writes_each_file_beside_it_and_says_nothing() {
 #[test]
 fn writes_into_a_folder_but_never_over_an_input() {
     let dir = folder("dir", &["a.png", "b.png"]);
-    let run = pngdeer(&dir, &["a.png", "b.png", "-d", "out/web"]);
+    let run = slimdeer(&dir, &["a.png", "b.png", "-d", "out/web"]);
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
     assert!(is_png(&dir.join("out/web/a.png")) && is_png(&dir.join("out/web/b.png")));
     // the inputs' own folder: that name is the input's
-    let run = pngdeer(&dir, &["a.png", "-d", "."]);
+    let run = slimdeer(&dir, &["a.png", "-d", "."]);
     assert_eq!(run.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&run.stderr).contains("would replace the input"));
     assert_eq!(fs::read(dir.join("a.png")).unwrap(), sample());
@@ -76,7 +76,7 @@ fn writes_into_a_folder_but_never_over_an_input() {
 #[test]
 fn names_one_output_with_o_in_the_format_its_name_says() {
     let dir = folder("output", &["a.png"]);
-    let run = pngdeer(&dir, &["a.png", "-o", "small.webp", "-v"]);
+    let run = slimdeer(&dir, &["a.png", "-o", "small.webp", "-v"]);
     assert_eq!(run.status.code(), Some(0), "{}", String::from_utf8_lossy(&run.stderr));
     assert_eq!(&fs::read(dir.join("small.webp")).unwrap()[8..12], b"WEBP");
     // -v: one line, on stderr
@@ -87,7 +87,7 @@ fn names_one_output_with_o_in_the_format_its_name_says() {
 
 #[test]
 fn reads_stdin_and_writes_stdout() {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_pngdeer")).arg("-").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_slimdeer")).arg("-").stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
     child.stdin.take().unwrap().write_all(&sample()).unwrap();
     let run = child.wait_with_output().unwrap();
     assert_eq!(run.status.code(), Some(0));
@@ -97,7 +97,7 @@ fn reads_stdin_and_writes_stdout() {
 #[test]
 fn json_is_a_line_per_file() {
     let dir = folder("json", &["a.png", "b.png"]);
-    let run = pngdeer(&dir, &["a.png", "b.png", "--json"]);
+    let run = slimdeer(&dir, &["a.png", "b.png", "--json"]);
     assert_eq!(run.status.code(), Some(0));
     let lines: Vec<String> = String::from_utf8(run.stdout).unwrap().lines().map(String::from).collect();
     assert_eq!(lines.len(), 2);
@@ -113,7 +113,7 @@ fn json_is_a_line_per_file() {
 fn a_bad_file_doesnt_stop_the_others() {
     let dir = folder("bad", &["good.png"]);
     fs::write(dir.join("notes.txt"), "not an image").unwrap();
-    let run = pngdeer(&dir, &["notes.txt", "missing.png", "good.png"]);
+    let run = slimdeer(&dir, &["notes.txt", "missing.png", "good.png"]);
     assert_eq!(run.status.code(), Some(1));
     let said = String::from_utf8(run.stderr).unwrap();
     assert!(said.contains("notes.txt: not a PNG or a JPEG") && said.contains("missing.png: no such file"), "{said}");
@@ -125,9 +125,9 @@ fn a_bad_file_doesnt_stop_the_others() {
 fn a_command_it_cant_run_exits_2() {
     let dir = folder("usage", &["a.png", "b.png"]);
     for args in [&[][..], &["a.png", "b.png", "-o", "x.png"], &["--quality", "80", "a.png"], &["a.png", "--target", "101"], &["-", "--json"]] {
-        let run = pngdeer(&dir, args);
+        let run = slimdeer(&dir, args);
         assert_eq!(run.status.code(), Some(2), "{args:?}");
-        assert!(String::from_utf8_lossy(&run.stderr).contains("pngdeer --help"), "{args:?}");
+        assert!(String::from_utf8_lossy(&run.stderr).contains("slimdeer --help"), "{args:?}");
     }
     assert!(!dir.join("a.min.png").exists() && !dir.join("x.png").exists());
     fs::remove_dir_all(&dir).unwrap();

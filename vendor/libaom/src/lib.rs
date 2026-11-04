@@ -1,4 +1,4 @@
-//! libaom 3.15.2's AV1 encoder (libaom/, BSD-2-Clause with AOM's patent license) for pngdeer: a
+//! libaom 3.15.2's AV1 encoder (libaom/, BSD-2-Clause with AOM's patent license) for slimdeer: a
 //! still image's planes to AV1 data, and the frame as a decoder shows it. Built the same way on
 //! every target (build.rs), so the command line and the browser build write the same bytes.
 
@@ -9,7 +9,7 @@ use std::sync::Once;
 mod workers;
 
 // the C library functions libaom calls, the same on every target
-use pngdeer_clib as _;
+use slimdeer_clib as _;
 
 /// AV1's limit on either side (16 bits in the sequence header).
 pub const MAX_SIDE: usize = 65536;
@@ -25,7 +25,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// libaom's tunings (aom_tune_metric) pngdeer uses.
+/// libaom's tunings (aom_tune_metric) slimdeer uses.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tune {
     Psnr = 0,
@@ -87,9 +87,9 @@ struct COptions {
 }
 
 extern "C" {
-    fn pngdeer_aom_init();
+    fn slimdeer_aom_init();
     #[allow(clippy::too_many_arguments)]
-    fn pngdeer_aom_encode(
+    fn slimdeer_aom_encode(
         planes: *const *const u16,
         count: c_int,
         width: c_int,
@@ -102,7 +102,7 @@ extern "C" {
         message: *mut c_char,
         message_size: usize,
     ) -> c_int;
-    fn pngdeer_aom_free(pointer: *mut c_void);
+    fn slimdeer_aom_free(pointer: *mut c_void);
 }
 
 /// Encodes one still image: `planes` holds 3 planes (Y, U and V, 4:4:4) or 1 (an alpha plane,
@@ -133,7 +133,7 @@ pub fn encode(planes: &[&[u16]], width: usize, height: usize, depth: u8, options
     // SAFETY: sets up libaom's workers and tables, once, before any encoder runs
     INIT.call_once(|| unsafe {
         workers::install();
-        pngdeer_aom_init();
+        slimdeer_aom_init();
     });
     let c = COptions {
         quantizer: options.quantizer as c_int,
@@ -156,7 +156,7 @@ pub fn encode(planes: &[&[u16]], width: usize, height: usize, depth: u8, options
     // samples as the planes) and the message, and allocates the data with malloc, freed here with
     // its own free.
     unsafe {
-        let ok = pngdeer_aom_encode(
+        let ok = slimdeer_aom_encode(
             pointers.as_ptr(),
             planes.len() as c_int,
             width as c_int,
@@ -173,7 +173,7 @@ pub fn encode(planes: &[&[u16]], width: usize, height: usize, depth: u8, options
             return Err(Error(format!("AV1 encoding failed: {}", CStr::from_ptr(message.as_ptr()).to_string_lossy())));
         }
         let data = std::slice::from_raw_parts(out, size).to_vec();
-        pngdeer_aom_free(out.cast());
+        slimdeer_aom_free(out.cast());
         Ok(Encoded { data, decoded })
     }
 }

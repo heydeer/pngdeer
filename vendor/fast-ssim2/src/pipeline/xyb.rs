@@ -33,7 +33,7 @@ pub(crate) const NEG_CBRT_BIAS: f32 = f32::from_bits(0xbe1f_b275); // -cbrtf(BIA
 /// Port of hwy's `CubeRootAndAdd` — the exact f32 op sequence, no f64.
 /// Returns approximately `x.cbrt() + add` with ~6 ulp error.
 #[allow(unused_imports)]
-use super::Fma; // pngdeer patch
+use super::Fma; // slimdeer patch
 #[inline]
 fn cube_root_and_add(x: f32, add: f32) -> f32 {
     const K_EXP_BIAS: i32 = 0x5480_0000; // cast(1.) + cast(1.) / 3

@@ -1,7 +1,7 @@
-/* pngdeer: mozjpeg 4.1.5's jconfigint.h as its CMake build generates it, with the sizes taken from
+/* slimdeer: mozjpeg 4.1.5's jconfigint.h as its CMake build generates it, with the sizes taken from
  * the compiler's own macros so that it holds for every target (arm64, x86-64, wasm32). */
 
-#define BUILD  "pngdeer"
+#define BUILD  "slimdeer"
 
 #undef inline
 #define INLINE  __inline__ __attribute__((always_inline))

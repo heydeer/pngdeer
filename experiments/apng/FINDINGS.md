@@ -1,6 +1,6 @@
 # Animated PNGs
 
-2026-10-28. Before this, pngdeer kept only an animated PNG's first frame, silently (`codec::decode`
+2026-10-28. Before this, slimdeer kept only an animated PNG's first frame, silently (`codec::decode`
 reads one image), and its WebP output refused animations. Now an animated PNG stays animated:
 `apng::decode` draws every frame as a viewer shows it, the search runs over all frames on one
 palette (`search::run_animation`), and `apng::encode` writes the frames back.
@@ -10,7 +10,7 @@ palette (`search::run_animation`), and `apng::encode` writes the frames back.
 - **Frames as shown.** Each frame is blended and disposed onto the canvas per the APNG spec, so the
   search scores the images people see. Checked against Pillow on 13 animations (12 below and a
   3-frame test): identical, pixel for pixel. Where they differ, on an animation of translucent
-  frames blended over translucent ones, pngdeer follows the spec's formula and Pillow pastes
+  frames blended over translucent ones, slimdeer follows the spec's formula and Pillow pastes
   through the frame's alpha (alpha 129 where the spec gives 191); browsers composite per the spec.
 - **One palette.** A palette APNG has one PLTE for every frame, so the palettes are built from all
   frames at once (stacked into one tall image). Each frame is remapped on its own, then every pixel
@@ -40,7 +40,7 @@ palette (`search::run_animation`), and `apng::encode` writes the frames back.
 12 animated emoji from Microsoft's Fluent set (github.com/microsoft/fluentui-emoji-animated, MIT;
 256 × 256, translucent, 13–73 frames), at automatic quality:
 
-| Animation | Frames | Original | Lossless (oxipng) | pngdeer | Worst frame (target) | Colors |
+| Animation | Frames | Original | Lossless (oxipng) | slimdeer | Worst frame (target) | Colors |
 |---|---:|---:|---:|---:|---:|---:|
 | aerial tramway | 72 | 1456 KB | 93.5% | 23.1% | 83.2 (82.9) | 230 |
 | airplane departure | 72 | 1906 KB | 93.3% | 25.1% | 86.3 (86.2) | 163 |
@@ -58,11 +58,11 @@ palette (`search::run_animation`), and `apng::encode` writes the frames back.
 
 Against TinyPNG (its API compresses APNGs: one palette of 255–256 colors, the input's frame
 rectangles and dispose ops kept), on 3 of the emoji and a screen recording (36 frames of 1000 ×
-640: a cursor moving over pngdeer's site, then a scroll). pngdeer's size where it matches TinyPNG's
+640: a cursor moving over slimdeer's site, then a scroll). slimdeer's size where it matches TinyPNG's
 worst frame, and (searching for an average frame instead, an experiment, before the preview)
 where it matches TinyPNG's average frame:
 
-| Animation | TinyPNG | Worst frame: TinyPNG | pngdeer's size at it | Average frame: TinyPNG | pngdeer's size at it |
+| Animation | TinyPNG | Worst frame: TinyPNG | slimdeer's size at it | Average frame: TinyPNG | slimdeer's size at it |
 |---|---:|---:|---:|---:|---:|
 | fire | 470 KB | 82.5 | 84.3% | 87.3 | 89.8% |
 | ghost | 757 KB | 81.7 | 94.9% | 84.8 | 99.2% |

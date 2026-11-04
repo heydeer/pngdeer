@@ -1,7 +1,7 @@
-// pngdeer: wasm32 has no C library; Rust's compiler-builtins provides the mem functions and strlen,
+// slimdeer: wasm32 has no C library; Rust's compiler-builtins provides the mem functions and strlen,
 // libc.c the rest.
-#ifndef PNGDEER_STRING_H_
-#define PNGDEER_STRING_H_
+#ifndef SLIMDEER_STRING_H_
+#define SLIMDEER_STRING_H_
 #include <stddef.h>
 void* memcpy(void* to, const void* from, size_t size);
 void* memmove(void* to, const void* from, size_t size);

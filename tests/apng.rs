@@ -1,7 +1,7 @@
 //! Animated PNGs: frames as viewers show them, and compressed animations that stay animations.
 
 use miniz_oxide::deflate::compress_to_vec_zlib;
-use pngdeer::{apng, compress, search, Settings, RGBA};
+use slimdeer::{apng, compress, search, Settings, RGBA};
 
 /// One frame of a test animation: its rectangle, delay, dispose and blend ops, and RGBA pixels.
 struct Frame {

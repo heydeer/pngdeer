@@ -1,11 +1,11 @@
 [package]
-name = "pngdeer"
+name = "slimdeer"
 version = "0.2.1"
 edition = "2021"
 license = "MIT"
-description = "Lossy PNG compression: per image, the smallest palette PNG that keeps a SSIMULACRA2 quality. The same code runs on the command line and in the browser (web/)."
+description = "Smaller PNG and JPEG images, or WebP and AVIF, that keep a SSIMULACRA2 quality picked per image. The same code runs on the command line and in the browser (web/)."
 readme = "README.md"
-repository = "https://github.com/heydeer/pngdeer"
+repository = "https://github.com/heydeer/slimdeer"
 # The library, the command line and their tests; not bench/'s images, web/ or the other tools.
 include = ["/src", "/tests", "/README.md", "/LICENSE"]
 
@@ -16,25 +16,25 @@ default = ["parallel", "oxipng", "webp", "jpeg", "avif"]
 parallel = ["dep:rayon", "fast-ssim2/rayon", "oxipng?/parallel", "aom?/parallel"]
 # compress() recompresses its final file with oxipng -o 2.
 oxipng = ["dep:oxipng"]
-# WebP output (pngdeer::compress_webp), with the vendored libwebp (vendor/libwebp).
+# WebP output (slimdeer::compress_webp), with the vendored libwebp (vendor/libwebp).
 webp = ["dep:libwebp"]
-# JPEG output (pngdeer::compress_jpeg): the vendored mozjpeg (vendor/mozjpeg) encodes, zune-jpeg decodes.
+# JPEG output (slimdeer::compress_jpeg): the vendored mozjpeg (vendor/mozjpeg) encodes, zune-jpeg decodes.
 jpeg = ["dep:mozjpeg", "dep:zune-jpeg", "dep:zune-core"]
-# AVIF output (pngdeer::compress_avif), with the vendored libaom (vendor/libaom).
+# AVIF output (slimdeer::compress_avif), with the vendored libaom (vendor/libaom).
 avif = ["dep:aom"]
 # For wasm32: oxipng's libdeflate built without libc (needs a clang that targets wasm32, see web/build.sh).
 freestanding = ["oxipng?/freestanding"]
 
 [dependencies]
-aom = { package = "pngdeer-libaom", path = "vendor/libaom", optional = true }
+aom = { package = "slimdeer-libaom", path = "vendor/libaom", optional = true }
 crc32fast = "1.5.3"
 fast-ssim2 = "0.9.0"
 # Math functions that give the same bits on every platform (std's come from the system libm on
 # native targets), so the browser build's output matches the command line's.
 libm = "0.2.16"
-libwebp = { package = "pngdeer-libwebp", path = "vendor/libwebp", optional = true }
+libwebp = { package = "slimdeer-libwebp", path = "vendor/libwebp", optional = true }
 miniz_oxide = "0.9.1"
-mozjpeg = { package = "pngdeer-mozjpeg", path = "vendor/mozjpeg", optional = true }
+mozjpeg = { package = "slimdeer-mozjpeg", path = "vendor/mozjpeg", optional = true }
 oxipng = { version = "10.2.1", default-features = false, optional = true }
 png = "0.18.1"
 rayon = { version = "1", optional = true }

@@ -1,4 +1,4 @@
-//! libwebp 1.6.0 (libwebp/, BSD-3-Clause) for pngdeer: RGBA to lossy or lossless WebP, and WebP
+//! libwebp 1.6.0 (libwebp/, BSD-3-Clause) for slimdeer: RGBA to lossy or lossless WebP, and WebP
 //! back to RGBA as browsers decode it. Built the same way on every target (build.rs), so the
 //! command line and the browser build write the same bytes; the C library functions that would
 //! differ between targets are here, below.
@@ -6,7 +6,7 @@
 use std::ffi::{c_int, c_void};
 
 // the C library functions libwebp calls, the same on every target
-use pngdeer_clib as _;
+use slimdeer_clib as _;
 use std::fmt;
 
 /// Lossy (VP8) settings; see libwebp's WebPConfig.
@@ -63,7 +63,7 @@ pub struct Decoded {
     pub height: usize,
 }
 
-/// Mirrors PngdeerWebpOptions in glue/pngdeer_webp.c.
+/// Mirrors SlimdeerWebpOptions in glue/slimdeer_webp.c.
 #[repr(C)]
 struct Options {
     lossless: c_int,
@@ -85,18 +85,18 @@ struct Options {
     near_lossless: c_int,
 }
 
-/// A setting for the glue: libwebp's default is -1 (glue/pngdeer_webp.c).
+/// A setting for the glue: libwebp's default is -1 (glue/slimdeer_webp.c).
 fn or_default<T: Into<c_int>>(value: Option<T>) -> c_int {
     value.map_or(-1, Into::into)
 }
 
 extern "C" {
-    fn pngdeer_webp_source_new(rgba: *const u8, width: c_int, height: c_int, sharp_yuv: c_int, error: *mut c_int) -> *mut c_void;
-    fn pngdeer_webp_source_encode(source: *const c_void, options: *const Options, out: *mut *mut u8, error: *mut c_int) -> usize;
-    fn pngdeer_webp_source_free(source: *mut c_void);
-    fn pngdeer_webp_encode(rgba: *const u8, width: c_int, height: c_int, options: *const Options, out: *mut *mut u8, error: *mut c_int) -> usize;
-    fn pngdeer_webp_decode(data: *const u8, size: usize, width: *mut c_int, height: *mut c_int) -> *mut u8;
-    fn pngdeer_webp_free(pointer: *mut c_void);
+    fn slimdeer_webp_source_new(rgba: *const u8, width: c_int, height: c_int, sharp_yuv: c_int, error: *mut c_int) -> *mut c_void;
+    fn slimdeer_webp_source_encode(source: *const c_void, options: *const Options, out: *mut *mut u8, error: *mut c_int) -> usize;
+    fn slimdeer_webp_source_free(source: *mut c_void);
+    fn slimdeer_webp_encode(rgba: *const u8, width: c_int, height: c_int, options: *const Options, out: *mut *mut u8, error: *mut c_int) -> usize;
+    fn slimdeer_webp_decode(data: *const u8, size: usize, width: *mut c_int, height: *mut c_int) -> *mut u8;
+    fn slimdeer_webp_free(pointer: *mut c_void);
 }
 
 /// RGBA (`width` * 4 bytes a row) as lossy WebP: VP8, and a separate alpha plane if any pixel is
@@ -124,7 +124,7 @@ impl Source {
         warm_up();
         let mut error = 0;
         // SAFETY: rgba holds width * height * 4 bytes (checked)
-        let picture = unsafe { pngdeer_webp_source_new(rgba.as_ptr(), width as c_int, height as c_int, sharp_yuv as c_int, &mut error) };
+        let picture = unsafe { slimdeer_webp_source_new(rgba.as_ptr(), width as c_int, height as c_int, sharp_yuv as c_int, &mut error) };
         if picture.is_null() {
             return Err(Error(encode_error(error)));
         }
@@ -139,7 +139,7 @@ impl Source {
         let (mut out, mut error) = (std::ptr::null_mut(), 0);
         // SAFETY: the picture is alive while self is; `out` as in `encode`
         unsafe {
-            let size = pngdeer_webp_source_encode(self.picture, &lossy_options(settings), &mut out, &mut error);
+            let size = slimdeer_webp_source_encode(self.picture, &lossy_options(settings), &mut out, &mut error);
             take(out, size, error)
         }
     }
@@ -147,8 +147,8 @@ impl Source {
 
 impl Drop for Source {
     fn drop(&mut self) {
-        // SAFETY: allocated by pngdeer_webp_source_new, freed once
-        unsafe { pngdeer_webp_source_free(self.picture) }
+        // SAFETY: allocated by slimdeer_webp_source_new, freed once
+        unsafe { slimdeer_webp_source_free(self.picture) }
     }
 }
 
@@ -250,7 +250,7 @@ fn encode(rgba: &[u8], width: usize, height: usize, options: &Options) -> Result
     let (mut out, mut error) = (std::ptr::null_mut(), 0);
     // SAFETY: rgba holds width * height * 4 bytes (checked above)
     unsafe {
-        let size = pngdeer_webp_encode(rgba.as_ptr(), width as c_int, height as c_int, options, &mut out, &mut error);
+        let size = slimdeer_webp_encode(rgba.as_ptr(), width as c_int, height as c_int, options, &mut out, &mut error);
         take(out, size, error)
     }
 }
@@ -265,7 +265,7 @@ unsafe fn take(out: *mut u8, size: usize, error: c_int) -> Result<Vec<u8>, Error
         return Err(Error(encode_error(error)));
     }
     let file = std::slice::from_raw_parts(out, size).to_vec();
-    pngdeer_webp_free(out.cast());
+    slimdeer_webp_free(out.cast());
     Ok(file)
 }
 
@@ -298,13 +298,13 @@ fn decode_any(webp: &[u8]) -> Result<Decoded, Error> {
     // SAFETY: libwebp reads `webp.len()` bytes; the result is width * height * 4 bytes of its
     // allocation, copied and then freed with its own free.
     unsafe {
-        let pixels = pngdeer_webp_decode(webp.as_ptr(), webp.len(), &mut width, &mut height);
+        let pixels = slimdeer_webp_decode(webp.as_ptr(), webp.len(), &mut width, &mut height);
         if pixels.is_null() {
             return Err(Error("not a WebP file libwebp can decode".into()));
         }
         let (width, height) = (width as usize, height as usize);
         let rgba = std::slice::from_raw_parts(pixels, width * height * 4).to_vec();
-        pngdeer_webp_free(pixels.cast());
+        slimdeer_webp_free(pixels.cast());
         Ok(Decoded { rgba, width, height })
     }
 }

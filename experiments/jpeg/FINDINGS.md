@@ -1,12 +1,12 @@
 # JPEG to smaller JPEG
 
-2026-10-30. pngdeer now takes JPEG photos too: `pngdeer::compress_jpeg` (src/jpeg.rs) decodes the
+2026-10-30. slimdeer now takes JPEG photos too: `slimdeer::compress_jpeg` (src/jpeg.rs) decodes the
 photo, re-encodes it at the lowest quality whose SSIMULACRA2 score against it reaches the target,
 and never returns more bytes than it was given. On 60 photos, at TinyPNG's quality, its files are
 10% smaller than TinyPNG's on the median photo and 13% smaller in total; at its automatic quality,
 which aims at about TinyPNG's, 18% and 16% smaller, scoring about the same (median +0.2 points).
 A photo can also come out as WebP (round 5): 5–9% smaller than TinyPNG's WebP at its quality, but
-no smaller than pngdeer's own JPEG at the same quality.
+no smaller than slimdeer's own JPEG at the same quality.
 
 ## Photos and method
 
@@ -14,7 +14,7 @@ no smaller than pngdeer's own JPEG at the same quality.
   resized copies (`web/`: 0.6–6.1 MP, quality 87, 4:2:0, 0.2–2.5 MB), the kind of JPEG a website
   serves, and 30 camera originals (`orig/`: 6.1–15.6 MP, quality 91–100, mostly 4:4:4, 1.3–13.8 MB).
 - **TinyPNG** through its API, 30 October 2026 (bench.py's client, `bench/.cache/tinypng`).
-- **Scores** against the photo, both decoded as pngdeer decodes them (zune-jpeg), with pngdeer's
+- **Scores** against the photo, both decoded as slimdeer decodes them (zune-jpeg), with slimdeer's
   `--score`. Browsers decode with libjpeg-turbo: on TinyPNG's 60 files its pixels score within 0.2
   points of zune-jpeg's (mean 0.05).
 - `compare.py` runs everything below and summarizes it; frontiers and interpolation are bench.py's,
@@ -39,7 +39,7 @@ the middle half of the photos):
 | mozjpeg, table 1 | 1.362 (1.20–1.55) |
 
 mozjpeg with table 2 (which cjpeg's usage describes as tuned for MS-SSIM) and 4:2:0 ties jpegli at
-4:2:0, and jpegli is C++, which the browser build can't link. pngdeer keeps mozjpeg's progressive
+4:2:0, and jpegli is C++, which the browser build can't link. slimdeer keeps mozjpeg's progressive
 scans and trellis quantization (its defaults), and writes baseline-compatible 8-bit tables, which
 every decoder reads.
 
@@ -63,14 +63,14 @@ CMYK JPEGs are refused.
   median 66.9 (65.8 on the originals, 68.3 on the web photos).
 - **4:4:4 stays 4:4:4** (21 of the originals), the rest 4:2:0; always progressive.
 - **All metadata goes**, the ICC profile too: a photo in Display P3 or Adobe RGB then shows in the
-  wrong colors. pngdeer keeps an ICC profile unless it is sRGB's (what viewers assume anyway) and
+  wrong colors. slimdeer keeps an ICC profile unless it is sRGB's (what viewers assume anyway) and
   the EXIF orientation (a phone photo would otherwise show sideways), and drops the rest of EXIF
   (camera, place, time), which is mostly bytes and sometimes private.
 - It kept 18% of the 60 photos' bytes in total.
 
 ## Round 3: automatic quality
 
-pngdeer's PNG and WebP output aim at TinyPNG's quality through a reference file whose score tracks
+slimdeer's PNG and WebP output aim at TinyPNG's quality through a reference file whose score tracks
 TinyPNG's per image. For JPEG no reference does: mozjpeg's file at any quality from 50 to 85, with
 libjpeg's table or table 2, scores with a correlation of −0.11 to +0.13 with TinyPNG's file, since
 TinyPNG goes by size. Models of TinyPNG's score per photo, each fitted on the other 59 photos and
@@ -91,18 +91,18 @@ treats both kinds alike, and adding a reference to it buys nothing. So the autom
 **72.3 − 3.2 ln(megapixels)**, at most 90 as for PNG: 74.5 at 0.5 MP, 70.1 at 2 MP, 67.2 at 5 MP,
 64.4 at 12 MP. TinyPNG's choice by size is a sensible one: a large photo is seen scaled down, which
 hides what its compression did. It also costs nothing to compute, where a reference file cost an
-encode and a scoring. The rest of TinyPNG's spread isn't in anything measured here; pngdeer lands
+encode and a scoring. The rest of TinyPNG's spread isn't in anything measured here; slimdeer lands
 within 3 points of TinyPNG's score on half the photos.
 
 ## Round 4: against TinyPNG
 
 | On the 60 photos, against TinyPNG | Bytes (median photo / total) | Points (median) |
 |---|---|---|
-| **pngdeer, at TinyPNG's score** | **89.5% / 86.7%** (all 60 reached) | |
-| **pngdeer, automatic quality** | **82.4% / 84.2%** | +0.2 |
+| **slimdeer, at TinyPNG's score** | **89.5% / 86.7%** (all 60 reached) | |
+| **slimdeer, automatic quality** | **82.4% / 84.2%** | +0.2 |
 | mozjpeg at its default quality (75) | 107.0% / 105.6% | +5.0 |
 
-- **At TinyPNG's score** (its score as the target), pngdeer's file is smaller on 57 of the 60
+- **At TinyPNG's score** (its score as the target), slimdeer's file is smaller on 57 of the 60
   photos (from 45% to 112% of TinyPNG's; middle half 82–96%): 85% on the median original, 94% on
   the median web photo, which TinyPNG compressed less to begin with.
 - **Automatic quality**: smaller than TinyPNG's file on 52 photos (middle half 75–93% of its
@@ -111,15 +111,15 @@ within 3 points of TinyPNG's score on half the photos.
   40–82, median 63.5 (the search starts there); every photo reached its target, none came back
   as the original. 2.3 s per photo (median) on a 14-core Mac.
 - **The open-source encoders**, each given its best quality per photo after the fact (a sweep,
-  pooled into one frontier; pngdeer's own encoder settings measured the same way for comparison):
+  pooled into one frontier; slimdeer's own encoder settings measured the same way for comparison):
 
   | At TinyPNG's quality | Bytes (median / total) | Reached | Points at TinyPNG's size |
   |---|---|---|---|
-  | pngdeer's settings (mozjpeg, table 2, 4:2:0), qualities 50–85 | 87.6% / 86.4% | 59 | +3.3 |
+  | slimdeer's settings (mozjpeg, table 2, 4:2:0), qualities 50–85 | 87.6% / 86.4% | 59 | +3.3 |
   | jpegli, defaults and 4:2:0, qualities 40–90 | 89.2% / 87.2% | 60 | +3.1 |
   | mozjpeg's defaults, qualities 40–90 | 94.2% / 89.1% | 59 | +1.8 |
 
-  Pooled with its two runs as well, as the README and the site show it, pngdeer's frontier needs
+  Pooled with its two runs as well, as the README and the site show it, slimdeer's frontier needs
   87.8% / 85.4% (12.2% saved on the median photo). Out of the box, mozjpeg's default quality is 5
   points above TinyPNG at 7% more bytes.
 
@@ -143,22 +143,22 @@ target**: one quality per photo, whichever format it comes out in.
 
 | On the 60 photos, against TinyPNG's WebP | Bytes (median photo / total) | Points (median) |
 |---|---|---|
-| **pngdeer, at TinyPNG's score** | **95.3% / 91.3%** (all 60 reached) | |
+| **slimdeer, at TinyPNG's score** | **95.3% / 91.3%** (all 60 reached) | |
 | cwebp, best of 13 settings (frontier) | 94.5% / 91.1% (all 60 reached) | +0.9 at its size |
-| **pngdeer, automatic quality** | **96.5% / 91.0%** | +2.0 |
+| **slimdeer, automatic quality** | **96.5% / 91.0%** | +2.0 |
 | cwebp at its default quality (75) | 106.2% / 106.0% | +1.5 |
 
-cwebp swept qualities 40–90 at its defaults (method 4) and at pngdeer's settings; given its best
-per photo after the fact it ties pngdeer, whose settings (method 6, auto filter) save 5.6% and
-2.5% over method 4 and no auto filter on 10 of the photos. At its automatic quality pngdeer's WebP
+cwebp swept qualities 40–90 at its defaults (method 4) and at slimdeer's settings; given its best
+per photo after the fact it ties slimdeer, whose settings (method 6, auto filter) save 5.6% and
+2.5% over method 4 and no auto filter on 10 of the photos. At its automatic quality slimdeer's WebP
 is 9% smaller in total than TinyPNG's and 2 points better (its target is a little higher).
 
-**WebP isn't smaller than pngdeer's JPEG.** At the same automatic target, pngdeer's WebP is 99% of
+**WebP isn't smaller than slimdeer's JPEG.** At the same automatic target, slimdeer's WebP is 99% of
 its JPEG's bytes on the median photo and 101% in total (middle half 92–107%; smaller on 33 of 60:
 97% on the web photos, 102% on the originals), scoring the same (median +0.06). mozjpeg's trellis
 quantization at 4:2:0 holds its own against VP8 at these qualities. TinyPNG's WebP looks smaller
-than its JPEG only because it is a point worse and TinyPNG's JPEG is less efficient than pngdeer's
-(pngdeer's WebP is 83% of TinyPNG's JPEG, as good). WebP from a JPEG is for sites that want WebP,
+than its JPEG only because it is a point worse and TinyPNG's JPEG is less efficient than slimdeer's
+(slimdeer's WebP is 83% of TinyPNG's JPEG, as good). WebP from a JPEG is for sites that want WebP,
 not for smaller files; and it takes longer: 8.6 s per photo (median; 3.4 s web, 15.7 s originals)
 against 2.3 s, mostly libwebp's slowest method and its auto filter.
 

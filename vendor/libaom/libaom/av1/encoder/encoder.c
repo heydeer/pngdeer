@@ -1182,7 +1182,7 @@ AV1_PRIMARY *av1_create_primary_compressor(
     }
   }
 
-#if PNGDEER_STILL
+#if SLIMDEER_STILL
 #define BFP(BT, SDF, SDAF, VF, SVF, SVAF, SDX4DF, SDX3DF) \
   ppi->fn_ptr[BT].sdf = SDF;                              \
   ppi->fn_ptr[BT].sdaf = NULL;                            \
@@ -1304,7 +1304,7 @@ AV1_PRIMARY *av1_create_primary_compressor(
       aom_sad4x4x3d)
 
 #if !CONFIG_REALTIME_ONLY
-#if PNGDEER_STILL
+#if SLIMDEER_STILL
 #define OBFP(BT, OSDF, OVF, OSVF) \
   ppi->fn_ptr[BT].osdf = NULL;    \
   ppi->fn_ptr[BT].ovf = NULL;     \
@@ -1362,7 +1362,7 @@ AV1_PRIMARY *av1_create_primary_compressor(
        aom_obmc_sub_pixel_variance64x16)
 #endif  // !CONFIG_REALTIME_ONLY
 
-#if PNGDEER_STILL
+#if SLIMDEER_STILL
 #define MBFP(BT, MCSDF, MCSVF)  \
   ppi->fn_ptr[BT].msdf = NULL;  \
   ppi->fn_ptr[BT].msvf = NULL;

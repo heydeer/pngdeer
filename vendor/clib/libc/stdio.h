@@ -1,8 +1,8 @@
-// pngdeer: wasm32 has no C library. The vendored libraries print only error messages and debugging
-// output, and mozjpeg's file destination and libaom's files are never used (pngdeer writes to
+// slimdeer: wasm32 has no C library. The vendored libraries print only error messages and debugging
+// output, and mozjpeg's file destination and libaom's files are never used (slimdeer writes to
 // memory): libc.c's stubs.
-#ifndef PNGDEER_STDIO_H_
-#define PNGDEER_STDIO_H_
+#ifndef SLIMDEER_STDIO_H_
+#define SLIMDEER_STDIO_H_
 #include <stdarg.h>
 #include <stddef.h>
 typedef struct FILE FILE;
@@ -16,7 +16,7 @@ size_t fwrite(const void* data, size_t size, size_t count, FILE* file);
 size_t fread(void* data, size_t size, size_t count, FILE* file);
 int fflush(FILE* file);
 int ferror(FILE* file);
-// libaom's statistics and option files, which pngdeer never asks for
+// libaom's statistics and option files, which slimdeer never asks for
 #define EOF (-1)
 #define SEEK_SET 0
 #define SEEK_CUR 1

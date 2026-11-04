@@ -190,7 +190,7 @@ pub struct Profile {
     pub remap: f64,
     pub score: f64,
     pub encode: f64,
-    /// oxipng on the final file (pngdeer::compress).
+    /// oxipng on the final file (slimdeer::compress).
     pub optimize: f64,
 }
 
@@ -250,7 +250,7 @@ fn enlargement(w: usize, h: usize) -> usize {
     factor
 }
 
-/// One-off score of `distorted` against `source` (pngdeer --score), with the same small-image rule.
+/// One-off score of `distorted` against `source` (slimdeer --score), with the same small-image rule.
 pub fn score(source: &[RGBA], distorted: &[RGBA], w: usize, h: usize) -> Result<f64, BoxError> {
     Scorer::new(source, w, h)?.score(distorted)
 }

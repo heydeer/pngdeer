@@ -60,7 +60,7 @@ pub struct ReferenceCache {
     height: usize,
     /// `true` when the source carries alpha (compare uses min-score).
     has_alpha: bool,
-    /// pngdeer patch: a lean cache keeps only the source (`stacks` stays empty). Each comparison
+    /// slimdeer patch: a lean cache keeps only the source (`stacks` stays empty). Each comparison
     /// converts both images scale by scale and scores one channel at a time (`lean_scales`), so
     /// large images fit in wasm32's 4 GB. Same scores, slower comparisons.
     lean_source: Option<LeanSource>,
@@ -139,7 +139,7 @@ fn ref_scales(
                     o
                 })
                 .collect();
-            // pngdeer patch: moved out rather than cloned, which held a second copy of all six
+            // slimdeer patch: moved out rather than cloned, which held a second copy of all six
             // planes at the peak.
             let [m0, s0, m1, s1, m2, s2]: [Vec<f32>; 6] = flat.try_into().unwrap();
             mu1 = [m0, m1, m2];
@@ -378,7 +378,7 @@ impl ReferenceCache {
         self.compare_stop_kernel(distorted, stop, Kernel::Simd)
     }
     /// [`Self::compare_stop_kernel`] taking the image. With neither side carrying alpha it frees
-    /// the image once linearized (pngdeer patch: otherwise it stays alive through the comparison's
+    /// the image once linearized (slimdeer patch: otherwise it stays alive through the comparison's
     /// peak); the steps and the result are the same.
     pub(crate) fn compare_owned_stop_kernel(
         &self,
@@ -505,7 +505,7 @@ fn dist_scales(
                     o
                 })
                 .collect();
-            // pngdeer patch: moved out rather than cloned, which held a second copy of all nine
+            // slimdeer patch: moved out rather than cloned, which held a second copy of all nine
             // planes at the peak.
             let [a0, a1, a2, b0, b1, b2, c0, c1, c2]: [Vec<f32>; 9] = flat.try_into().unwrap();
             sigma2_sq = [a0, a1, a2];
@@ -514,7 +514,7 @@ fn dist_scales(
         }
         #[cfg(not(feature = "rayon"))]
         {
-            // pngdeer patch: dropped three planes allocated here and never used.
+            // slimdeer patch: dropped three planes allocated here and never used.
             let mut tmp = vec![0f32; npix];
             let mut run = |a: &[f32], b: Option<&[f32]>| -> Vec<f32> {
                 let mut o = vec![0f32; npix];
@@ -605,7 +605,7 @@ fn dist_scales(
 }
 
 /// One channel's `SSIMMap` pair and `EdgeDiffMap` quad, with the kernels the whole-image
-/// comparison uses for that channel in this build. pngdeer patch: shared with the lean path, which
+/// comparison uses for that channel in this build. slimdeer patch: shared with the lean path, which
 /// scores channel by channel, so both give the same bits.
 #[allow(clippy::too_many_arguments)]
 fn channel_maps(
@@ -926,7 +926,7 @@ fn blur_channel(
     }
 }
 
-/// The scalar kernel's blur (the one wasm builds run). pngdeer patch: a product is formed a row at a
+/// The scalar kernel's blur (the one wasm builds run). slimdeer patch: a product is formed a row at a
 /// time in `out`, which the vertical pass overwrites anyway, rather than in a plane of its own, and
 /// with rayon the rows, then column ranges, run in parallel. Each row and each column goes through
 /// the same arithmetic, so results are bit-identical.

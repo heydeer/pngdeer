@@ -1,5 +1,5 @@
-// pngdeer: the few C library functions the vendored libraries need on wasm32 that neither Rust's
-// compiler-builtins nor src/lib.rs provides. Messages go nowhere: pngdeer reports errors itself.
+// slimdeer: the few C library functions the vendored libraries need on wasm32 that neither Rust's
+// compiler-builtins nor src/lib.rs provides. Messages go nowhere: slimdeer reports errors itself.
 #include <stddef.h>
 
 typedef struct FILE FILE;
@@ -7,7 +7,7 @@ FILE* stderr = NULL;
 int errno = 0;
 
 void abort(void) { __builtin_trap(); }
-// setjmp.h: an error inside libaom, which pngdeer's checks leave to running out of memory
+// setjmp.h: an error inside libaom, which slimdeer's checks leave to running out of memory
 _Noreturn void longjmp(int* env, int value) {
   (void)env, (void)value;
   __builtin_trap();
@@ -25,8 +25,8 @@ char* getenv(const char* name) {
 int abs(int x) { return x < 0 ? -x : x; }
 long long llabs(long long x) { return x < 0 ? -x : x; }
 
-// libaom's option parsing (decimal, or hexadecimal or octal by prefix with base 0), which pngdeer
-// doesn't use; and its film grain's seed, off in pngdeer
+// libaom's option parsing (decimal, or hexadecimal or octal by prefix with base 0), which slimdeer
+// doesn't use; and its film grain's seed, off in slimdeer
 unsigned long strtoul(const char* text, char** end, int base) {
   const char* s = text;
   while (*s == ' ' || (*s >= '\t' && *s <= '\r')) s++;

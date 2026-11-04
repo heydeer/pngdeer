@@ -1,4 +1,4 @@
-"""python3 experiments/webp/compare.py RUN [RUN ...]: pngdeer's WebP output (wpauto) against its PNG
+"""python3 experiments/webp/compare.py RUN [RUN ...]: slimdeer's WebP output (wpauto) against its PNG
 (pdauto) and against libwebp's own cwebp, from bench.py runs with the pipelines
 pdauto,wpauto,cw50,...,cw100,cwll. Several runs are pooled by image (the main and held-out sets);
 where two have the same pipeline for an image, the later run's row counts (a rerun of wpauto
@@ -12,7 +12,7 @@ alone, say).
   against TinyPNG).
 - A second wpauto-like pipeline (e.g. one run with --pd-args), if given as --other NAME, is set
   against wpauto the same way as the PNG.
-- TinyPNG's WebP (tinywebp), where a run has it: pngdeer's WebP curve (every wp pipeline, wpT and
+- TinyPNG's WebP (tinywebp), where a run has it: slimdeer's WebP curve (every wp pipeline, wpT and
   wpauto) and cwebp's read at TinyPNG's score (bytes for the same quality) and at its size (score
   for the same bytes), as bench.py places TinyPNG's PNG on the PNG tools' curves. --tiny NAME reads
   another pipeline in its place (tiny_emulate.py's stand-in, tinyemu), and where a run has both,
@@ -126,7 +126,7 @@ def tiny_section(data: dict[str, dict[str, dict]], name: str = "tinywebp") -> No
           f"(P10 {sorted(t['score'] for t in tiny)[len(tiny) // 10]:.1f})" + (f"; its PNG {statistics.median(png):.1f}.\n" if (png := [o['tinypng']['score'] for o in images.values() if 'tinypng' in o]) else ".\n"))
     headers = ["Curve", "n", "Bytes at TinyPNG's score / TinyPNG's (median)", "(total)", "Can't reach its score", "Score at TinyPNG's size, difference (median)", "P10"]
     rows = []
-    for label, prefix in (("pngdeer WebP (wp*)", "wp"), ("cwebp (cw*)", "cw")):
+    for label, prefix in (("slimdeer WebP (wp*)", "wp"), ("cwebp (cw*)", "cw")):
         pairs = [(*on_curve(o, prefix, o["tinywebp"]), o["tinywebp"]) for o in images.values()]
         rows.append(tiny_rows(pairs, label))
         if prefix == "wp":
@@ -136,9 +136,9 @@ def tiny_section(data: dict[str, dict[str, dict]], name: str = "tinywebp") -> No
     headers = ["Images", "n", "Size ratio (median)", "Size ratio (total)", "P10 – P90", "Score difference (median)"]
     print("\nOne file each, as they come (different qualities):\n")
     print(table(headers, [
-        vs([(o["wpauto"], o["tinywebp"]) for o in images.values() if "wpauto" in o], "pngdeer WebP (wpauto) / TinyPNG's WebP"),
+        vs([(o["wpauto"], o["tinywebp"]) for o in images.values() if "wpauto" in o], "slimdeer WebP (wpauto) / TinyPNG's WebP"),
         *([vs([(o["tinywebp"], o["tinypng"]) for o in images.values() if "tinypng" in o], "TinyPNG's WebP / TinyPNG's PNG")] if any("tinypng" in o for o in images.values()) else []),
-        vs([(o["tinywebp"], o["pdauto"]) for o in images.values() if "pdauto" in o], "TinyPNG's WebP / pngdeer PNG (pdauto)"),
+        vs([(o["tinywebp"], o["pdauto"]) for o in images.values() if "pdauto" in o], "TinyPNG's WebP / slimdeer PNG (pdauto)"),
     ]))
 
 

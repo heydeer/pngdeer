@@ -1,11 +1,11 @@
 [package]
-name = "pngdeer-libwebp"
+name = "slimdeer-libwebp"
 version = "1.6.0"
 edition = "2021"
 # libwebp is BSD-3-Clause with Google's patent grant (libwebp/COPYING, libwebp/PATENTS); the Rust
-# and glue code here is pngdeer's, MIT.
+# and glue code here is slimdeer's, MIT.
 license = "BSD-3-Clause AND MIT"
-description = "libwebp 1.6.0 for pngdeer: WebP encoding and decoding with the same bytes on every target"
+description = "libwebp 1.6.0 for slimdeer: WebP encoding and decoding with the same bytes on every target"
 publish = false
 
 [lib]
@@ -13,7 +13,7 @@ name = "libwebp"
 
 [dependencies]
 # the C library functions libwebp calls (math, qsort, and on wasm32 the allocator), the same everywhere
-pngdeer-clib = { path = "../clib" }
+slimdeer-clib = { path = "../clib" }
 
 [build-dependencies]
 cc = "1"

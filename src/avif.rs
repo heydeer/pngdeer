@@ -22,7 +22,7 @@
 //!   image in sRGB needs neither; gAMA and cHRM that aren't sRGB's are refused, as for WebP. A JPEG
 //!   photo (with the jpeg feature) is turned as its EXIF orientation says, and keeps its ICC profile
 //!   unless it is sRGB's. Animated PNGs are refused.
-//! - The file: a small AVIF container of pngdeer's own (`container`).
+//! - The file: a small AVIF container of slimdeer's own (`container`).
 
 use crate::codec::{self, Error};
 use crate::par;

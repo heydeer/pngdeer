@@ -31,7 +31,7 @@
 //! the reference's lcms evaluation (the reference binary only ever sees
 //! u8, so no u16 reference behavior exists to match).
 
-/// pngdeer patch: wasm32 has no scalar fused multiply-add, so `f32::mul_add` becomes a call into
+/// slimdeer patch: wasm32 has no scalar fused multiply-add, so `f32::mul_add` becomes a call into
 /// compiler-builtins' bit-exact software emulation. An f32 product is exact in f64, so this matches
 /// a true fma except for rare double-rounding ties (1 ulp), and inlines to a few instructions.
 pub(crate) trait Fma {
@@ -239,7 +239,7 @@ pub(crate) fn linearize_stop(
         };
         match &enc.data {
             EncodedData::U8(data) => {
-                // pngdeer patch: a blended pixel's value depends only on its alpha byte, its
+                // slimdeer patch: a blended pixel's value depends only on its alpha byte, its
                 // channel byte and `bg`, so each pair is computed once (NaN: not yet). The
                 // rational polynomial behind `encoded` is eight f64 `mul_add`s, which wasm32
                 // runs as software fma calls: most of a translucent image's scoring there.
@@ -516,7 +516,7 @@ pub fn planes_to_positive_xyb_hi(p: &mut [Vec<f32>; 3], npix: usize) {
 /// Convert linear-RGB planes to positive-XYB planes in place
 /// (`LinearRGBToXYB` + `MakePositiveXYB` per pixel).
 pub fn planes_to_positive_xyb(p: &mut [Vec<f32>; 3], npix: usize) {
-    // pngdeer patch: a pixel equal to the one before it (flat areas, palette images) reuses its
+    // slimdeer patch: a pixel equal to the one before it (flat areas, palette images) reuses its
     // result instead of recomputing three cube roots. Bit-identical.
     let mut last = [u32::MAX; 3]; // a NaN pattern the linear input never holds
     let mut out = [0f32; 3];

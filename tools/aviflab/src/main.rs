@@ -1,4 +1,4 @@
-//! aviflab png IN OUT.png                IN (PNG or JPEG) as pngdeer decodes it, a JPEG turned upright,
+//! aviflab png IN OUT.png                IN (PNG or JPEG) as slimdeer decodes it, a JPEG turned upright,
 //!                                       as an 8-bit PNG (RGB when opaque) for encoders that read PNG
 //! aviflab enc IN OUT.avif Q SPEED       rav1e at quality Q (1–100) and speed SPEED (1–10), as
 //!                                       aviflab::encode; prints the encode's milliseconds
@@ -7,7 +7,7 @@
 
 use std::{env, fs, process, time::Instant};
 
-use pngdeer::{codec, jpeg, RGBA};
+use slimdeer::{codec, jpeg, RGBA};
 
 fn decode(path: &str) -> (Vec<RGBA>, usize, usize) {
     let bytes = fs::read(path).unwrap_or_else(|e| fail(&format!("{path}: {e}")));

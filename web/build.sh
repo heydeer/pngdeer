@@ -21,10 +21,10 @@ fi
 # No +simd128: fast-ssim2's wasm SIMD path emulates exact fused multiply-add lane by lane and
 # measured ~1.8x slower than its scalar one (one 5 MP score: 6.5 s vs 3.6 s in Node), and scoring
 # is most of the time. The scalar path is patched for wasm in vendor/fast-ssim2.
-cargo build --release --target wasm32-unknown-unknown -p pngdeer-wasm
-wasm-bindgen --target web --no-typescript --out-dir web/pkg target/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
-cargo build --release --target wasm32-unknown-unknown -p pngdeer-wasm --features avif --target-dir target-avif
-wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif target-avif/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
+cargo build --release --target wasm32-unknown-unknown -p slimdeer-wasm
+wasm-bindgen --target web --no-typescript --out-dir web/pkg target/wasm32-unknown-unknown/release/slimdeer_wasm.wasm
+cargo build --release --target wasm32-unknown-unknown -p slimdeer-wasm --features avif --target-dir target-avif
+wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif target-avif/wasm32-unknown-unknown/release/slimdeer_wasm.wasm
 
 # Threads: shared memory needs atomics in std (rebuilt with build-std, hence nightly) and in the C
 # code, an imported shared memory (wasm32's 4 GiB ceiling, which MAX_PIXELS in worker.js keeps to), and
@@ -33,11 +33,11 @@ LINK="--shared-memory --import-memory --max-memory=4294967296 --export=__wasm_in
 export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals $(for a in $LINK; do printf -- '-C link-arg=%s ' "$a"; done)"
 export CFLAGS_wasm32_unknown_unknown="-matomics -mbulk-memory"
 cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=panic_abort,std \
-  -p pngdeer-wasm --features threads --target-dir target-mt
-wasm-bindgen --target web --no-typescript --out-dir web/pkg-mt target-mt/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
+  -p slimdeer-wasm --features threads --target-dir target-mt
+wasm-bindgen --target web --no-typescript --out-dir web/pkg-mt target-mt/wasm32-unknown-unknown/release/slimdeer_wasm.wasm
 cargo +nightly build --release --target wasm32-unknown-unknown -Z build-std=panic_abort,std \
-  -p pngdeer-wasm --features threads,avif --target-dir target-avif-mt
-wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif-mt target-avif-mt/wasm32-unknown-unknown/release/pngdeer_wasm.wasm
+  -p slimdeer-wasm --features threads,avif --target-dir target-avif-mt
+wasm-bindgen --target web --no-typescript --out-dir web/pkg-avif-mt target-avif-mt/wasm32-unknown-unknown/release/slimdeer_wasm.wasm
 ls -l web/pkg web/pkg-mt web/pkg-avif web/pkg-avif-mt
 # the AVIF build writes the command line's files (see check-avif.mjs)
 node web/check-avif.mjs

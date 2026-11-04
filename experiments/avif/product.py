@@ -1,16 +1,16 @@
-"""pngdeer's own AVIF output (FINDINGS.md round 9) on round 8's images, beside round 8's prototype.
+"""slimdeer's own AVIF output (FINDINGS.md round 9) on round 8's images, beside round 8's prototype.
 
   python3 experiments/avif/product.py tiny PHOTOS IMAGES TINYAVIF TINYPNGS TINY.csv
   python3 experiments/avif/product.py run PHOTOS IMAGES AUTO.csv OUT.csv [TINY.csv]
   python3 experiments/avif/product.py summary OUT.csv
 
 `run` compresses compare.py's images (the first 15 web photos and 15 camera originals of PHOTOS, 4
-PNGs per category of IMAGES, their color chunks stripped as round 8's were) with `pngdeer IN -o
+PNGs per category of IMAGES, their color chunks stripped as round 8's were) with `slimdeer IN -o
 OUT.avif` at its automatic target, one at a time, and writes each file's target, setting, quality,
 size, score and time next to the prototype's row of AUTO.csv (auto.py's `run ... tinypng` output with
 FINAL=margin), which also holds TinyPNG's AVIF's size and score. With TINY.csv, each image's target
 is instead TinyPNG's AVIF's score as Chrome shows it, from `tiny`: TinyPNG's files (compare.py's
-`tiny` and `tiny-pngs`) decoded by chrome.mjs and scored by `pngdeer --score`, as pngdeer scores its
+`tiny` and `tiny-pngs`) decoded by chrome.mjs and scored by `slimdeer --score`, as slimdeer scores its
 own; the rows' TinyPNG score is then that one. `summary` compares them.
 """
 import csv
@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from compare import PNGDEER, bench, chosen_photos, chosen_pngs  # noqa: E402
+from compare import SLIMDEER, bench, chosen_photos, chosen_pngs  # noqa: E402
 
 FIELDS = ["image", "target", "setting", "quality", "bytes", "score", "tries", "rounds", "ms",
           "p_target", "p_setting", "p_quality", "p_bytes", "p_score", "tiny_bytes", "tiny_score"]
@@ -37,7 +37,7 @@ def images(photos: Path, pngs: Path):
 
 
 def source(path: Path, photo: bool, t: Path) -> Path:
-    """What pngdeer compresses: the photo, or the PNG with its color chunks stripped as round 8's were."""
+    """What slimdeer compresses: the photo, or the PNG with its color chunks stripped as round 8's were."""
     if photo:
         return path
     src = t / "src.png"
@@ -59,7 +59,7 @@ def tiny(photos: Path, pngs: Path, tiny_photos: Path, tiny_pngs: Path, out: Path
             writer = csv.writer(f)
             writer.writerow(["image", "tiny_bytes", "tiny_score"])
             for name, path, photo, copy in named:
-                score = subprocess.run([PNGDEER, source(path, photo, t), "--score", f"{copy}.chrome.png"], check=True, capture_output=True, text=True).stdout
+                score = subprocess.run([SLIMDEER, source(path, photo, t), "--score", f"{copy}.chrome.png"], check=True, capture_output=True, text=True).stdout
                 writer.writerow([name, copy.stat().st_size, round(float(score), 3)])
 
 
@@ -80,7 +80,7 @@ def run(photos: Path, pngs: Path, auto: Path, out: Path, tiny_scores: Path | Non
             with tempfile.TemporaryDirectory() as t:
                 src = source(path, photo, Path(t))
                 start = time.perf_counter()
-                report = subprocess.run([PNGDEER, src, "-o", Path(t) / "out.avif", "--json", *target], check=True, capture_output=True, text=True).stdout
+                report = subprocess.run([SLIMDEER, src, "-o", Path(t) / "out.avif", "--json", *target], check=True, capture_output=True, text=True).stdout
                 ms = round(1000 * (time.perf_counter() - start))
             r, p = json.loads(report.strip().splitlines()[-1]), dict(proto[name])
             if at:

@@ -1,7 +1,7 @@
-//! End-to-end checks of pngdeer::compress_jpeg on small synthetic photos.
+//! End-to-end checks of slimdeer::compress_jpeg on small synthetic photos.
 #![cfg(feature = "jpeg")]
 
-use pngdeer::{compress_jpeg, jpeg, search, Settings};
+use slimdeer::{compress_jpeg, jpeg, search, Settings};
 
 const W: usize = 160;
 const H: usize = 120;
@@ -132,7 +132,7 @@ fn refuses_what_it_cant_read() {
     let scan = input.windows(2).position(|w| w == [0xff, 0xda]).unwrap();
     for broken in [&input[..2], &input[..scan], b"\xff\xd8\xff\xe0 not a jpeg"] {
         let error = compress_jpeg(broken, &Settings::default()).err().unwrap().to_string();
-        assert!(error.starts_with("not a JPEG pngdeer can read: ") && !error.ends_with('\n'), "{error:?}");
+        assert!(error.starts_with("not a JPEG slimdeer can read: ") && !error.ends_with('\n'), "{error:?}");
     }
     // a file cut short in its scans compresses as viewers show it: what arrived, gray below
     assert!(compress_jpeg(&input[..input.len() / 2], &Settings::default()).is_ok());
@@ -140,7 +140,7 @@ fn refuses_what_it_cant_read() {
 
 /// The bytes on every platform: mozjpeg is built as plain C without fused multiply-add, and the
 /// decoder is zune-jpeg's plain Rust, so the command line and the browser build write the same
-/// files. A change that alters pngdeer's output on purpose updates these.
+/// files. A change that alters slimdeer's output on purpose updates these.
 #[test]
 fn same_bytes_everywhere() {
     let digest = |input: &[u8], target| {
@@ -168,7 +168,7 @@ fn webp_chunks(webp: &[u8]) -> Vec<([u8; 4], &[u8])> {
 #[cfg(feature = "webp")]
 #[test]
 fn becomes_lossy_webp_at_the_jpeg_target() {
-    use pngdeer::{compress_webp, webp};
+    use slimdeer::{compress_webp, webp};
     let input = camera_jpeg(None, None);
     let out = compress_webp(&input, &Settings::default()).unwrap();
     assert_eq!((&out.webp[..4], &out.webp[8..12], out.mode), (&b"RIFF"[..], &b"WEBP"[..], "lossy"));
@@ -183,7 +183,7 @@ fn becomes_lossy_webp_at_the_jpeg_target() {
 #[cfg(feature = "webp")]
 #[test]
 fn webp_is_turned_upright_and_keeps_the_colors() {
-    use pngdeer::{compress_webp, webp};
+    use slimdeer::{compress_webp, webp};
     let display_p3 = profile("Display P3");
     let out = compress_webp(&camera_jpeg(Some(&display_p3), Some(&camera_exif(6))), &Settings::default()).unwrap();
     // a quarter turn: 120 × 160, its top row the photo's left column, bottom up
@@ -202,7 +202,7 @@ fn webp_is_turned_upright_and_keeps_the_colors() {
 #[test]
 fn same_webp_bytes_everywhere() {
     let digest = |input: &[u8], target| {
-        let out = pngdeer::compress_webp(input, &Settings { target, ..Default::default() }).unwrap();
+        let out = slimdeer::compress_webp(input, &Settings { target, ..Default::default() }).unwrap();
         (out.webp.len(), crc32fast::hash(&out.webp))
     };
     let (plain, tagged) = (camera_jpeg(None, None), camera_jpeg(Some(&profile("Display P3")), Some(&camera_exif(6))));

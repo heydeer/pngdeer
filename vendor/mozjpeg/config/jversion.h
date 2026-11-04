@@ -1,4 +1,4 @@
-/* pngdeer: mozjpeg 4.1.5's jversion.h as its CMake build generates it. */
+/* slimdeer: mozjpeg 4.1.5's jversion.h as its CMake build generates it. */
 /*
  * jversion.h
  *

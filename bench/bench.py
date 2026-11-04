@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""PNG compression benchmark: pngdeer, pngquant and other open-source quantizers vs TinyPNG, and WebP.
+"""PNG compression benchmark: slimdeer, pngquant and other open-source quantizers vs TinyPNG, and WebP.
 
 Every output is scored against its original with SSIMULACRA2
 (100 = identical, 90 = indistinguishable at 1:1, 70 = high quality, 50 = medium).
 
 Pipelines (pick with --pipelines):
   oxipng   lossless re-encode only (reference point)
-  pdT      pngdeer --target T: the smallest file scoring >= T, exactly as the CLI and browser make it
-  pdauto   pngdeer's automatic quality (its default, what the browser does)
+  pdT      slimdeer --target T: the smallest file scoring >= T, exactly as the CLI and browser make it
+  pdauto   slimdeer's automatic quality (its default, what the browser does)
   pqN      pngquant --quality 0-N, then oxipng (e.g. pq80)
   pqN-dD   same with dithering level D/100 (pq80-d50 = --floyd=0.5, pq80-d0 = --nofs)
   <tool>N  other open-source quantizers at N colors, then oxipng (see QUANT_TOOLS)
@@ -16,10 +16,10 @@ Pipelines (pick with --pipelines):
            when one's monthly compressions run out
 
 WebP pipelines (outputs decoded with dwebp, as browsers decode them, then scored the same way):
-  wpT      pngdeer --format webp --target T
-  wpauto   pngdeer --format webp at its automatic quality
+  wpT      slimdeer --format webp --target T
+  wpauto   slimdeer --format webp at its automatic quality
   cwQ      cwebp -q Q -m 6 -sharp_yuv -alpha_q 100 (libwebp at its slowest and sharpest)
-  cwafQ    the same with the auto filter (-af), as pngdeer encodes
+  cwafQ    the same with the auto filter (-af), as slimdeer encodes
   cwdQ     cwebp -q Q at cwebp's other defaults (method 4, plain YUV)
   cwll     cwebp -lossless -z 9
   pqwN     pngquant --quality 0-N, then cwebp -lossless -z 9: a palette image as lossless WebP
@@ -65,10 +65,10 @@ COLOR_CHUNKS = {b"gAMA", b"cHRM", b"sRGB", b"iCCP", b"cICP", b"mDCV", b"cLLI"}
 @dataclass(frozen=True)
 class Pipeline:
     name: str
-    kind: str  # "oxipng" | "pngdeer" | "pngquant" | "quant" | "tinypng" | "pngdeer-webp" | "cwebp" | "pngquant-webp" | "tinywebp"
+    kind: str  # "oxipng" | "slimdeer" | "pngquant" | "quant" | "tinypng" | "slimdeer-webp" | "cwebp" | "pngquant-webp" | "tinywebp"
     quality: int | None = None  # pngquant(-webp): --quality; quant: palette size; cwebp: -q (None: lossless)
     dither: int | None = None  # pngquant(-webp) and quant; None = the tool's default dithering
-    target: int | None = None  # pngdeer: SSIMULACRA2 score to reach (None: automatic)
+    target: int | None = None  # slimdeer: SSIMULACRA2 score to reach (None: automatic)
     tool: str | None = None  # quant: a QUANT_TOOLS key
     cwebp: str | None = None  # cwebp: "af" adds the auto filter, "d" keeps cwebp's defaults (see run_cwebp)
 
@@ -78,7 +78,7 @@ class Pipeline:
 
     @property
     def webp(self) -> bool:
-        return self.kind in ("pngdeer-webp", "cwebp", "pngquant-webp", "tinywebp")
+        return self.kind in ("slimdeer-webp", "cwebp", "pngquant-webp", "tinywebp")
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ class Row:
     ssimulacra2: float | None = None
     seconds: float | None = None
     pngquant_bytes: int | None = None  # pngquant output before oxipng
-    params: str = ""  # pngdeer only: what the search picked
+    params: str = ""  # slimdeer only: what the search picked
     note: str = ""
 
 
@@ -114,12 +114,12 @@ class Config:
     oxipng_level: str
     zopfli: bool
     pq_speed: int | None
-    pngdeer: str | None = None
-    pd_variants: str | None = None  # pngdeer --variants (None: its default)
-    pd_preview_pixels: int | None = None  # pngdeer --preview-pixels (None: its default, as shipped)
+    slimdeer: str | None = None
+    pd_variants: str | None = None  # slimdeer --variants (None: its default)
+    pd_preview_pixels: int | None = None  # slimdeer --preview-pixels (None: its default, as shipped)
     quantlab: str | None = None  # tools/quantlab, for the exq / qte / nq / qzr pipelines
     small_side: int = 256  # score images with a shorter longer side enlarged; 0 = off
-    pd_args: tuple[str, ...] = ()  # more pngdeer arguments, e.g. --webp-method 5
+    pd_args: tuple[str, ...] = ()  # more slimdeer arguments, e.g. --webp-method 5
     cwebp: str | None = None
     dwebp: str | None = None
 
@@ -289,7 +289,7 @@ class TinyPNG:
 # ---------------------------------------------------------------- tools
 
 
-PNGDEER_BUILT = BENCH_DIR.parent / "target/release/pngdeer"
+SLIMDEER_BUILT = BENCH_DIR.parent / "target/release/slimdeer"
 QUANTLAB_BUILT = BENCH_DIR.parent / "target/release/quantlab"
 # Other open-source palette quantizers, for side-by-side curves: pipelines like im256 (dithered) and
 # im256-d0. ImageMagick, FFmpeg and quantette support only on/off transparency in a palette PNG.
@@ -305,11 +305,11 @@ QUANT_TOOLS = {
 QUANTLAB_ALGOS = {"exq": "exoquant", "qte": "quantette", "nq": "neuquant", "qzr": "quantizr"}
 
 
-def find_pngdeer() -> str | None:
-    return os.environ.get("PNGDEER") or (str(PNGDEER_BUILT) if PNGDEER_BUILT.exists() else shutil.which("pngdeer"))
+def find_slimdeer() -> str | None:
+    return os.environ.get("SLIMDEER") or (str(SLIMDEER_BUILT) if SLIMDEER_BUILT.exists() else shutil.which("slimdeer"))
 
 
-def find_tools(need_pngdeer: bool, quant_tools: set[str] = frozenset(), webp: bool = False) -> dict[str, str]:
+def find_tools(need_slimdeer: bool, quant_tools: set[str] = frozenset(), webp: bool = False) -> dict[str, str]:
     tools = {}
     missing = []
     needed = ["pngquant", "oxipng", "ssimulacra2"] + ["magick"] * ("im" in quant_tools) + ["ffmpeg"] * ("ff" in quant_tools) + ["cwebp", "dwebp"] * webp
@@ -326,10 +326,10 @@ def find_tools(need_pngdeer: bool, quant_tools: set[str] = frozenset(), webp: bo
         if not path:
             sys.exit("exq / qte / nq / qzr pipelines need quantlab; build it with: cargo build --release -p quantlab")
         tools["quantlab"] = path
-    if path := find_pngdeer():
-        tools["pngdeer"] = path
-    elif need_pngdeer:
-        sys.exit("pd pipelines need pngdeer; build it with: cargo build --release")
+    if path := find_slimdeer():
+        tools["slimdeer"] = path
+    elif need_slimdeer:
+        sys.exit("pd pipelines need slimdeer; build it with: cargo build --release")
     return tools
 
 
@@ -434,12 +434,12 @@ class Scorer:
 
     def __init__(self, cfg: Config, source: Path, workdir: Path, width: int, height: int):
         self.cfg, self.workdir, self.reference, self.factor = cfg, workdir, source, 1
-        if cfg.small_side and cfg.pngdeer:
+        if cfg.small_side and cfg.slimdeer:
             while max(width, height) * self.factor < cfg.small_side and self.factor < 8:
                 self.factor *= 2
         if self.factor > 1:
             self.reference = workdir / "score-reference.png"
-            run([cfg.pngdeer, str(source), "-o", str(self.reference), "--upscale", str(self.factor)])
+            run([cfg.slimdeer, str(source), "-o", str(self.reference), "--upscale", str(self.factor)])
 
     def score(self, path: Path) -> float:
         scored = self.workdir / "score-candidate.png"
@@ -449,15 +449,15 @@ class Scorer:
             strip_color_chunks(path, scored)
         if self.factor > 1:
             enlarged = self.workdir / "score-candidate-big.png"
-            run([self.cfg.pngdeer, str(scored), "-o", str(enlarged), "--upscale", str(self.factor)])
+            run([self.cfg.slimdeer, str(scored), "-o", str(enlarged), "--upscale", str(self.factor)])
             scored = enlarged
         return ssimulacra2(self.cfg, self.reference, scored)
 
 
-def run_pngdeer(cfg: Config, src: Path, dst: Path, target: int | None, webp: bool = False) -> tuple[str, float]:
-    """pngdeer's whole pipeline (search, oxipng -o 2, lossless fallbacks), as the CLI and the browser
+def run_slimdeer(cfg: Config, src: Path, dst: Path, target: int | None, webp: bool = False) -> tuple[str, float]:
+    """slimdeer's whole pipeline (search, oxipng -o 2, lossless fallbacks), as the CLI and the browser
     run it, or its WebP output. Returns what it picked and the time it took."""
-    cmd = [cfg.pngdeer, str(src), "-o", str(dst), "--json", "--target", "auto" if target is None else str(target), *cfg.pd_args]
+    cmd = [cfg.slimdeer, str(src), "-o", str(dst), "--json", "--target", "auto" if target is None else str(target), *cfg.pd_args]
     if webp:
         cmd += ["--format", "webp"]
     if cfg.pd_variants:
@@ -468,7 +468,7 @@ def run_pngdeer(cfg: Config, src: Path, dst: Path, target: int | None, webp: boo
     proc = subprocess.run(cmd, capture_output=True, text=True)
     seconds = time.perf_counter() - start
     if proc.returncode != 0:
-        raise RuntimeError(f"pngdeer exited {proc.returncode}: {proc.stderr.strip()}")
+        raise RuntimeError(f"slimdeer exited {proc.returncode}: {proc.stderr.strip()}")
     report = json.loads(proc.stdout)
     if webp:
         q = "" if report["quality"] is None else f" q{report['quality']}"
@@ -500,11 +500,11 @@ def parse_pipelines(spec: str) -> list[Pipeline]:
                 sys.exit(f"palette size must be 2-256: {name}")
             pipelines.append(Pipeline(name, "quant", colors, 0 if m.group(3) else None, tool=m.group(1)))
         elif name == "pdauto":
-            pipelines.append(Pipeline(name, "pngdeer"))
+            pipelines.append(Pipeline(name, "slimdeer"))
         elif name == "wpauto":
-            pipelines.append(Pipeline(name, "pngdeer-webp"))
+            pipelines.append(Pipeline(name, "slimdeer-webp"))
         elif m := re.fullmatch(r"wp(\d{1,3})", name):
-            pipelines.append(Pipeline(name, "pngdeer-webp", target=int(m.group(1))))
+            pipelines.append(Pipeline(name, "slimdeer-webp", target=int(m.group(1))))
         elif name == "cwll":
             pipelines.append(Pipeline(name, "cwebp"))
         elif m := re.fullmatch(r"cw(af|d)?(\d{1,3})", name):
@@ -522,8 +522,8 @@ def parse_pipelines(spec: str) -> list[Pipeline]:
         elif m := re.fullmatch(r"pd(\d{1,3})", name):
             target = int(m.group(1))
             if not 1 <= target <= 100:
-                sys.exit(f"pngdeer target must be an SSIMULACRA2 score 1-100: {name}")
-            pipelines.append(Pipeline(name, "pngdeer", target=target))
+                sys.exit(f"slimdeer target must be an SSIMULACRA2 score 1-100: {name}")
+            pipelines.append(Pipeline(name, "slimdeer", target=target))
         else:
             sys.exit(f"unknown pipeline: {name} (expected oxipng, tinypng, pdT, pdauto, pqN, pqN-dD, <tool>N / <tool>N-d0 with tool {'/'.join(QUANT_TOOLS)}, wpT, wpauto, cwQ, cwafQ, cwdQ, cwll, pqwN, pqwN-dD or tinywebp)")
     return pipelines
@@ -592,8 +592,8 @@ def process_image(img: Image, pipelines: list[Pipeline], cfg: Config, tiny: Tiny
                     run_quantizer(cfg, p.tool, p.quality, p.dither != 0, source, quantized)
                     row.pngquant_bytes = quantized.stat().st_size
                     run_oxipng(cfg, quantized, dst)
-                elif p.kind in ("pngdeer", "pngdeer-webp"):
-                    row.params, seconds = run_pngdeer(cfg, source, dst, p.target, p.kind == "pngdeer-webp")
+                elif p.kind in ("slimdeer", "slimdeer-webp"):
+                    row.params, seconds = run_slimdeer(cfg, source, dst, p.target, p.kind == "slimdeer-webp")
                 elif p.kind == "cwebp":
                     run_cwebp(cfg, source, dst, p.quality, p.cwebp)
                 elif p.kind == "pngquant-webp":
@@ -758,12 +758,12 @@ def category_rows(comps: list[VsTiny], prefix: str = "") -> list[list]:
     return [vs_tiny_row(prefix + cat, [c for c in comps if c.tiny.category == cat]) for cat in categories]
 
 
-LOSSY_KINDS = ("pngquant", "quant", "pngdeer")
+LOSSY_KINDS = ("pngquant", "quant", "slimdeer")
 
 
 def on_curve(p: Pipeline, kinds: tuple[str, ...] = LOSSY_KINDS) -> bool:
     """Pipelines that make a size/quality curve per image: every lossy one but pdauto (one point)."""
-    return p.kind in kinds and not (p.kind == "pngdeer" and p.target is None)
+    return p.kind in kinds and not (p.kind == "slimdeer" and p.target is None)
 
 
 def lossy_names(pipelines: list[Pipeline], kinds: tuple[str, ...] = LOSSY_KINDS) -> set[str]:
@@ -800,7 +800,7 @@ def auto_table(rows: list[Row], pipelines: list[Pipeline]) -> str:
 
     table = []
     for p in pipelines:
-        if p.kind != "pngdeer":
+        if p.kind != "slimdeer":
             continue
         mine = [o[p.name] for o in by_image.values() if p.name in o]
         if not mine:
@@ -825,7 +825,7 @@ def auto_table(rows: list[Row], pipelines: list[Pipeline]) -> str:
 
 
 def timing_by_category_table(rows: list[Row], pipelines: list[Pipeline]) -> str:
-    names = [p.name for p in pipelines if p.kind in ("pngdeer", "tinypng")]
+    names = [p.name for p in pipelines if p.kind in ("slimdeer", "tinypng")]
     table = []
     for cat in sorted({r.category for r in rows}):
         line = [cat]
@@ -932,7 +932,7 @@ def build_report(rows: list[Row], pipelines: list[Pipeline], images: list[Image]
             "- **Score difference at equal size**: how much higher open source scores with as many bytes as TinyPNG (negative means lower).",
             "- **Not comparable**: TinyPNG's file is smaller than the family's smallest setting.",
             "",
-            "The pq families pick from fixed settings after the fact, an upper bound on choosing settings per image; the pd families are what pngdeer finds while compressing. "
+            "The pq families pick from fixed settings after the fact, an upper bound on choosing settings per image; the pd families are what slimdeer finds while compressing. "
             "The category rows use every pq setting.",
             "",
             vs_tiny_table(rows, pipelines),
@@ -945,18 +945,18 @@ def build_report(rows: list[Row], pipelines: list[Pipeline], images: list[Image]
             "",
             head_to_head_table(rows, pipelines),
         ]
-    searched = [p for p in pipelines if p.kind == "pngdeer"]
+    searched = [p for p in pipelines if p.kind == "slimdeer"]
     if searched:
         parts += [
             "",
-            "## pngdeer (pdT / pdauto)",
+            "## slimdeer (pdT / pdauto)",
             "",
-            "`pngdeer IN.png -o OUT.png --target T` (`pdauto` is `--target auto`, the default), the same process as the command line and the browser: "
+            "`slimdeer IN.png -o OUT.png --target T` (`pdauto` is `--target auto`, the default), the same process as the command line and the browser: "
             "at each color count (2–256) it tries a few remapping variants and finds the smallest file that reaches the target SSIMULACRA2; images over 350,000 pixels are searched on a downscaled copy first, "
             "then confirmed on the original. Finally oxipng -o 2; when the original has at most 256 colors and the lossless version is only a little larger, the lossless one is used, and the original is kept when the result would be larger. "
             "Scores come from fast-ssim2 in-process, within 0.25 of the libjxl ssimulacra2 used for scoring here.",
             "",
-            "Times are one pngdeer run per target (using several CPU cores). "
+            "Times are one slimdeer run per target (using several CPU cores). "
             "TinyPNG's times are API round trips (upload, server processing, download), counted only for images actually requested.",
             "",
             auto_table(rows, pipelines),
@@ -986,24 +986,24 @@ def main() -> None:
     parser.add_argument("--oxipng-level", default="max", help="oxipng -o level for the oxipng, pq and tool pipelines (default: max)")
     parser.add_argument("--zopfli", action="store_true", help="use zopfli in oxipng (smaller, much slower)")
     parser.add_argument("--pq-speed", type=int, choices=range(1, 12), metavar="1-11", help="pngquant --speed (default: pngquant's own, 4)")
-    parser.add_argument("--pd-variants", help="pngdeer --variants for the pd pipelines: what it tries per palette size (default: pngdeer's own)")
-    parser.add_argument("--pd-args", default="", help="more pngdeer arguments for the pd and wp pipelines, e.g. '--webp-method 5'")
+    parser.add_argument("--pd-variants", help="slimdeer --variants for the pd pipelines: what it tries per palette size (default: slimdeer's own)")
+    parser.add_argument("--pd-args", default="", help="more slimdeer arguments for the pd and wp pipelines, e.g. '--webp-method 5'")
     parser.add_argument("--pd-preview-pixels", type=int,
-                        help="pngdeer --preview-pixels for the pd pipelines; 0 searches at full size (default: pngdeer's own, as shipped)")
+                        help="slimdeer --preview-pixels for the pd pipelines; 0 searches at full size (default: slimdeer's own, as shipped)")
     parser.add_argument("--small-side", type=int, default=256,
                         help="score images whose longer side is below this enlarged to at least this size; 0 = off (default: 256)")
     parser.add_argument("-j", "--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2), help="images processed in parallel")
     args = parser.parse_args()
 
     pipelines = parse_pipelines(args.pipelines)
-    tools = find_tools(need_pngdeer=any(p.kind in ("pngdeer", "pngdeer-webp") for p in pipelines), quant_tools={p.tool for p in pipelines if p.kind == "quant"}, webp=any(p.webp for p in pipelines))
+    tools = find_tools(need_slimdeer=any(p.kind in ("slimdeer", "slimdeer-webp") for p in pipelines), quant_tools={p.tool for p in pipelines if p.kind == "quant"}, webp=any(p.webp for p in pipelines))
     cfg = Config(
         tools["pngquant"], tools["oxipng"], tools["ssimulacra2"], args.oxipng_level, args.zopfli, args.pq_speed,
-        tools.get("pngdeer"), args.pd_variants, args.pd_preview_pixels, tools.get("quantlab"),
-        args.small_side if tools.get("pngdeer") else 0, tuple(args.pd_args.split()), tools.get("cwebp"), tools.get("dwebp"),
+        tools.get("slimdeer"), args.pd_variants, args.pd_preview_pixels, tools.get("quantlab"),
+        args.small_side if tools.get("slimdeer") else 0, tuple(args.pd_args.split()), tools.get("cwebp"), tools.get("dwebp"),
     )
-    if args.small_side and not tools.get("pngdeer"):
-        print("warning: pngdeer not found, so small images are scored at their own size", file=sys.stderr)
+    if args.small_side and not tools.get("slimdeer"):
+        print("warning: slimdeer not found, so small images are scored at their own size", file=sys.stderr)
 
     tiny = None
     if any(p.kind in ("tinypng", "tinywebp") for p in pipelines):

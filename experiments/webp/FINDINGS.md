@@ -1,6 +1,6 @@
 # WebP output: findings
 
-pngdeer's WebP output (`pngdeer --format webp`, `pngdeer::compress_webp`, src/webp.rs): per image,
+slimdeer's WebP output (`slimdeer --format webp`, `slimdeer::compress_webp`, src/webp.rs): per image,
 the smaller of two WebP files that keep the quality the PNG search settled on. Measured on the
 benchmark's 180 images (bench/images, 109, and bench/images-holdout, 71) with bench.py and
 compare.py (both in this repository; results stay in the ignored bench/results/).
@@ -9,14 +9,14 @@ compare.py (both in this repository; results stay in the ignored bench/results/)
 
 - **Encoder: libwebp 1.6.0**, vendored and built for every target alike (vendor/libwebp/README.md):
   BSD-licensed, the reference encoder (Chrome, cwebp). The pure-Rust zenwebp is AGPL or commercial,
-  which doesn't fit pngdeer's MIT license.
+  which doesn't fit slimdeer's MIT license.
 - **Same bytes everywhere.** Plain C only (no SSE/NEON), no fused multiply-add, libwebp's log, pow
   and friends from Rust's libm crate and its qsort a stable sort. The wasm32 build writes the same
   files as the native one (libwebp alone, and all of `compress_webp` on tests/webp.rs's four pinned
   cases), and the native files matched Homebrew's cwebp 1.6.0 with its NEON code byte for byte.
 - **Two candidates, because neither wins everywhere.** A first look (11 images, scores by the
   ssimulacra2 tool, lossy quality bisected with cwebp -m 6 -sharp_yuv to match the PNG's score):
-  pngdeer's own palette image as lossless WebP was always 2–31% smaller than its PNG, while lossy
+  slimdeer's own palette image as lossless WebP was always 2–31% smaller than its PNG, while lossy
   WebP was 11–70% smaller on photos, 3D, illustrations and 2× screenshots but 129–170% bigger on
   flat icons and 1× UI, or never reached the score. So both are made and the smaller one that
   reaches the target ships:
@@ -25,7 +25,7 @@ compare.py (both in this repository; results stay in the ignored bench/results/)
   - lossy: the lowest quality (integer, 0–100) whose file reaches the target, at `-m 6`, sharp YUV,
     the alpha plane lossless.
 - **The target is the PNG's**: the automatic one (TinyPNG's quality, as for PNG) or `--target`. A
-  WebP file is then the same quality as pngdeer's PNG of that image, in fewer bytes.
+  WebP file is then the same quality as slimdeer's PNG of that image, in fewer bytes.
 - **Settings tried** (wpauto with each, all 180 images; sizes against the default's):
   - method 5 instead of 6: 1.0% bigger in total (photos 1.8%), no faster;
   - sharp YUV off: on sun-poster and stripe@2x no quality reaches the target at all;
@@ -53,7 +53,7 @@ compare.py (both in this repository; results stay in the ignored bench/results/)
 
 ### Results
 
-All 180 images at the automatic target (wpauto, as shipped: no `-z 9`), against pngdeer's PNG
+All 180 images at the automatic target (wpauto, as shipped: no `-z 9`), against slimdeer's PNG
 (pdauto) at the same target and against cwebp (`-m 6 -sharp_yuv -alpha_q 100` at qualities 50–100,
 and `-lossless -z 9`), every file scored by the ssimulacra2 tool after dwebp:
 
@@ -74,7 +74,7 @@ and `-lossless -z 9`), every file scored by the ssimulacra2 tool after dwebp:
 - "cwebp at the same score" gives cwebp the best of its eleven settings for each image, picked
   after the fact (log size interpolated in score, as bench.py does against TinyPNG), which cwebp
   alone can't do. It needs about the same bytes where the lossy file wins (photos, 3D: the same
-  encoder), and a quarter to two thirds more where pngdeer's palette does (UI, icons,
+  encoder), and a quarter to two thirds more where slimdeer's palette does (UI, icons,
   illustrations). Against one setting for all, cwebp -q 75 is smaller (wpauto 124% of it on the
   median image) but scores 9.8 points lower.
 - Time (seven images at a time on 14 cores): 2.6 s per image on the median (PNG 1.7 s), 3.5 s
@@ -92,16 +92,16 @@ and `-lossless -z 9`), every file scored by the ssimulacra2 tool after dwebp:
 TinyPNG converts to WebP on request (a shrink, then a conversion of its result: two compressions,
 checked on the account's count). With 249 compressions left in the month, 120 images: all 71
 held-out ones and 49 of the 109 tuning images, spread over the categories as the set is (every
-`n/k`-th by name). Against them, pngdeer's WebP at targets 40–98 and cwebp at qualities 10–100 and
+`n/k`-th by name). Against them, slimdeer's WebP at targets 40–98 and cwebp at qualities 10–100 and
 lossless, each read at TinyPNG's score and at its size as bench.py places TinyPNG's PNG on the PNG
 tools' curves.
 
 - **TinyPNG's WebP is a lower quality than its PNG**: 80.0 on the median image (P10 67.4) against
   87.2 for its PNG, 6.0 points lower per image on the median, in 41% of its PNG's bytes. It is
   lossless WebP on 38 images and lossy on 82 (50 of them with an alpha plane).
-- **At the same quality pngdeer's WebP is about 3% smaller:**
+- **At the same quality slimdeer's WebP is about 3% smaller:**
 
-  | Images | n | pngdeer's bytes at TinyPNG's score / TinyPNG's, median | total | pngdeer's score at TinyPNG's size, difference (median) | P10 |
+  | Images | n | slimdeer's bytes at TinyPNG's score / TinyPNG's, median | total | slimdeer's score at TinyPNG's size, difference (median) | P10 |
   |---|---|---|---|---|---|
   | all | 120 | 96.9% | 96.5% | +0.9 | -1.3 |
   | 3D | 22 | 101.2% | 96.6% | -0.3 | -3.8 |
@@ -112,30 +112,30 @@ tools' curves.
   | UI | 17 | 99.6% | 96.8% | +0.1 | -1.6 |
 
   Two illustrations are left out: TinyPNG's lossless WebP scores 88.5 and 92.2 on them, above
-  anything pngdeer makes (87.5, 91.9): a palette of 256 colors can't get there, nor lossy WebP
-  (thin lines in color), and pngdeer has no lossless candidate with more colors.
+  anything slimdeer makes (87.5, 91.9): a palette of 256 colors can't get there, nor lossy WebP
+  (thin lines in color), and slimdeer has no lossless candidate with more colors.
 - cwebp at its best quality for each image, picked after the fact, needs 102% of TinyPNG's bytes
   on the median image and 115% in total: TinyPNG's WebP is about libwebp at a quality picked per
-  image, with a lossless (likely palette) file where that is smaller, which is what pngdeer does;
-  pngdeer's edge is its palette and hitting the target more closely.
-- As each tool ships, at its own quality: pngdeer's WebP (automatic: the PNG's target, about
+  image, with a lossless (likely palette) file where that is smaller, which is what slimdeer does;
+  slimdeer's edge is its palette and hitting the target more closely.
+- As each tool ships, at its own quality: slimdeer's WebP (automatic: the PNG's target, about
   TinyPNG's PNG quality) is 136% of TinyPNG's WebP on the median image and scores 7.9 points
-  higher. TinyPNG's WebP is 44% of pngdeer's PNG, at 7.7 points lower.
+  higher. TinyPNG's WebP is 44% of slimdeer's PNG, at 7.7 points lower.
 
 ## Round 3: automatic quality from TinyPNG's WebP
 
-Round 2 left pngdeer's WebP at its PNG's quality, which TinyPNG's WebP undercuts by 6 points per
+Round 2 left slimdeer's WebP at its PNG's quality, which TinyPNG's WebP undercuts by 6 points per
 image. Calibrated here on the 120 images with TinyPNG's WebP, and checked on the other 60.
 
 - **How TinyPNG picks it.** Lossless on 38 of the 120 (all icons, 12 illustrations, 7 UI), scoring
   exactly its PNG's score: its palette PNG, stored losslessly. Lossy on 82, and there its score
-  follows a fixed libwebp quality, not the PNG's: pngdeer's PNG target predicts it poorly (median
+  follows a fixed libwebp quality, not the PNG's: slimdeer's PNG target predicts it poorly (median
   9.8 points above, P10 5.2, P90 18.4, correlation 0.47), cwebp at one quality for every image well
   (quality 70 with `-m 6 -sharp_yuv`: 0.15 points under on the median image, correlation 0.94, the
   same bytes, 1.001× on the median). Quality 70 holds on both halves: −0.17 on the 34 lossy tuning
   images, −0.05 on the 48 held-out ones (60: −2.9 and −2.6; 75: +0.9 and +1.6).
 - **The rule** (src/webp.rs): with automatic quality, a lossy file at quality 70 is weighed
-  against the lossless file of pngdeer's PNG, as TinyPNG would. Where the lossless file is smaller,
+  against the lossless file of slimdeer's PNG, as TinyPNG would. Where the lossless file is smaller,
   the PNG's target stays (TinyPNG ships its palette there). Otherwise the lossy file's score is the
   target (at most 90): the lossy search finds the lowest quality reaching it (sometimes below 70:
   stripe@2x reaches it at 61, 9% smaller), and a palette made for that lower target competes too.
@@ -147,8 +147,8 @@ image. Calibrated here on the 120 images with TinyPNG's WebP, and checked on the
   nothing fetched): its cached PNG losslessly, or cwebp `-q 70 -m 6 -sharp_yuv` of the source,
   whichever is smaller. On the 120 it picks the same kind 119 times, at 100.0% of TinyPNG's bytes
   (median and total, P10 95.4%, P90 102.5%) and the same score (median +0.00). Its lossy files are
-  pngdeer's quality-70 reference itself, so on photos it can only show a draw; the real TinyPNG's
-  lossy files came out about 5% bigger than pngdeer's.
+  slimdeer's quality-70 reference itself, so on photos it can only show a draw; the real TinyPNG's
+  lossy files came out about 5% bigger than slimdeer's.
 
 Results (as shipped; scores by the ssimulacra2 tool):
 
@@ -169,9 +169,9 @@ Results (as shipped; scores by the ssimulacra2 tool):
 | photos with alpha | 9 | 100.0% | 99.8% | +0.00 |
 | UI | 8 | 98.4% | 97.2% | +0.09 |
 
-- Icons score 1–1.6 points under TinyPNG's: both are lossless palettes there, at pngdeer's PNG
+- Icons score 1–1.6 points under TinyPNG's: both are lossless palettes there, at slimdeer's PNG
   target, which sits that far under TinyPNG's PNG score on icons (as for PNG output).
-- Against pngdeer's own output, all 180: 45.6% of its PNG on the median image (34.5% in total) at
+- Against slimdeer's own output, all 180: 45.6% of its PNG on the median image (34.5% in total) at
   6.3 points lower, and 74.3% of round 1's WebP (58.0% in total) at 6.4 lower; icons, most
   illustrations and UI keep the PNG's quality (lossless won), photos drop 17 points (to TinyPNG's
   WebP quality). Median score 80.4 (the stand-in's 79.8, the PNG's 88.1). Lossy won 97 images,
@@ -183,8 +183,8 @@ Results (as shipped; scores by the ssimulacra2 tool):
 ## Round 4: widening the lead
 
 Three ideas, measured with tools/webplab: for each image and libwebp setting, the bytes of the
-smallest lossy file that reaches the image's target, scored as pngdeer scores; the target is
-TinyPNG's WebP's score (its file re-scored by pngdeer). Summaries by experiments/webp/lab_report.py,
+smallest lossy file that reaches the image's target, scored as slimdeer scores; the target is
+TinyPNG's WebP's score (its file re-scored by slimdeer). Summaries by experiments/webp/lab_report.py,
 on the 90 of the 120 images where lossy WebP reaches that score at all.
 
 - **libwebp's finer settings**, one at a time (bytes against libwebp's defaults, median / total):
@@ -200,13 +200,13 @@ on the 90 of the 120 images where lossy WebP reaches that score at all.
 - **Finer quality steps**: quarter steps below the lowest whole quality that reaches the target
   saved 0.0% on the median image and 0.3–0.5% in total, for 1.5 more files scored per image.
 - **Beyond 256 colors**: a near-lossless file (levels 0–80) reached the target in fewer bytes than
-  what pngdeer ships on 2 of the 120 images (7.6% and 0.3% smaller). Elsewhere a palette file is
+  what slimdeer ships on 2 of the 120 images (7.6% and 0.3% smaller). Elsewhere a palette file is
   smaller (libwebp skips near-lossless for images that fit a palette). On the two illustrations
-  where TinyPNG's lossless file scores above anything pngdeer makes, a lossless file of the source
-  is 2.7 times TinyPNG's: its palette, not the encoder, is what pngdeer lacks there.
+  where TinyPNG's lossless file scores above anything slimdeer makes, a lossless file of the source
+  is 2.7 times TinyPNG's: its palette, not the encoder, is what slimdeer lacks there.
 - **Adopted**: the auto filter for the lossy search (`WebpOptions::autofilter`, `--webp-autofilter`).
   The quality-70 reference keeps libwebp's defaults, since it stands for TinyPNG's file, and stays
-  a candidate: the auto filter loses on some images (kodim01: 1.2% bigger), so pngdeer's WebP is
+  a candidate: the auto filter loses on some images (kodim01: 1.2% bigger), so slimdeer's WebP is
   never bigger than that file. The rest gained under 1% each for more time, and were left out.
 
 Results, all 180 images (as shipped):
@@ -224,7 +224,7 @@ Results, all 180 images (as shipped):
 | round 3's WebP (all 180) | 180 | 100.0% | 97.5% | +0.00 |
 
 - Against TinyPNG's WebP, from 96.4% / 96.1% at −0.15 points in round 3 to 94.6% / 93.8% at
-  +0.07. Icons are unchanged (lossless, at pngdeer's PNG target, as in round 3).
+  +0.07. Icons are unchanged (lossless, at slimdeer's PNG target, as in round 3).
 - Time: 3.0 s per image on the median (round 3: 2.9 s), 5.4 s mean (4.4 s), 21 s at most
   (14.5 s): auto-filtered files take longer to encode, and the reference no longer starts the
   search's files where the settings differ.
@@ -290,9 +290,9 @@ the stand-in for the other 60.
 The contenders. Every open-source WebP tool we know of encodes with libwebp (Squoosh, sharp,
 Pillow, ImageMagick, FFmpeg), so they differ in settings, which cwebp covers:
 
-- **pngdeer**: 12 targets (40–98) and automatic.
+- **slimdeer**: 12 targets (40–98) and automatic.
 - **cwebp**: 27 settings, best per image picked after the fact: -q 10–100 (13 steps) at -m 6
-  -sharp_yuv, the same with -af (pngdeer's lossy encoder settings), and -lossless -z 9.
+  -sharp_yuv, the same with -af (slimdeer's lossy encoder settings), and -lossless -z 9.
 - **pngquant + cwebp**: pngquant at 60–100, with and without dithering (as in the PNG
   leaderboard), stored as lossless WebP (-z 9): TinyPNG's palette route from open-source parts.
 
@@ -300,27 +300,27 @@ Against TinyPNG's WebP (120 images):
 
 | Tool | Size at TinyPNG's quality, median / total | Points | Reaches |
 |---|---:|---:|---:|
-| **pngdeer** | **95.0% / 93.9%** | **+1.6** (all 120) | 118 |
+| **slimdeer** | **95.0% / 93.9%** | **+1.6** (all 120) | 118 |
 | TinyPNG (yardstick) | 100% | 0 | 120 |
 | cwebp, best of 27 | 97.9% / 110.2% | +0.9 (102) | 120 |
 | pngquant + cwebp, best of 10 | 135.0% / 212.1% | +1.1 (58) | 115 |
 
 - Points (score at TinyPNG's file size) exist only where TinyPNG's file is no smaller than a
   tool's smallest, so the medians cover different images: pngquant + cwebp's 58 are mostly where
-  TinyPNG went lossless itself. On the 40 images all three cover: pngdeer +2.6, pngquant + cwebp
+  TinyPNG went lossless itself. On the 40 images all three cover: slimdeer +2.6, pngquant + cwebp
   +1.9, cwebp −0.3. Size at TinyPNG's quality covers nearly every image.
-- By category (median size at TinyPNG's quality, pngdeer / cwebp / pngquant + cwebp): 3D 97 / 100 /
+- By category (median size at TinyPNG's quality, slimdeer / cwebp / pngquant + cwebp): 3D 97 / 100 /
   142%, icons 95 / 118 / 96%, illustrations 92 / 97 / 100%, photos 92 / 93 / 317%, cut-outs 97 / 97 /
-  229%, UI 96 / 98 / 105%. pngdeer is under TinyPNG in every category; cwebp loses on icons, where a
+  229%, UI 96 / 98 / 105%. slimdeer is under TinyPNG in every category; cwebp loses on icons, where a
   palette wins, and pngquant everywhere else.
-- pngdeer can't reach 2 (and 2 of the 60): line drawings where TinyPNG's palette scores 0.2–1.0
-  above pngdeer's best palette and lossy can't get there; pngdeer has no truecolor lossless WebP.
+- slimdeer can't reach 2 (and 2 of the 60): line drawings where TinyPNG's palette scores 0.2–1.0
+  above slimdeer's best palette and lossy can't get there; slimdeer has no truecolor lossless WebP.
 - One setting, as tools ship: cwebp's default (-q 75) is 105.8% of TinyPNG's size (111.8% in
   total) at −0.32 points, bigger and worse on 64 of the 120; -q 80 (sharp's and Pillow's default
-  quality, at method 4 as here) 124.9% at +2.23. pngdeer's automatic quality: 94.6% / 93.8% at
+  quality, at method 4 as here) 124.9% at +2.23. slimdeer's automatic quality: 94.6% / 93.8% at
   +0.07, bigger and worse on 1.
 
-Against the stand-in (the other 60): pngdeer 95.8% / 92.0%, +1.2, reaches 58; cwebp 99.7% /
+Against the stand-in (the other 60): slimdeer 95.8% / 92.0%, +1.2, reaches 58; cwebp 99.7% /
 111.8%, +0.4 (50), 60; pngquant + cwebp 115.9% / 181.5%, +1.9 (34), 57; on the 24 images all
-cover, +3.2 / +0.1 / +2.2. cwebp -q 75: 110.4% at −1.89; pngdeer automatic 95.9% / 94.1% at +0.13.
+cover, +3.2 / +0.1 / +2.2. cwebp -q 75: 110.4% at −1.89; slimdeer automatic 95.9% / 94.1% at +0.13.
 The cwebp files are byte-identical to round 1's.

@@ -1,6 +1,6 @@
 """simd-wasm.py NATIVE OUT [--all-simd] [--all-o3]: aomenc for wasm32-wasip1 with wasm SIMD, from libaom's NEON code.
 
-libaom has no wasm SIMD of its own, but its NEON functions write the same bytes as its C (pngdeer.patch drops the two
+libaom has no wasm SIMD of its own, but its NEON functions write the same bytes as its C (slimdeer.patch drops the two
 that don't), and SIMDe implements NEON's intrinsics on wasm's SIMD128. So this takes NATIVE, an arm64 build tree of the
 patched libaom configured with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON (see FINDINGS.md), recompiles each of its files for
 wasm with simde/arm_neon.h in place of the real one, and links OUT/aomenc.wasm (with function names, for
@@ -9,7 +9,7 @@ profile.sh) and OUT/aomenc.opt.wasm (through wasm-opt, to ship and time), run wi
 To keep the module no bigger than the plain C one, only the NEON functions simd.json lists are used (the ones 10-bit
 encodes spent time in, as profile.sh and hot.py measured; the rest go back to C, which writes the same bytes), files
 that took under 0.1% of the time in files.json are built at -Os and the others at -O2, and every file is built with
--DPNGDEER_STILL=1, which leaves the encoder's inter-frame-only functions out of its tables (pngdeer.patch). --all-simd
+-DSLIMDEER_STILL=1, which leaves the encoder's inter-frame-only functions out of its tables (slimdeer.patch). --all-simd
 and --all-o3 turn off the first two.
 """
 
@@ -57,7 +57,7 @@ def main() -> None:
     hot_files = json.load(open(HERE / "files.json"))
     source = pathlib.Path(re.search(r"^CMAKE_HOME_DIRECTORY:INTERNAL=(.*)$", (native / "CMakeCache.txt").read_text(), re.M).group(1))
     common = ["--target=wasm32-wasip1", f"--sysroot={SYSROOT}", f"-resource-dir={RUNTIMES}/wasi-runtimes", "-mllvm", "-wasm-enable-sjlj",
-              "-msimd128", "-ffp-contract=off", "-D_GNU_SOURCE", "-DPNGDEER_STILL=1", f"-I{HERE / 'simde'}", f"-I{out}", f"-I{SIMDE}"]
+              "-msimd128", "-ffp-contract=off", "-D_GNU_SOURCE", "-DSLIMDEER_STILL=1", f"-I{HERE / 'simde'}", f"-I{out}", f"-I{SIMDE}"]
     cxx = ["-fno-exceptions", "-isystem", f"{RUNTIMES}/wasi-sysroot/include/wasm32-wasip1/c++/v1", "-isystem", f"{RUNTIMES}/wasi-sysroot/include/c++/v1"]
     jobs = []
     for entry in json.load(open(native / "compile_commands.json")):

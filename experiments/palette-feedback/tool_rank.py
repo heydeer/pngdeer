@@ -11,7 +11,7 @@ for r in rows:
     by[r["image"]][r["pipeline"]] = (int(r["out_bytes"]), float(r["ssimulacra2"]))
 opaque = {img for img in by if (lambda a: a.shape[-1] < 4 or (a[..., 3] == 255).all())(np.asarray(Image.open(images / img).convert("RGBA")))}
 def tool(p):
-    if p.startswith("pd") or p.startswith("liq"): return "pngdeer (ours)"
+    if p.startswith("pd") or p.startswith("liq"): return "slimdeer (ours)"
     if p.startswith("pq"): return "pngquant"
     m = re.match(r"(im|ff|pil|exq|qte|nq|qzr)\d", p)
     return {"im": "ImageMagick", "ff": "FFmpeg", "pil": "Pillow", "exq": "exoquant", "qte": "quantette", "nq": "NeuQuant", "qzr": "quantizr"}[m.group(1)] if m else None

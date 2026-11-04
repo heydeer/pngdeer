@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Blind A/B test: a challenger family (pd, pngdeer, by default) against TinyPNG, judged by eye.
+"""Blind A/B test: a challenger family (pd, slimdeer, by default) against TinyPNG, judged by eye.
 
 Serves a local page that shows each image's two outputs as A and B in random order, plus the
 original for reference. Votes go to <run>/blind/, next to the benchmark results they come from.
 
-  python3 bench/blind.py                      # pngdeer vs TinyPNG, the pd output closest in file size
+  python3 bench/blind.py                      # slimdeer vs TinyPNG, the pd output closest in file size
   python3 bench/blind.py --match quality      # smallest pd output scoring at least TinyPNG's
   python3 bench/blind.py --challenger pq      # pngquant's fixed levels instead
   python3 bench/blind.py --challenger liq --results bench/results/20261023-151136   # a run from before the rename

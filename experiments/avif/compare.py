@@ -1,4 +1,4 @@
-"""AVIF from photos and PNGs: libaom (avifenc) and rav1e (tools/aviflab) against pngdeer's JPEG and
+"""AVIF from photos and PNGs: libaom (avifenc) and rav1e (tools/aviflab) against slimdeer's JPEG and
 WebP and against TinyPNG.
 
   python3 experiments/avif/compare.py tiny PHOTOS TINYAVIF
@@ -15,18 +15,18 @@ measures the web ones only). `tiny` fetches TinyPNG's AVIF of each into TINYAVIF
 (bench.py's `convert_avif`: a shrink, then a conversion, two compressions; cached). `tiny-pngs` does
 the same for bench/images (PICK=4: 4 per category) as CATEGORY-STEM.avif.
 
-`photos` encodes each photo as pngdeer decodes it (zune-jpeg, turned upright), written as a PNG by
+`photos` encodes each photo as slimdeer decodes it (zune-jpeg, turned upright), written as a PNG by
 `aviflab png`, with every CONFIG over a sweep of qualities (default: those at speed 6). Every file is
 decoded with avifdec (dav1d; libavif's own YUV to RGB, bilinear chroma) to 8-bit and scored against
-the photo with `pngdeer PHOTO --score`. `pngs` does the same for bench/images (default: aom-s6 and
+the photo with `slimdeer PHOTO --score`. `pngs` does the same for bench/images (default: aom-s6 and
 rav1e-s6; PICK=N: N per category), scored as bench.py scores (color chunks stripped, small images
 enlarged, libjxl's ssimulacra2), with TinyPNG's AVIF where TINYAVIF has it. Rows already in CSV
 aren't run again. Encodes run one thread each, 10 photos (4 images) at a time: their times are
 contended; `speed` times encodes one at a time.
 
 `summary` compares on frontiers, as experiments/jpeg does: the bytes each config needs for a score
-(TinyPNG's AVIF's and JPEG's, pngdeer's JPEG's and WebP's at automatic quality, from experiments/jpeg's
-CSVs) against those files' bytes. `summary-pngs` compares at TinyPNG's PNG score against pngdeer's
+(TinyPNG's AVIF's and JPEG's, slimdeer's JPEG's and WebP's at automatic quality, from experiments/jpeg's
+CSVs) against those files' bytes. `summary-pngs` compares at TinyPNG's PNG score against slimdeer's
 WebP frontier (targets 40-98: the smaller of its palette as lossless WebP and lossy WebP), from
 bench.py results (the first file with a pipeline for an image wins). `summary-tiny-pngs` compares at
 TinyPNG's AVIF's score, on the images that have it.
@@ -41,7 +41,7 @@ sys.path.insert(0, str(ROOT / "bench"))
 import bench  # noqa: E402
 from bench import bytes_at_score, frontier, score_at_bytes  # noqa: E402
 
-PNGDEER = ROOT / "target/release/pngdeer"
+SLIMDEER = ROOT / "target/release/slimdeer"
 AVIFLAB = ROOT / "target/release/aviflab"
 AVIFLAB_WASM = ROOT / "target/wasm32-unknown-unknown/release/aviflab.wasm"
 AOM_Q = [30, 40, 50, 55, 60, 65, 70, 80]
@@ -75,7 +75,7 @@ PHOTO_CONFIGS = {
 PNG_CONFIGS = {
     "aom-s6": (PNG_AOM_Q, aom(6)),
     "rav1e-s6": (PNG_RAV1E_Q, rav1e(6)),
-    # pngdeer's best shot, on the images TinyPNG's AVIF was fetched for (PICK=4)
+    # slimdeer's best shot, on the images TinyPNG's AVIF was fetched for (PICK=4)
     "aom-s6-10bit": (PNG_AOM_Q, aom(6, "-d", "10")),
     "aom-s4-10bit": (PNG_AOM_Q, aom(4, "-d", "10")),
     "aom-s6-10bit-screen": (PNG_AOM_Q, aom(6, "-d", "10", "-a", "tune-content=screen")),
@@ -151,14 +151,14 @@ def tiny_pngs(images: Path, out: Path) -> None:
 
 
 def photo_scorer(photo: Path, t: Path):
-    """The photo as pngdeer decodes it (turned upright), written to t/src.png to encode, and a function
+    """The photo as slimdeer decodes it (turned upright), written to t/src.png to encode, and a function
     scoring an AVIF against the photo."""
     src, dec = t / "src.png", t / "dec.png"
     subprocess.run([AVIFLAB, "png", photo, src], check=True)
 
     def score(avif: Path) -> float:
         avifdec(avif, dec)
-        return round(float(subprocess.run([PNGDEER, photo, "--score", dec], capture_output=True, text=True, check=True).stdout), 3)
+        return round(float(subprocess.run([SLIMDEER, photo, "--score", dec], capture_output=True, text=True, check=True).stdout), 3)
 
     return src, score
 
@@ -175,13 +175,13 @@ def png_scorer(img: Path, t: Path):
     ref = src
     if factor > 1:
         ref = t / "ref.png"
-        subprocess.run([PNGDEER, src, "-o", ref, "--upscale", str(factor)], check=True, capture_output=True)
+        subprocess.run([SLIMDEER, src, "-o", ref, "--upscale", str(factor)], check=True, capture_output=True)
 
     def score(avif: Path) -> float:
         avifdec(avif, dec)
         scored = dec
         if factor > 1:
-            subprocess.run([PNGDEER, dec, "-o", big, "--upscale", str(factor)], check=True, capture_output=True)
+            subprocess.run([SLIMDEER, dec, "-o", big, "--upscale", str(factor)], check=True, capture_output=True)
             scored = big
         return round(float(subprocess.run(["ssimulacra2", ref, scored], capture_output=True, text=True, check=True).stdout.split()[-1]), 3)
 
@@ -267,8 +267,8 @@ def summary(path: str, jpeg_path: str, webp_path: str) -> None:
     anchors = {
         "TinyPNG's AVIF": lambda i: pick(avif[i], "tinypng"),
         "TinyPNG's JPEG": lambda i: pick(jpeg[i], "tinypng"),
-        "pngdeer's JPEG (automatic)": lambda i: pick(jpeg[i], "pngdeer auto"),
-        "pngdeer's WebP (automatic)": lambda i: pick(webp[i], "pngdeer auto"),
+        "slimdeer's JPEG (automatic)": lambda i: pick(jpeg[i], "slimdeer auto"),
+        "slimdeer's WebP (automatic)": lambda i: pick(webp[i], "slimdeer auto"),
     }
     tools = [t for t in PHOTO_CONFIGS if any(r["tool"] == t for i in images for r in avif[i])]
     for name, anchor in anchors.items():
@@ -294,7 +294,7 @@ def summary(path: str, jpeg_path: str, webp_path: str) -> None:
                 print(f"  {tool:18} {pct(statistics.median(ratios))} / {pct(sizes[0] / sizes[1])}  {len(ratios)}/{n}  {statistics.median(points):+.2f}   "
                       + "  ".join(f"{k} {pct(statistics.median(v))}" for k, v in sorted(kinds.items())))
         print()
-    print("What speed costs, at pngdeer's JPEG's score: bytes against the same encoder at speed 6 (median / total), encode time against it (median)")
+    print("What speed costs, at slimdeer's JPEG's score: bytes against the same encoder at speed 6 (median / total), encode time against it (median)")
     for tool, base in [("aom-s4-444-10bit", "aom-s6-444-10bit"), ("aom-s5-444-10bit", "aom-s6-444-10bit"), ("aom-s8-444-10bit", "aom-s6-444-10bit"), ("aom-s9-444-10bit", "aom-s6-444-10bit"),
                        ("rav1e-s8", "rav1e-s6"), ("rav1e-s10", "rav1e-s6")]:
         ratios, sizes, times = [], [0, 0], []
@@ -302,7 +302,7 @@ def summary(path: str, jpeg_path: str, webp_path: str) -> None:
             rows, base_rows = [r for r in avif[i] if r["tool"] == tool], [r for r in avif[i] if r["tool"] == base]
             if not rows or not base_rows:
                 continue
-            target = float(pick(jpeg[i], "pngdeer auto")["score"])
+            target = float(pick(jpeg[i], "slimdeer auto")["score"])
             a, b = (bytes_at_score(frontier([as_row(r["score"], r["bytes"]) for r in rs]), target) for rs in (rows, base_rows))
             if a is not None and b is not None:
                 ratios.append(a / b)
@@ -324,8 +324,8 @@ def summary_pngs(path: str, *bench_paths: str) -> None:
         seen |= have
     images = sorted(avif)
     categories = sorted({avif[i][0]["category"] for i in images})
-    print(f"{len(images)} images, at TinyPNG's PNG score: AVIF reached; AVIF's and pngdeer's WebP's bytes against TinyPNG's PNG (median, where reached);")
-    print("AVIF against pngdeer's WebP (median, total, smaller in); the smaller of the two per image against pngdeer's WebP (total)")
+    print(f"{len(images)} images, at TinyPNG's PNG score: AVIF reached; AVIF's and slimdeer's WebP's bytes against TinyPNG's PNG (median, where reached);")
+    print("AVIF against slimdeer's WebP (median, total, smaller in); the smaller of the two per image against slimdeer's WebP (total)")
     for tool in [t for t in PNG_CONFIGS if any(r["tool"] == t for i in images for r in avif[i])]:
         print(f"\n{tool}")
         for cat in categories + ["all"]:
@@ -351,7 +351,7 @@ def summary_pngs(path: str, *bench_paths: str) -> None:
                     best += 1
             line = f"  {cat:14} {reached:3}/{n:<3}"
             if vs_tiny:
-                line += f"  AVIF {pct(statistics.median(vs_tiny))} of TinyPNG, pngdeer WebP {pct(statistics.median(wp_tiny))}"
+                line += f"  AVIF {pct(statistics.median(vs_tiny))} of TinyPNG, slimdeer WebP {pct(statistics.median(wp_tiny))}"
             if vs_wp:
                 line += f"  AVIF/WebP {pct(statistics.median(vs_wp))} median, smaller in {sum(x < 1 for x in vs_wp)}/{len(vs_wp)}"
             if best:
@@ -399,7 +399,7 @@ def summary_tiny_pngs(path: str, *bench_paths: str) -> None:
 
 def speed(paths: list[str]) -> None:
     """One encode at a time: libaom (avifenc, one thread, 4:4:4 10-bit) and rav1e natively and in
-    wasm (node), at quality 60, and pngdeer's whole JPEG and WebP compression for comparison."""
+    wasm (node), at quality 60, and slimdeer's whole JPEG and WebP compression for comparison."""
     with tempfile.TemporaryDirectory() as t:
         t = Path(t)
         for path in paths:
@@ -416,8 +416,8 @@ def speed(paths: list[str]) -> None:
                 print(f"  rav1e wasm s{s}   {ms / 1000:6.1f} s  {out.stat().st_size} bytes")
             for fmt in ["jpg", "webp"]:
                 start = time.perf_counter()
-                subprocess.run([PNGDEER, photo, "-o", t / f"p.{fmt}"], check=True, capture_output=True)
-                print(f"  pngdeer {fmt:5}    {time.perf_counter() - start:6.1f} s  (whole search)")
+                subprocess.run([SLIMDEER, photo, "-o", t / f"p.{fmt}"], check=True, capture_output=True)
+                print(f"  slimdeer {fmt:5}    {time.perf_counter() - start:6.1f} s  (whole search)")
 
 
 if __name__ == "__main__":

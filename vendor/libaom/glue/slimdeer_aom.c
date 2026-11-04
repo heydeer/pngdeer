@@ -1,4 +1,4 @@
-// pngdeer: entry points into libaom's AV1 encoder with plain arguments, so the Rust side
+// slimdeer: entry points into libaom's AV1 encoder with plain arguments, so the Rust side
 // (src/lib.rs) declares none of libaom's structs. One call encodes one still image (its color, or
 // an alpha plane) the way libavif's codec_aom.c encodes a still AVIF (all-intra, one frame, a
 // constant quantizer), and hands back the frame as a decoder shows it.
@@ -24,12 +24,12 @@ typedef struct {
   int color_primaries;
   int transfer_characteristics;
   int matrix_coefficients;
-} PngdeerAomOptions;
+} SlimdeerAomOptions;
 
 // libaom sets up its function tables and lookup tables on its first encoder, through aom_once,
 // which without HAVE_PTHREAD_H has no lock: src/lib.rs calls this once, before encoders can run on
 // several threads.
-void pngdeer_aom_init(void) { av1_initialize_enc(ALLINTRA, AOM_Q); }
+void slimdeer_aom_init(void) { av1_initialize_enc(ALLINTRA, AOM_Q); }
 
 static int append(uint8_t** out, size_t* size, size_t* capacity, const void* data, size_t n) {
   if (*size + n > *capacity) {
@@ -46,11 +46,11 @@ static int append(uint8_t** out, size_t* size, size_t* capacity, const void* dat
 
 // Encodes `count` planes (3: Y, U and V of 4:4:4; 1: an alpha plane, encoded as monochrome) of
 // `height` rows of `width` samples of `depth` bits (8 or 10). The AV1 data (the temporal unit
-// libaom writes) goes to *out (free it with pngdeer_aom_free), its size to *out_size, and the frame
+// libaom writes) goes to *out (free it with slimdeer_aom_free), its size to *out_size, and the frame
 // as decoded to `decoded` (count × width × height samples). Returns 1, or 0 with an error message
 // in `message` (`message_size` bytes at most).
-int pngdeer_aom_encode(const uint16_t* const* planes, int count, int width, int height, int depth,
-                       const PngdeerAomOptions* options, uint8_t** out, size_t* out_size,
+int slimdeer_aom_encode(const uint16_t* const* planes, int count, int width, int height, int depth,
+                       const SlimdeerAomOptions* options, uint8_t** out, size_t* out_size,
                        uint16_t* decoded, char* message, size_t message_size) {
   const int alpha = count == 1;
   aom_codec_iface_t* iface = aom_codec_av1_cx();
@@ -92,7 +92,7 @@ int pngdeer_aom_encode(const uint16_t* const* planes, int count, int width, int 
     aom_codec_control(&encoder, AV1E_SET_MATRIX_COEFFICIENTS, options->matrix_coefficients);
   }
   // libavif skips applying the last loop filters to the encoder's own copy of a still frame
-  // (AV1E_SET_SKIP_POSTPROC_FILTERING): the bitstream is the same either way, and pngdeer scores
+  // (AV1E_SET_SKIP_POSTPROC_FILTERING): the bitstream is the same either way, and slimdeer scores
   // that copy, so it applies them
   if (options->tune >= 0) aom_codec_control(&encoder, AOME_SET_TUNING, options->tune);
   if (options->screen) aom_codec_control(&encoder, AV1E_SET_TUNE_CONTENT, AOM_CONTENT_SCREEN);
@@ -187,4 +187,4 @@ int pngdeer_aom_encode(const uint16_t* const* planes, int count, int width, int 
   return !error;
 }
 
-void pngdeer_aom_free(void* pointer) { free(pointer); }
+void slimdeer_aom_free(void* pointer) { free(pointer); }

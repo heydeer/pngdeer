@@ -4,7 +4,7 @@ TinyPNG's AVIF.
 
   python3 experiments/avif/auto.py refs PHOTOS IMAGES TINYAVIF TINYPNGS refs.csv
   python3 experiments/avif/auto.py fit refs.csv
-  python3 experiments/avif/auto.py run PHOTOS IMAGES TINYAVIF TINYPNGS refs.csv auto.csv tinypng|pngdeer|at-tinypng [MARGIN]
+  python3 experiments/avif/auto.py run PHOTOS IMAGES TINYAVIF TINYPNGS refs.csv auto.csv tinypng|slimdeer|at-tinypng [MARGIN]
   python3 experiments/avif/auto.py summary auto.csv
 
 The images are compare.py's: 15 web photos and 15 camera originals of experiments/jpeg, and 4 PNGs per
@@ -12,7 +12,7 @@ category of bench/images (PICK=4), scored as compare.py scores them, with TinyPN
 (TINYAVIF and TINYPNGS, from compare.py's `tiny` and `tiny-pngs`).
 
 TinyPNG writes every AVIF at one quantizer (base_q_idx 104, its alpha planes too), so its score
-follows the image, not its size. `refs` records, for each image, TinyPNG's AVIF, pngdeer's automatic
+follows the image, not its size. `refs` records, for each image, TinyPNG's AVIF, slimdeer's automatic
 target for the image as it stands (JPEG output's for a photo, PNG output's for a PNG), and a
 reference encode made as TinyPNG's headers say its AVIF was (REFERENCE: libaom all-intra at
 quantizer 26, tune=ssim, quantization matrices, chroma and perceptual delta-q, which leaves CDEF
@@ -21,7 +21,7 @@ checks how well each of those predicts TinyPNG's score, every image predicted fr
 
 `run` is the prototype, with one of two automatic targets: `tinypng`, about TinyPNG's AVIF's quality
 (photos: the median TinyPNG score of the other photos; PNGs: PNG output's target less the median
-gap to TinyPNG's AVIF on the other PNGs), or `pngdeer`, pngdeer's own target as it stands; plus
+gap to TinyPNG's AVIF on the other PNGs), or `slimdeer`, slimdeer's own target as it stands; plus
 MARGIN points (default 0). `at-tinypng` aims at each image's TinyPNG score instead, to compare at
 the same quality, as the leaderboards do.
 
@@ -47,7 +47,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from compare import AVIFLAB, PNGDEER, append_rows, bench, chosen_photos, chosen_pngs, photo_scorer, png_scorer  # noqa: E402
+from compare import AVIFLAB, SLIMDEER, append_rows, bench, chosen_photos, chosen_pngs, photo_scorer, png_scorer  # noqa: E402
 
 REFERENCE = ["-q", "59", "-a", "tune=ssim", "-a", "enable-qm=1", "-a", "enable-chroma-deltaq=1", "-a", "deltaq-mode=3"]
 SMALL_MP = 0.5
@@ -77,7 +77,7 @@ def is_photo(row: dict) -> bool:
 
 
 def prepare(path: Path, photo: bool, t: Path):
-    """The source to encode, the scorer, its megapixels and whether it has transparency (as pngdeer decodes it)."""
+    """The source to encode, the scorer, its megapixels and whether it has transparency (as slimdeer decodes it)."""
     src, score = (photo_scorer if photo else png_scorer)(path, t)
     w, h, _ = bench.png_info(src)
     alpha = False
@@ -88,10 +88,10 @@ def prepare(path: Path, photo: bool, t: Path):
 
 
 def base_target(path: Path, photo: bool, mp: float, t: Path) -> float:
-    """pngdeer's automatic target as it stands: src/jpeg.rs's auto_target for a photo, PNG output's for a PNG."""
+    """slimdeer's automatic target as it stands: src/jpeg.rs's auto_target for a photo, PNG output's for a PNG."""
     if photo:
         return round(min(72.3 - 3.2 * math.log(mp), 90.0), 3)
-    report = subprocess.run([PNGDEER, path, "-o", t / "pngdeer.png", "--json"], check=True, capture_output=True, text=True).stdout
+    report = subprocess.run([SLIMDEER, path, "-o", t / "slimdeer.png", "--json"], check=True, capture_output=True, text=True).stdout
     return json.loads(report.strip().splitlines()[-1])["target"]
 
 
@@ -138,7 +138,7 @@ def fit(path: str) -> None:
     rows = list(csv.DictReader(open(path)))
     models = {
         "a constant": lambda r: [],
-        "pngdeer's target as it stands": lambda r: [float(r["base_target"])],
+        "slimdeer's target as it stands": lambda r: [float(r["base_target"])],
         "the reference's score": lambda r: [float(r["ref_score"])],
         "both, their distances from 100 added": lambda r: [float(r["base_target"]) + float(r["ref_score"]) - 100],
     }
@@ -155,14 +155,14 @@ def fit(path: str) -> None:
             print(f"  {name:38} median {statistics.median(errors):+5.2f}, rms {statistics.fmean([e * e for e in errors]) ** 0.5:5.2f},"
                   f" worst {min(errors):+6.1f} / {max(errors):+6.1f}")
         gap = [float(r["tiny_score"]) - float(r["base_target"]) for r in g]
-        print(f"  TinyPNG's AVIF less pngdeer's target: median {statistics.median(gap):+.2f}; reference's bytes over TinyPNG's: median"
+        print(f"  TinyPNG's AVIF less slimdeer's target: median {statistics.median(gap):+.2f}; reference's bytes over TinyPNG's: median"
               f" {statistics.median(int(r['ref_bytes']) / int(r['tiny_bytes']) for r in g):.1%}")
 
 
 def target(ref_rows: list[dict], name: str, policy: str, margin: float) -> float:
     """The image's automatic target under policy, from the other images only (see the module docs)."""
     row = next(r for r in ref_rows if r["image"] == name)
-    if policy == "pngdeer":
+    if policy == "slimdeer":
         return float(row["base_target"]) + margin
     if policy == "at-tinypng":
         return float(row["tiny_score"]) + margin

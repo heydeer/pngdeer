@@ -1,4 +1,4 @@
-// pngdeer's entry points into libwebp. They take plain values rather than libwebp's structs, so
+// slimdeer's entry points into libwebp. They take plain values rather than libwebp's structs, so
 // the Rust side (src/lib.rs) declares no struct layouts of libwebp's.
 
 #include <string.h>
@@ -26,10 +26,10 @@ typedef struct {
   int autofilter;         // lossy: 0-1
   int preprocessing;      // lossy: 0-7
   int near_lossless;      // lossless: 0-100, 100 is off
-} PngdeerWebpOptions;
+} SlimdeerWebpOptions;
 
 // A WebPConfig from the options; 0 if libwebp rejects them.
-static int Configure(WebPConfig* config, const PngdeerWebpOptions* options) {
+static int Configure(WebPConfig* config, const SlimdeerWebpOptions* options) {
   if (!WebPConfigInit(config)) return 0;
   if (options->lossless) {
     if (!WebPConfigLosslessPreset(config, options->level)) return 0;
@@ -54,7 +54,7 @@ static int Configure(WebPConfig* config, const PngdeerWebpOptions* options) {
   return WebPValidateConfig(config);
 }
 
-// Encodes `picture` (freeing it) into memory; see pngdeer_webp_encode.
+// Encodes `picture` (freeing it) into memory; see slimdeer_webp_encode.
 static size_t Encode(const WebPConfig* config, WebPPicture* picture,
                      WebPMemoryWriter* writer, uint8_t** out, int* error) {
   WebPMemoryWriterInit(writer);
@@ -72,9 +72,9 @@ static size_t Encode(const WebPConfig* config, WebPPicture* picture,
 }
 
 // Encodes `rgba` (width * 4 bytes a row). Returns the file's size and points `*out` at it (to free
-// with pngdeer_webp_free), or returns 0 and sets `*error` to a WebPEncodingError (-1: bad options).
-size_t pngdeer_webp_encode(const uint8_t* rgba, int width, int height,
-                           const PngdeerWebpOptions* options, uint8_t** out,
+// with slimdeer_webp_free), or returns 0 and sets `*error` to a WebPEncodingError (-1: bad options).
+size_t slimdeer_webp_encode(const uint8_t* rgba, int width, int height,
+                           const SlimdeerWebpOptions* options, uint8_t** out,
                            int* error) {
   WebPConfig config;
   WebPPicture picture;
@@ -97,11 +97,11 @@ size_t pngdeer_webp_encode(const uint8_t* rgba, int width, int height,
   return Encode(&config, &picture, &writer, out, error);
 }
 
-// An image converted to YUV once, for any number of lossy encodes (pngdeer_webp_source_encode):
+// An image converted to YUV once, for any number of lossy encodes (slimdeer_webp_source_encode):
 // WebPEncode converts a picture that has no YUV samples yet, then works on its YUV samples alone, so
 // encoding a copy of this one is the same as encoding the RGBA with the same conversion. NULL on
 // failure, with `*error` set.
-WebPPicture* pngdeer_webp_source_new(const uint8_t* rgba, int width, int height,
+WebPPicture* slimdeer_webp_source_new(const uint8_t* rgba, int width, int height,
                                      int sharp_yuv, int* error) {
   WebPPicture picture;
   WebPPicture* source = (WebPPicture*)WebPMalloc(sizeof(*source));
@@ -114,7 +114,7 @@ WebPPicture* pngdeer_webp_source_new(const uint8_t* rgba, int width, int height,
   picture.use_argb = 1;
   picture.width = width;
   picture.height = height;
-  // as WebPEncode converts it (no dithering: pngdeer sets no preprocessing)
+  // as WebPEncode converts it (no dithering: slimdeer sets no preprocessing)
   if (!WebPPictureImportRGBA(&picture, rgba, width * 4) ||
       !(sharp_yuv ? WebPPictureSharpARGBToYUVA(&picture)
                   : WebPPictureARGBToYUVADithered(&picture, WEBP_YUV420, 0.f)) ||
@@ -128,10 +128,10 @@ WebPPicture* pngdeer_webp_source_new(const uint8_t* rgba, int width, int height,
   return source;
 }
 
-// pngdeer_webp_encode for a source's picture (lossy only; `options->sharp_yuv` must be the
+// slimdeer_webp_encode for a source's picture (lossy only; `options->sharp_yuv` must be the
 // source's). Safe to call from several threads at once on one source: it is only read.
-size_t pngdeer_webp_source_encode(const WebPPicture* source,
-                                  const PngdeerWebpOptions* options, uint8_t** out,
+size_t slimdeer_webp_source_encode(const WebPPicture* source,
+                                  const SlimdeerWebpOptions* options, uint8_t** out,
                                   int* error) {
   WebPConfig config;
   WebPPicture picture;
@@ -149,16 +149,16 @@ size_t pngdeer_webp_source_encode(const WebPPicture* source,
   return Encode(&config, &picture, &writer, out, error);
 }
 
-void pngdeer_webp_source_free(WebPPicture* source) {
+void slimdeer_webp_source_free(WebPPicture* source) {
   WebPPictureFree(source);
   WebPFree(source);
 }
 
 // A WebP file as RGBA (width * 4 bytes a row, fancy upsampling as browsers decode it), to free with
-// pngdeer_webp_free; NULL if it can't be decoded.
-uint8_t* pngdeer_webp_decode(const uint8_t* data, size_t size, int* width,
+// slimdeer_webp_free; NULL if it can't be decoded.
+uint8_t* slimdeer_webp_decode(const uint8_t* data, size_t size, int* width,
                              int* height) {
   return WebPDecodeRGBA(data, size, width, height);
 }
 
-void pngdeer_webp_free(void* pointer) { WebPFree(pointer); }
+void slimdeer_webp_free(void* pointer) { WebPFree(pointer); }

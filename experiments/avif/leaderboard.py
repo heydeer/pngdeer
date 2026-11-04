@@ -7,7 +7,7 @@ each tool's files pooled into one size-quality frontier per image, against TinyP
 The images are round 8's 54 (compare.py's 15 web photos, 15 camera originals and 4 PNGs per
 category of IMAGES, their color chunks stripped); TINY.csv is product.py `tiny`'s, TinyPNG's AVIF
 scored as Chrome shows it. `sweep` makes, per image:
-- pngdeer: its runs at the automatic target (62.3 for a photo) and at TinyPNG's score less 6, less 3,
+- slimdeer: its runs at the automatic target (62.3 for a photo) and at TinyPNG's score less 6, less 3,
   plus 0, 3 and 6;
 - avifenc (libavif with libaom, what Squoosh and sharp encode with): its default speed, 4:4:4 at 8
   bits (its default for a PNG), 4:4:4 at 10 bits and 4:2:0 at 10 bits (TinyPNG's), qualities 30-90;
@@ -15,7 +15,7 @@ scored as Chrome shows it. `sweep` makes, per image:
 all from the PNG (for a photo, the upright PNG of it, as round 1 to 8 encoded, without its color
 profile: Chrome would show a file with one color-managed, not as the photo's own pixels, which TinyPNG,
 dropping the profile, is scored against), decodes every file in Chrome (chrome.mjs) and scores it with
-`pngdeer --score`, as TinyPNG's were. With TOOL, only that tool's files. `summary` gives, per tool:
+`slimdeer --score`, as TinyPNG's were. With TOOL, only that tool's files. `summary` gives, per tool:
 bytes saved at TinyPNG's quality (median, where it gets there; and in total), how many images it gets
 there on, and its points above TinyPNG at TinyPNG's size; a later OUT.csv's rows of a tool replace
 an earlier one's for the same image.
@@ -29,14 +29,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from compare import AVIFLAB, PNGDEER, bench  # noqa: E402
+from compare import AVIFLAB, SLIMDEER, bench  # noqa: E402
 from product import images, source  # noqa: E402
 
 QUALITIES = [30, 40, 50, 55, 60, 65, 70, 75, 80, 85, 90]
 AVIFENC = {"444": ["-y", "444", "-d", "8"], "444-10bit": ["-y", "444", "-d", "10"], "420-10bit": ["-y", "420", "-d", "10"]}
 OFFSETS = [-6, -3, 0, 3, 6]
 FIELDS = ["image", "group", "tool", "setting", "bytes", "score"]
-TOOLS = ["pngdeer", "avifenc", "rav1e"]
+TOOLS = ["slimdeer", "avifenc", "rav1e"]
 
 
 def group(name: str) -> str:
@@ -63,8 +63,8 @@ def sweep(photos: Path, pngs: Path, tiny_csv: Path, out: Path, only: str | None 
                     subprocess.run([AVIFLAB, "png", path, upright], check=True)
                 score = float(tiny[name]["tiny_score"])
                 # a photo's automatic target, src/avif.rs's PHOTO_TARGET, as it would get from the JPEG
-                jobs = [("pngdeer", "auto", [PNGDEER, upright, "-o", "{out}", *(["--target", "62.3"] if photo else [])])]
-                jobs += [("pngdeer", f"tiny{o:+d}", [PNGDEER, upright, "-o", "{out}", "--target", f"{score + o:.3f}"]) for o in OFFSETS]
+                jobs = [("slimdeer", "auto", [SLIMDEER, upright, "-o", "{out}", *(["--target", "62.3"] if photo else [])])]
+                jobs += [("slimdeer", f"tiny{o:+d}", [SLIMDEER, upright, "-o", "{out}", "--target", f"{score + o:.3f}"]) for o in OFFSETS]
                 jobs += [("avifenc", f"{fmt}-q{q}", ["avifenc", "-j", "1", "-s", "6", *flags, "-q", str(q), upright, "{out}"]) for fmt, flags in AVIFENC.items()
                          for q in QUALITIES]
                 jobs += [("rav1e", f"s6-q{q}", [AVIFLAB, "enc", upright, "{out}", str(q), "6"]) for q in QUALITIES]
@@ -81,7 +81,7 @@ def sweep(photos: Path, pngs: Path, tiny_csv: Path, out: Path, only: str | None 
 
                 def scored(file):
                     tool, setting, avif = file
-                    s = subprocess.run([PNGDEER, src, "--score", f"{avif}.chrome.png"], check=True, capture_output=True, text=True).stdout
+                    s = subprocess.run([SLIMDEER, src, "--score", f"{avif}.chrome.png"], check=True, capture_output=True, text=True).stdout
                     return {"image": name, "group": group(name), "tool": tool, "setting": setting, "bytes": avif.stat().st_size, "score": round(float(s), 3)}
 
                 for row in ThreadPoolExecutor(4).map(scored, files):

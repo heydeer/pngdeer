@@ -59,8 +59,8 @@ def main() -> None:
     parser.add_argument("--lossy-from", choices=("source", "tinypng"), default="source")
     parser.add_argument("-j", "--jobs", type=int, default=7)
     args = parser.parse_args()
-    tools = bench.find_tools(need_pngdeer=True, webp=True)
-    cfg = bench.Config(tools["pngquant"], tools["oxipng"], tools["ssimulacra2"], "max", False, None, tools["pngdeer"], cwebp=tools["cwebp"], dwebp=tools["dwebp"])
+    tools = bench.find_tools(need_slimdeer=True, webp=True)
+    cfg = bench.Config(tools["pngquant"], tools["oxipng"], tools["ssimulacra2"], "max", False, None, tools["slimdeer"], cwebp=tools["cwebp"], dwebp=tools["dwebp"])
     images = bench.find_images(args.images.resolve())
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         rows = list(pool.map(lambda img: emulate(img, cfg, args), images))

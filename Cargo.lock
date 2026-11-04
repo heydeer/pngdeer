@@ -140,9 +140,9 @@ name = "aviflab"
 version = "0.1.0"
 dependencies = [
  "png",
- "pngdeer",
  "ravif",
  "rgb",
+ "slimdeer",
 ]
 
 [[package]]
@@ -777,68 +777,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pngdeer"
-version = "0.2.1"
-dependencies = [
- "crc32fast",
- "fast-ssim2",
- "libm",
- "miniz_oxide 0.9.1",
- "oxipng",
- "png",
- "pngdeer-libaom",
- "pngdeer-libwebp",
- "pngdeer-mozjpeg",
- "rayon",
- "rgb",
- "zune-core",
- "zune-jpeg",
-]
-
-[[package]]
-name = "pngdeer-clib"
-version = "0.1.0"
-dependencies = [
- "cc",
- "libm",
-]
-
-[[package]]
-name = "pngdeer-libaom"
-version = "3.15.2"
-dependencies = [
- "cc",
- "pngdeer-clib",
- "rayon",
-]
-
-[[package]]
-name = "pngdeer-libwebp"
-version = "1.6.0"
-dependencies = [
- "cc",
- "pngdeer-clib",
-]
-
-[[package]]
-name = "pngdeer-mozjpeg"
-version = "4.1.5"
-dependencies = [
- "cc",
- "pngdeer-clib",
-]
-
-[[package]]
-name = "pngdeer-wasm"
-version = "0.1.0"
-dependencies = [
- "js-sys",
- "pngdeer",
- "wasm-bindgen",
- "wasm-bindgen-rayon",
-]
-
-[[package]]
 name = "ppv-lite86"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -906,9 +844,9 @@ dependencies = [
  "color_quant",
  "exoquant",
  "palette",
- "pngdeer",
  "quantette",
  "quantizr",
+ "slimdeer",
 ]
 
 [[package]]
@@ -1154,6 +1092,68 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
+name = "slimdeer"
+version = "0.2.1"
+dependencies = [
+ "crc32fast",
+ "fast-ssim2",
+ "libm",
+ "miniz_oxide 0.9.1",
+ "oxipng",
+ "png",
+ "rayon",
+ "rgb",
+ "slimdeer-libaom",
+ "slimdeer-libwebp",
+ "slimdeer-mozjpeg",
+ "zune-core",
+ "zune-jpeg",
+]
+
+[[package]]
+name = "slimdeer-clib"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "libm",
+]
+
+[[package]]
+name = "slimdeer-libaom"
+version = "3.15.2"
+dependencies = [
+ "cc",
+ "rayon",
+ "slimdeer-clib",
+]
+
+[[package]]
+name = "slimdeer-libwebp"
+version = "1.6.0"
+dependencies = [
+ "cc",
+ "slimdeer-clib",
+]
+
+[[package]]
+name = "slimdeer-mozjpeg"
+version = "4.1.5"
+dependencies = [
+ "cc",
+ "slimdeer-clib",
+]
+
+[[package]]
+name = "slimdeer-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "slimdeer",
+ "wasm-bindgen",
+ "wasm-bindgen-rayon",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1315,10 +1315,10 @@ dependencies = [
 name = "webplab"
 version = "0.1.0"
 dependencies = [
- "pngdeer",
- "pngdeer-libwebp",
  "rayon",
  "rgb",
+ "slimdeer",
+ "slimdeer-libwebp",
 ]
 
 [[package]]

@@ -1,4 +1,4 @@
-"""JPEG photos to smaller JPEG or WebP: pngdeer against TinyPNG and open-source encoders.
+"""JPEG photos to smaller JPEG or WebP: slimdeer against TinyPNG and open-source encoders.
 
   python3 experiments/jpeg/compare.py run PHOTOS TINY CSV [--cjpeg BIN] [--cjpegli BIN]
   python3 experiments/jpeg/compare.py run PHOTOS TINYWEBP CSV --webp [--cwebp BIN]
@@ -6,20 +6,20 @@
 
 PHOTOS holds the photos in subfolders (their kind: web/, orig/), TINY TinyPNG's file for each as
 KIND-NAME, TINYWEBP its WebP as KIND-STEM.webp (bench.py's TinyPNG client fetches and caches them:
-`compress`, `convert_webp`). Every file is scored against its photo with `pngdeer PHOTO --score
-FILE`, the JPEGs decoded as pngdeer decodes them (zune-jpeg; within 0.2 points of libjpeg-turbo,
+`compress`, `convert_webp`). Every file is scored against its photo with `slimdeer PHOTO --score
+FILE`, the JPEGs decoded as slimdeer decodes them (zune-jpeg; within 0.2 points of libjpeg-turbo,
 which browsers use), WebP files with libwebp. Per photo:
 
 - tinypng: TinyPNG's file.
-- pngdeer auto: pngdeer's automatic quality. pngdeer at tiny: pngdeer with TinyPNG's score as the
+- slimdeer auto: slimdeer's automatic quality. slimdeer at tiny: slimdeer with TinyPNG's score as the
   target, the lowest quality reaching it.
 - mozjpeg q75: cjpeg's defaults (mozjpeg 4.1.5: its table 3, 4:2:0, progressive, trellis), Squoosh's
   default quality. mozjpeg qN: a sweep, cjpeg choosing the chroma (4:2:0 below quality 80, 4:4:4 at
   90). jpegli qN and qN-420: a sweep with cjpegli's defaults (4:4:4, adaptive quantization) and with
   4:2:0. Each tool's settings are pooled into one size-quality frontier per photo. Both encode the
   photo as libjpeg-turbo decodes it (Pillow).
-- With --webp, the same for WebP: tinypng is TinyPNG's WebP, pngdeer's files are WebP, and cwebp
-  (libwebp 1.6.0) sweeps at its defaults (q75 alone too, Squoosh's default) and at pngdeer's lossy
+- With --webp, the same for WebP: tinypng is TinyPNG's WebP, slimdeer's files are WebP, and cwebp
+  (libwebp 1.6.0) sweeps at its defaults (q75 alone too, Squoosh's default) and at slimdeer's lossy
   settings (-m 6 -sharp_yuv -af).
 
 The summary compares each with TinyPNG as bench.py and the WebP leaderboard do: on the frontier,
@@ -35,17 +35,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "bench"))
 from bench import bytes_at_score, frontier, score_at_bytes  # noqa: E402
 
-PNGDEER = ROOT / "target/release/pngdeer"
+SLIMDEER = ROOT / "target/release/slimdeer"
 SWEEP = [40, 50, 60, 70, 80, 90]
 FIELDS = ["image", "kind", "megapixels", "input_bytes", "tool", "setting", "bytes", "score", "quality", "ms"]
 
 
 def score(photo: Path, file: Path) -> float:
-    return float(subprocess.run([PNGDEER, photo, "--score", file], capture_output=True, text=True, check=True).stdout)
+    return float(subprocess.run([SLIMDEER, photo, "--score", file], capture_output=True, text=True, check=True).stdout)
 
 
-def pngdeer(photo: Path, out: Path, target: float | None) -> dict:
-    args = [PNGDEER, photo, "-o", out, "--json"] + (["--target", f"{target:.3f}"] if target is not None else [])
+def slimdeer(photo: Path, out: Path, target: float | None) -> dict:
+    args = [SLIMDEER, photo, "-o", out, "--json"] + (["--target", f"{target:.3f}"] if target is not None else [])
     return json.loads(subprocess.run(args, capture_output=True, text=True, check=True).stdout.strip().splitlines()[-1])
 
 
@@ -66,8 +66,8 @@ def run_photo(photo: Path, tiny_dir: Path, tools: dict, webp: bool) -> list[dict
         add("tinypng", "", tiny)
         tiny_score = rows[-1]["score"]
         out = t / ("p.webp" if webp else "p.jpg")
-        for tool, target in [("pngdeer auto", None), ("pngdeer at tiny", tiny_score)]:
-            r = pngdeer(photo, out, target)
+        for tool, target in [("slimdeer auto", None), ("slimdeer at tiny", tiny_score)]:
+            r = slimdeer(photo, out, target)
             add(tool, r.get("outcome", r.get("mode")), out, r["quality"], sum(r["ms"].values()), r["score"] if r["quality"] is not None else 100.0)
         ppm = t / "in.ppm"
         image.convert("RGB").save(ppm)
@@ -112,7 +112,7 @@ def summary(path: Path) -> None:
     tiny = {i: next(r for r in by_image[i] if r["tool"] == "tinypng") for i in images}
     print(f"{len(images)} photos; TinyPNG keeps {pct(sum(int(t['bytes']) for t in tiny.values()) / sum(int(t['input_bytes']) for t in tiny.values()))} of their bytes, median score {statistics.median(float(t['score']) for t in tiny.values()):.1f}\n")
     print("Frontier against TinyPNG: bytes at its score (median / total, where reached), reached, points at its size (median)")
-    for tool in ["pngdeer at tiny", "mozjpeg", "jpegli", "cwebp"]:
+    for tool in ["slimdeer at tiny", "mozjpeg", "jpegli", "cwebp"]:
         ratios, sizes, points, reached = [], [0, 0], [], 0
         for i in images:
             rows = [r for r in by_image[i] if r["tool"] == tool]
@@ -132,7 +132,7 @@ def summary(path: Path) -> None:
         if ratios:
             print(f"  {tool:16} {pct(statistics.median(ratios))} / {pct(sizes[0] / sizes[1])}  {reached}/{len(images)}  {f'{statistics.median(points):+.2f}' if points else '-'}")
     print("\nSingle files against TinyPNG: bytes (median ratio / total), score difference (median), files bigger than the input")
-    for tool, setting in [("pngdeer auto", None), ("mozjpeg", "q75"), ("cwebp", "q75")]:
+    for tool, setting in [("slimdeer auto", None), ("mozjpeg", "q75"), ("cwebp", "q75")]:
         if not any(r["tool"] == tool for r in by_image[images[0]]):
             continue
         pairs = [(next(r for r in by_image[i] if r["tool"] == tool and (setting is None or r["setting"] == setting)), tiny[i]) for i in images]
@@ -141,13 +141,13 @@ def summary(path: Path) -> None:
         diff = statistics.median(float(a["score"]) - float(t["score"]) for a, t in pairs)
         bigger = sum(int(a["bytes"]) >= int(a["input_bytes"]) for a, _ in pairs)
         print(f"  {tool + (' ' + setting if setting else ''):16} {pct(ratio)} / {pct(total)}  {diff:+.2f}  {bigger}")
-    auto = [next(r for r in by_image[i] if r["tool"] == "pngdeer auto") for i in images]
+    auto = [next(r for r in by_image[i] if r["tool"] == "slimdeer auto") for i in images]
     for kind in sorted({r["kind"] for r in auto}):
         mine = [(a, tiny[a["image"]]) for a in auto if a["kind"] == kind]
         print(f"    {kind}: {len(mine)} photos, bytes {pct(statistics.median(int(a['bytes']) / int(t['bytes']) for a, t in mine))}, score {statistics.median(float(a['score']) - float(t['score']) for a, t in mine):+.2f}")
     qualities = [int(a["quality"]) for a in auto if a["quality"]]
     outcomes = dict(Counter(a["setting"] for a in auto))
-    print(f"  pngdeer auto: quality {min(qualities)}-{max(qualities)} (median {statistics.median(qualities)}), outcomes {outcomes}, median time {statistics.median(float(a['ms']) for a in auto) / 1000:.1f} s")
+    print(f"  slimdeer auto: quality {min(qualities)}-{max(qualities)} (median {statistics.median(qualities)}), outcomes {outcomes}, median time {statistics.median(float(a['ms']) for a in auto) / 1000:.1f} s")
 
 
 if __name__ == "__main__":

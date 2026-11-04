@@ -127,7 +127,7 @@ static inline void init_buffer_indices(
   force_intpel_info->rate_size = 0;
 }
 
-#if PNGDEER_STILL
+#if SLIMDEER_STILL
 #define HIGHBD_BFP(BT, SDF, SDAF, VF, SVF, SVAF, SDX4DF, SDX3DF) \
   ppi->fn_ptr[BT].sdf = SDF;                                     \
   ppi->fn_ptr[BT].sdaf = NULL;                                   \
@@ -312,7 +312,7 @@ MAKE_BFP_SAD4D_WRAPPER(aom_highbd_sad64x16x3d)
 #endif
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
-#if PNGDEER_STILL
+#if SLIMDEER_STILL
 #define HIGHBD_MBFP(BT, MCSDF, MCSVF) \
   ppi->fn_ptr[BT].msdf = NULL;        \
   ppi->fn_ptr[BT].msvf = NULL;
@@ -472,7 +472,7 @@ MAKE_SDSF_SKIP_SAD_4D_WRAPPER(aom_highbd_sad_skip_8x32x4d)
               aom_highbd_8_obmc_variance##WIDTH##x##HEIGHT,  \
               aom_highbd_8_obmc_sub_pixel_variance##WIDTH##x##HEIGHT)
 
-#if PNGDEER_STILL
+#if SLIMDEER_STILL
 #define HIGHBD_OBFP(BT, OSDF, OVF, OSVF) \
   ppi->fn_ptr[BT].osdf = NULL;           \
   ppi->fn_ptr[BT].ovf = NULL;            \
@@ -540,7 +540,7 @@ static inline void highbd_set_var_fns(AV1_PRIMARY *const ppi) {
   if (seq_params->use_highbitdepth) {
     switch (seq_params->bit_depth) {
       case AOM_BITS_8:
-#if !PNGDEER_STILL
+#if !SLIMDEER_STILL
 #if !CONFIG_REALTIME_ONLY
         HIGHBD_BFP_WRAPPER(64, 16, 8)
         HIGHBD_BFP_WRAPPER(16, 64, 8)
@@ -634,7 +634,7 @@ static inline void highbd_set_var_fns(AV1_PRIMARY *const ppi) {
         HIGHBD_SDSFP_WRAPPER(8, 32, 8)
         HIGHBD_SDSFP_WRAPPER(4, 16, 8)
 #endif
-#endif  // !PNGDEER_STILL
+#endif  // !SLIMDEER_STILL
         break;
 
       case AOM_BITS_10:
@@ -735,7 +735,7 @@ static inline void highbd_set_var_fns(AV1_PRIMARY *const ppi) {
         break;
 
       case AOM_BITS_12:
-#if !PNGDEER_STILL
+#if !SLIMDEER_STILL
 #if !CONFIG_REALTIME_ONLY
         HIGHBD_BFP_WRAPPER(64, 16, 12)
         HIGHBD_BFP_WRAPPER(16, 64, 12)
@@ -830,7 +830,7 @@ static inline void highbd_set_var_fns(AV1_PRIMARY *const ppi) {
         HIGHBD_SDSFP_WRAPPER(8, 32, 12)
         HIGHBD_SDSFP_WRAPPER(4, 16, 12)
 #endif
-#endif  // !PNGDEER_STILL
+#endif  // !SLIMDEER_STILL
         break;
 
       default:

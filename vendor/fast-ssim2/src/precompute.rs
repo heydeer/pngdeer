@@ -57,7 +57,7 @@ impl Ssimulacra2Reference {
     /// [`Self::new_with_config`] keeping only the source: each comparison converts both images scale
     /// by scale and scores one channel at a time, so it needs well under half the memory and takes
     /// longer. Scores are bit-identical. Only encoded (8- or 16-bit, sRGB) images: a linear source
-    /// gets a full reference, and a lean one rejects strips and linear images to compare. pngdeer
+    /// gets a full reference, and a lean one rejects strips and linear images to compare. slimdeer
     /// patch.
     pub fn new_lean_with_config(
         source: &PixelSlice<'_>,
@@ -260,7 +260,7 @@ impl Ssimulacra2Reference {
 }
 
 /// The encoded image reflect-padded to the 8px pyramid floor, or itself when it is already that big
-/// (pngdeer patch: `reflect_padded` copies it then, a whole extra image at the peak).
+/// (slimdeer patch: `reflect_padded` copies it then, a whole extra image at the peak).
 fn padded_to_8(e: crate::pipeline::EncodedSrgb) -> crate::pipeline::EncodedSrgb {
     if e.width >= 8 && e.height >= 8 {
         e

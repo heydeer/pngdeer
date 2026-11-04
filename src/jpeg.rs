@@ -75,7 +75,7 @@ pub fn decode(bytes: &[u8]) -> Result<Photo, Error> {
     let options = decoder.options().jpeg_set_out_colorspace(if gray { ColorSpace::Luma } else { ColorSpace::RGB });
     let mut decoder = JpegDecoder::new_with_options(ZCursor::new(bytes), options);
     let samples = decoder.decode().map_err(unreadable)?;
-    let (width, height) = decoder.dimensions().ok_or("not a JPEG pngdeer can read")?;
+    let (width, height) = decoder.dimensions().ok_or("not a JPEG slimdeer can read")?;
     let pixels = if gray {
         samples.iter().map(|&g| RGBA::new(g, g, g, 255)).collect()
     } else {
@@ -85,7 +85,7 @@ pub fn decode(bytes: &[u8]) -> Result<Photo, Error> {
 }
 
 fn unreadable(e: zune_jpeg::errors::DecodeErrors) -> Error {
-    format!("not a JPEG pngdeer can read: {}", e.to_string().trim()).into()
+    format!("not a JPEG slimdeer can read: {}", e.to_string().trim()).into()
 }
 
 /// A compressed JPEG and what the search found.

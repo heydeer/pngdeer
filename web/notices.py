@@ -14,7 +14,7 @@ NAMES = ("license", "licence", "copying", "notice", "copyright", "patents")
 # Files holding a license under another name: the IJG license is in libjpeg's README.
 ALSO = ("readme.ijg",)
 # Statements a license asks binary distributions to make, by crate.
-STATEMENTS = {"pngdeer-mozjpeg": "This software is based in part on the work of the Independent JPEG Group."}
+STATEMENTS = {"slimdeer-mozjpeg": "This software is based in part on the work of the Independent JPEG Group."}
 
 
 def is_license(path: Path) -> bool:
@@ -23,7 +23,7 @@ def is_license(path: Path) -> bool:
 
 def license_files(directory: Path) -> list[Path]:
     """A crate's license files; one directory down too for -sys crates (vendored C code) or when the
-    top has none, and any depth for pngdeer's vendored C (libaom/third_party/*/LICENSE)."""
+    top has none, and any depth for slimdeer's vendored C (libaom/third_party/*/LICENSE)."""
     found = sorted(p for p in directory.iterdir() if p.is_file() and is_license(p))
     if not found or directory.name.split("-")[-2:-1] == ["sys"]:
         pattern = "**/*" if directory.is_relative_to(ROOT / "vendor") else "*/*"
@@ -33,13 +33,13 @@ def license_files(directory: Path) -> list[Path]:
 
 def main() -> None:
     meta = json.loads(subprocess.run(
-        ["cargo", "metadata", "--format-version", "1", "--filter-platform", "wasm32-unknown-unknown", "--features", "pngdeer-wasm/threads,pngdeer-wasm/avif"],
+        ["cargo", "metadata", "--format-version", "1", "--filter-platform", "wasm32-unknown-unknown", "--features", "slimdeer-wasm/threads,slimdeer-wasm/avif"],
         cwd=ROOT, capture_output=True, text=True, check=True).stdout)
     packages = {p["id"]: p for p in meta["packages"]}
     nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
     # proc-macro crates (and what only they use) run at compile time and aren't in the .wasm
     is_macro = lambda i: any("proc-macro" in t["kind"] for t in packages[i]["targets"])
-    root = next(i for i, p in packages.items() if p["name"] == "pngdeer-wasm")
+    root = next(i for i, p in packages.items() if p["name"] == "slimdeer-wasm")
     seen, stack = set(), [root]
     while stack:
         node = stack.pop()
@@ -49,7 +49,7 @@ def main() -> None:
         stack += [d["pkg"] for d in nodes[node]["deps"] if any(k["kind"] is None for k in d["dep_kinds"])]
     texts: dict[str, tuple[str, list[str]]] = {}  # text with whitespace collapsed -> (text, crates under it)
     unfiled = []
-    for p in sorted((packages[i] for i in seen if packages[i]["name"] not in ("pngdeer", "pngdeer-wasm")), key=lambda p: (p["name"], p["version"])):
+    for p in sorted((packages[i] for i in seen if packages[i]["name"] not in ("slimdeer", "slimdeer-wasm")), key=lambda p: (p["name"], p["version"])):
         label = f"{p['name']} {p['version']} ({p.get('license') or 'see its source'})"
         files = license_files(Path(p["manifest_path"]).parent)
         if not files:
@@ -57,7 +57,7 @@ def main() -> None:
         for f in files:
             text = f.read_text(errors="replace").strip()
             texts.setdefault(" ".join(text.split()), (text, []))[1].append(label)
-    parts = ["Third-party software compiled into pngdeer's browser builds (web/pkg, web/pkg-mt; web/pkg-avif and",
+    parts = ["Third-party software compiled into slimdeer's browser builds (web/pkg, web/pkg-mt; web/pkg-avif and",
              "web/pkg-avif-mt add libaom), and its licenses.",
              "Each license text below is followed by the crates it covers.", ""]
     names = {packages[i]["name"] for i in seen}

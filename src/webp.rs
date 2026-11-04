@@ -2,7 +2,7 @@
 //!
 //! The target is `--target`'s, or automatically TinyPNG's WebP quality for the image (round 3 of
 //! experiments/webp/FINDINGS.md). TinyPNG's WebP is its palette PNG stored losslessly, or where that
-//! is bigger, libwebp at about quality 70: so pngdeer's PNG (whose automatic target is TinyPNG's PNG
+//! is bigger, libwebp at about quality 70: so slimdeer's PNG (whose automatic target is TinyPNG's PNG
 //! quality) is compared with a lossy file at quality 70 (WebpOptions::reference_quality, libwebp's
 //! default settings), and where that is smaller, its score becomes the target (at most 90, as for
 //! PNG) and the PNG search runs again for it where its palette might win (PALETTE_REACH).

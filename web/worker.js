@@ -1,4 +1,4 @@
-// Runs pngdeer's WebAssembly compressor off the main thread, one file at a time: a PNG to PNG, WebP
+// Runs slimdeer's WebAssembly compressor off the main thread, one file at a time: a PNG to PNG, WebP
 // or AVIF, a JPEG to JPEG, WebP or AVIF. On a cross-origin isolated page (see serve.py) it loads the
 // threaded build, whose rayon pool spreads each file's quantizing, encoding, scoring and oxipng over
 // all cores; elsewhere, or with ?single, the single-threaded one. With ?avif, the build with AVIF
@@ -14,7 +14,7 @@ const SELF_TEST = Uint8Array.from(atob(
   "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACD0lEQVR42g3LoQFEEQAAUCMYwQhGMIIRjGAE7SJNpIk0kSbSRJpIE91//QEAHgQXgY3BImBQ0BmoHBQBkgLRAh+Ay8A0oCeQB/wAgA/Ci+DGcBE4KOwMVg6LgEnBaKEP0GVoGtQTygO/gB5EF6GN0SJoUNQZqhwVgZJC0SIfkMvINKQnkgd9AT+IL8Ib40XwoLgzXDkuAieFo8U+YJexaVhPLA/+AnmQXEQ2JouQQUlnpHJSBEmKREt8IC4T04ieRB7yBfogvYhuTBehg9LOaOW0CJoUjZb6QF2mplE9qTz0C+xBdhHbmC3CBmWdscpZESwpFi3zgbnMTGN6MnnYF/iD/CK+MV+ED8o745XzInhSPFruA3eZm8b15PLwL4gHxUViY7GIGFR0JioXRYikRLTCB+GyME3oKeQRX1APqovUxmoRNajqTFWuilBJqWiVD8plZZrSU8mjvmAftBfZje0idlDbma3cFmGTstFaH6zL1jSrp5XHfiE8GC4KG4dFwqChs1B5KCIkFaINPgSXg2lBzyBP+EJ+MF+UN86L5EFzZ7nyXEROKkebfcguZ9Oynlme/IX2YLuobdwWaYO2zlrlrYiWVIu2+dBcbqY1PZs87QvzwXnR3HguMgednc3KZxEzqRnt9GG6PE2bek555hfOg+eis/FZ5Ax6OjuVnyJOUifa48Nx+Zh29DzynN8f4RqzEK8Frl4AAAAASUVORK5CYII="
 ), (c) => c.charCodeAt(0));
 
-// Large images peak at about 80 bytes a pixel, 87 with transparency (above 8 MP pngdeer keeps a lean
+// Large images peak at about 80 bytes a pixel, 87 with transparency (above 8 MP slimdeer keeps a lean
 // reference: LEAN_PIXELS in src/search.rs), in either build, and wasm32 has 4 GB. Running out of
 // memory would hang the threaded build, so the limit leaves room: 40 MP peaks at about 3.5 GB.
 const MAX_PIXELS = 40e6;
@@ -49,7 +49,7 @@ function jpegSize(jpeg) {
 }
 
 const ready = (async () => {
-  const mod = await import(`./pkg${avif ? "-avif" : ""}${threaded ? "-mt" : ""}/pngdeer_wasm.js`);
+  const mod = await import(`./pkg${avif ? "-avif" : ""}${threaded ? "-mt" : ""}/slimdeer_wasm.js`);
   await mod.default();
   if (threaded) {
     await mod.initThreadPool(navigator.hardwareConcurrency);
@@ -64,7 +64,7 @@ const WEBP_MAX_SIDE = 16383;
 
 self.onmessage = async ({ data }) => {
   // format: "png" or "jpeg" (a PNG's or a JPEG's own), "webp" or "avif"; no target: automatic quality;
-  // no preview: pngdeer's default
+  // no preview: slimdeer's default
   const { id, bytes, format, target, preview } = data;
   try {
     const input = new Uint8Array(bytes);

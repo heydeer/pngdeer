@@ -1,7 +1,7 @@
-// pngdeer: wasm32 has no C library. The allocator is Rust's (src/lib.rs); abort, exit, getenv, abs,
-// llabs, strtol, strtoul and rand are in libc.c; qsort goes to pngdeer_qsort (include/pngdeer_clib.h).
-#ifndef PNGDEER_STDLIB_H_
-#define PNGDEER_STDLIB_H_
+// slimdeer: wasm32 has no C library. The allocator is Rust's (src/lib.rs); abort, exit, getenv, abs,
+// llabs, strtol, strtoul and rand are in libc.c; qsort goes to slimdeer_qsort (include/slimdeer_clib.h).
+#ifndef SLIMDEER_STDLIB_H_
+#define SLIMDEER_STDLIB_H_
 #include <stddef.h>
 void* malloc(size_t size);
 void* calloc(size_t count, size_t size);

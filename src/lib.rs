@@ -1,4 +1,4 @@
-//! pngdeer: lossy PNG compression that finds, per image, the smallest palette PNG keeping a
+//! slimdeer: lossy PNG compression that finds, per image, the smallest palette PNG keeping a
 //! SSIMULACRA2 quality. The same code runs the command-line tool (src/main.rs) and the browser build
 //! (web/wasm), and both write the same bytes for the same input.
 //!
@@ -63,7 +63,7 @@ pub struct Settings {
     pub preview_pixels: usize,
     /// Milliseconds since some fixed point, for the report's time breakdown (wasm has no std clock).
     pub clock: Option<fn() -> f64>,
-    /// How compress_webp encodes (the defaults are what pngdeer ships; for experiments).
+    /// How compress_webp encodes (the defaults are what slimdeer ships; for experiments).
     pub webp: WebpOptions,
 }
 

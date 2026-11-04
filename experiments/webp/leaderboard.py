@@ -19,8 +19,8 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "bench"))
 from bench import bytes_at_score, frontier, score_at_bytes  # noqa: E402
 
-TOOLS = {"pngdeer": r"wp\d+|wpauto", "cwebp": r"cw(af)?\d+|cwll", "pngquant + cwebp": r"pqw\d+(-d0)?"}
-DEFAULTS = {"cwebp -q 75 (its default)": "cwd75", "cwebp -q 80": "cwd80", "pngdeer, automatic": "wpauto"}
+TOOLS = {"slimdeer": r"wp\d+|wpauto", "cwebp": r"cw(af)?\d+|cwll", "pngquant + cwebp": r"pqw\d+(-d0)?"}
+DEFAULTS = {"cwebp -q 75 (its default)": "cwd75", "cwebp -q 80": "cwd80", "slimdeer, automatic": "wpauto"}
 
 
 def load(pattern, into, only=None):

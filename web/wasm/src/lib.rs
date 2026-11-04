@@ -1,4 +1,4 @@
-//! pngdeer in the browser: pngdeer::compress, compress_webp and compress_jpeg compiled to WebAssembly,
+//! slimdeer in the browser: slimdeer::compress, compress_webp and compress_jpeg compiled to WebAssembly,
 //! single-threaded or (feature `threads`) with a rayon pool on Web Workers, and with feature `avif`
 //! compress_avif. Same output as the command line.
 
@@ -29,18 +29,18 @@ impl Compressed {
     }
 }
 
-fn settings(target: Option<f64>, preview_pixels: Option<u32>) -> pngdeer::Settings {
-    let defaults = pngdeer::Settings::default();
-    pngdeer::Settings { target, preview_pixels: preview_pixels.map_or(defaults.preview_pixels, |p| p as usize), clock: Some(js_sys::Date::now), ..defaults }
+fn settings(target: Option<f64>, preview_pixels: Option<u32>) -> slimdeer::Settings {
+    let defaults = slimdeer::Settings::default();
+    slimdeer::Settings { target, preview_pixels: preview_pixels.map_or(defaults.preview_pixels, |p| p as usize), clock: Some(js_sys::Date::now), ..defaults }
 }
 
 /// Compresses one PNG file to the smallest palette PNG scoring at least `target` (SSIMULACRA2), or
 /// with no target at a quality picked per image (auto mode). Images over `preview_pixels` (default
-/// pngdeer::PREVIEW_PIXELS, as on the command line) are searched on a downscaled preview and checked
+/// slimdeer::PREVIEW_PIXELS, as on the command line) are searched on a downscaled preview and checked
 /// at full size; 0 searches at full size, several times slower on big images.
 #[wasm_bindgen]
 pub fn compress(input: &[u8], target: Option<f64>, preview_pixels: Option<u32>) -> Result<Compressed, JsError> {
-    let result = pngdeer::compress(input, &settings(target, preview_pixels)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = slimdeer::compress(input, &settings(target, preview_pixels)).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(Compressed { report: result.json(), png: result.png })
 }
 
@@ -66,13 +66,13 @@ impl CompressedWebp {
     }
 }
 
-/// Compresses one PNG file to WebP (pngdeer::compress_webp): the smaller of its palette image stored
+/// Compresses one PNG file to WebP (slimdeer::compress_webp): the smaller of its palette image stored
 /// losslessly and the lowest lossy quality reaching the target; with no target, TinyPNG's WebP
 /// quality for the image. `preview_pixels` as for `compress`. A JPEG becomes lossy WebP, at JPEG
 /// output's automatic quality.
 #[wasm_bindgen]
 pub fn compress_webp(input: &[u8], target: Option<f64>, preview_pixels: Option<u32>) -> Result<CompressedWebp, JsError> {
-    let result = pngdeer::compress_webp(input, &settings(target, preview_pixels)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = slimdeer::compress_webp(input, &settings(target, preview_pixels)).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(CompressedWebp { report: result.json(), webp: result.webp })
 }
 
@@ -97,11 +97,11 @@ impl CompressedJpeg {
     }
 }
 
-/// Compresses one JPEG file to the lowest quality JPEG scoring at least `target` (pngdeer::compress_jpeg),
+/// Compresses one JPEG file to the lowest quality JPEG scoring at least `target` (slimdeer::compress_jpeg),
 /// never bigger than the input; with no target, at a quality picked per image.
 #[wasm_bindgen]
 pub fn compress_jpeg(input: &[u8], target: Option<f64>) -> Result<CompressedJpeg, JsError> {
-    let result = pngdeer::compress_jpeg(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = slimdeer::compress_jpeg(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(CompressedJpeg { report: result.json(), jpeg: result.jpeg })
 }
 
@@ -129,11 +129,11 @@ impl CompressedAvif {
     }
 }
 
-/// Compresses a PNG or a JPEG to AVIF (pngdeer::compress_avif): libaom's lowest quality whose file,
+/// Compresses a PNG or a JPEG to AVIF (slimdeer::compress_avif): libaom's lowest quality whose file,
 /// as Chrome shows it, scores at least `target`; with no target, about TinyPNG's AVIF's quality.
 #[cfg(feature = "avif")]
 #[wasm_bindgen]
 pub fn compress_avif(input: &[u8], target: Option<f64>) -> Result<CompressedAvif, JsError> {
-    let result = pngdeer::compress_avif(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
+    let result = slimdeer::compress_avif(input, &settings(target, None)).map_err(|e| JsError::new(&e.to_string()))?;
     Ok(CompressedAvif { report: result.json(), avif: result.avif })
 }

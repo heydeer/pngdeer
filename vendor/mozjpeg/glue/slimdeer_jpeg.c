@@ -1,4 +1,4 @@
-// pngdeer: one entry point into mozjpeg with plain arguments, so the Rust side (src/lib.rs) declares
+// slimdeer: one entry point into mozjpeg with plain arguments, so the Rust side (src/lib.rs) declares
 // none of libjpeg's structs.
 #include <stddef.h>
 #include <stdio.h>  // jpeglib.h needs FILE and size_t declared first
@@ -11,10 +11,10 @@ typedef struct {
   int quant_table;  // mozjpeg's base quantization table (0-8), or -1 for its default
   int subsampling;  // chroma: 0 for 4:2:0 (libjpeg's default for color), 1 for 4:4:4
   int progressive;  // mozjpeg's progressive scans, chosen per image; 0 for one baseline scan
-} PngdeerJpegOptions;
+} SlimdeerJpegOptions;
 
 // libjpeg ends on any error through error_exit, which must not return. Encoding fails only on
-// arguments src/lib.rs has already checked, or out of memory, where pngdeer aborts anyway.
+// arguments src/lib.rs has already checked, or out of memory, where slimdeer aborts anyway.
 static void error_exit(j_common_ptr cinfo) {
   (void)cinfo;
   abort();
@@ -23,9 +23,9 @@ static void error_exit(j_common_ptr cinfo) {
 static void output_message(j_common_ptr cinfo) { (void)cinfo; }
 
 // `pixels`: `height` rows of `width` × `components` bytes (1: gray, 3: RGB). The file's bytes are
-// in *out (free them with pngdeer_jpeg_free); returns their count.
-size_t pngdeer_jpeg_encode(const unsigned char* pixels, int width, int height, int components,
-                           const PngdeerJpegOptions* options, const unsigned char* icc,
+// in *out (free them with slimdeer_jpeg_free); returns their count.
+size_t slimdeer_jpeg_encode(const unsigned char* pixels, int width, int height, int components,
+                           const SlimdeerJpegOptions* options, const unsigned char* icc,
                            size_t icc_size, const unsigned char* exif, size_t exif_size,
                            unsigned char** out) {
   struct jpeg_compress_struct cinfo;
@@ -71,4 +71,4 @@ size_t pngdeer_jpeg_encode(const unsigned char* pixels, int width, int height, i
   return size;
 }
 
-void pngdeer_jpeg_free(void* pointer) { free(pointer); }
+void slimdeer_jpeg_free(void* pointer) { free(pointer); }

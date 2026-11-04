@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pngdeer · Open-source PNG compressor · HeyDeer</title>
-<meta name="description" content="pngdeer finds the smallest palette PNG that still looks like your image. Open source, runs in your browser, nothing is uploaded. By HeyDeer.">
-<link rel="canonical" href="https://heydeer.ai/open-source/pngdeer">
+<title>slimdeer · Open-source image compressor · HeyDeer</title>
+<meta name="description" content="slimdeer makes PNG and JPEG images smaller, or turns them into WebP and AVIF, and keeps them looking the same. Open source, runs in your browser, nothing is uploaded. By HeyDeer.">
+<link rel="canonical" href="https://heydeer.ai/open-source/slimdeer">
 <script>
-  // heydeer.ai serves this page at /open-source/pngdeer, without the trailing slash Next.js strips,
+  // heydeer.ai serves this page at /open-source/slimdeer, without the trailing slash Next.js strips,
   // so the page's relative URLs (icons, worker, WebAssembly, samples) need a base under it.
   if (/\/[^./]+$/.test(location.pathname)) document.write(`<base href="${location.pathname}/">`);
 </script>
@@ -399,16 +399,16 @@
 <header class="top" id="top">
   <div class="wrap">
     <a class="brand" href="https://heydeer.ai/"><img src="brand/heydeer-logo.svg" alt="HeyDeer" width="111" height="26"></a>
-    <a class="brand" href="#"><span class="slash" aria-hidden="true"></span><span class="product">pngdeer</span></a>
+    <a class="brand" href="#"><span class="slash" aria-hidden="true"></span><span class="product">slimdeer</span></a>
     <nav>
       <a class="keep" href="#research">Research</a>
       <a href="#how">How it works</a>
       <a href="#cli">Command line</a>
     </nav>
     <div class="end">
-      <a class="promo" href="https://heydeer.ai/?utm_source=pngdeer"><img src="brand/heydeer-sun-icon.svg" alt="" width="22" height="22">AI code review<em>Free for open source</em><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+      <a class="promo" href="https://heydeer.ai/?utm_source=slimdeer"><img src="brand/heydeer-sun-icon.svg" alt="" width="22" height="22">AI code review<em>Free for open source</em><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
       <div class="star">
-        <a class="gh" href="https://github.com/heydeer/pngdeer" aria-label="Star heydeer/pngdeer on GitHub">
+        <a class="gh" href="https://github.com/heydeer/slimdeer" aria-label="Star heydeer/slimdeer on GitHub">
           <span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg><span class="label">Star</span></span><span class="count" id="gh-stars" hidden></span>
         </a>
         <div class="nudge" aria-hidden="true">
@@ -422,7 +422,7 @@
 
 <main class="wrap">
   <section class="hero">
-    <h1 class="rise d1">Smaller PNGs. <span class="px">Same picture.</span></h1>
+    <h1 class="rise d1">Smaller images. <span class="px">Same picture.</span></h1>
     <p class="lede rise d2"><a href="#research"><strong>8–12% smaller than even TinyPNG</strong></a> at the same quality. Free and open source.</p>
   </section>
 
@@ -454,12 +454,12 @@
       </div>
       <div class="stagewrap">
         <div class="tag left"><b>Original</b><span class="mono" id="t-before"></span></div>
-        <div class="tag right"><b>pngdeer</b><span class="mono" id="t-after"></span><span class="save" id="t-save"></span></div>
+        <div class="tag right"><b>slimdeer</b><span class="mono" id="t-after"></span><span class="save" id="t-save"></span></div>
         <div class="stagebox" id="stagebox">
           <div class="center">
             <div class="stage" id="stage" style="--split: 50%">
               <img id="img-before" class="before" alt="Original">
-              <img id="img-after" class="after" alt="Compressed by pngdeer">
+              <img id="img-after" class="after" alt="Compressed by slimdeer">
               <div class="divider"><button class="knob" id="knob" type="button" role="slider" aria-label="Compare original and compressed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-5 6 5 6M15 6l5 6-5 6"/></svg>
               </button></div>
@@ -470,7 +470,7 @@
       </div>
       <div class="foot">
         <span class="label" id="p-label"></span>
-        <div class="palette" id="palette" title="The palette pngdeer chose for this image, lightest first"></div>
+        <div class="palette" id="palette" title="The palette slimdeer chose for this image, lightest first"></div>
         <div class="dl"><button class="pill sun small" id="dl-one" type="button">Download</button></div>
       </div>
     </div>
@@ -492,7 +492,7 @@
     <div class="reveal">
       <div class="kicker"><i></i>Research</div>
       <h2 class="big" id="r-title">The best open-source PNG compressor we've measured.</h2>
-      <p class="intro" id="r-intro">We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
+      <p class="intro" id="r-intro">We ran slimdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.</p>
       <div class="switch r-format" id="r-format" role="group" aria-label="Output format">
         <button type="button" data-kind="png" aria-pressed="true">PNG</button><button type="button" data-kind="webp" aria-pressed="false">WebP</button><button type="button" data-kind="jpeg" aria-pressed="false">JPEG</button><button type="button" data-kind="avif" aria-pressed="false">AVIF</button>
       </div>
@@ -505,7 +505,7 @@
         <div class="stats">
           <div class="stat"><b id="r-smaller"></b><span>smaller than TinyPNG at the same quality (median image)</span></div>
           <div class="stat"><b id="r-points"></b><span>SSIMULACRA2 points above TinyPNG at TinyPNG's file size</span></div>
-          <div class="stat"><b id="r-reach"></b><span>images where pngdeer reaches TinyPNG's quality at all</span></div>
+          <div class="stat"><b id="r-reach"></b><span>images where slimdeer reaches TinyPNG's quality at all</span></div>
         </div>
       </div>
       <div class="chart">
@@ -517,21 +517,21 @@
     </div>
     <div class="method reveal" id="r-method">
       <div><b>Held out</b>The parameters were tuned on 109 images. The other 71 were collected afterwards and never used for tuning; both sets agree.</div>
-      <div><b>Generous to the others</b>Each open-source tool gets its best of ten settings per image, picked after the fact. pngdeer's results are searched at compression time, as you get them here.</div>
-      <div><b>A second opinion</b>Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026.</div>
+      <div><b>Generous to the others</b>Each open-source tool gets its best of ten settings per image, picked after the fact. slimdeer's results are searched at compression time, as you get them here.</div>
+      <div><b>A second opinion</b>Scored with butteraugli instead, which the search never looks at, slimdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026.</div>
     </div>
   </section>
 
   <section class="block" aria-labelledby="ad-title">
     <div class="ad reveal">
       <div class="copy">
-        <div class="from">From HeyDeer, the makers of pngdeer</div>
+        <div class="from">From HeyDeer, the makers of slimdeer</div>
         <h2 id="ad-title">AI code review that finds <mark>78% more issues</mark> than GitHub Copilot.</h2>
         <p>HeyDeer is the independent reviewer for every pull request, whether Codex, Claude Code, Cursor or a person wrote it.</p>
         <ul class="facts"><li>Free for open source</li><li>2-click install</li><li>No credit card required</li></ul>
         <div class="actions">
-          <a class="go" href="https://heydeer.ai/?utm_source=pngdeer">Get started free <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
-          <a class="more" href="https://heydeer.ai/research/coding-agent-review-benchmark?utm_source=pngdeer">Read the research</a>
+          <a class="go" href="https://heydeer.ai/?utm_source=slimdeer">Get started free <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></a>
+          <a class="more" href="https://heydeer.ai/research/coding-agent-review-benchmark?utm_source=slimdeer">Read the research</a>
         </div>
       </div>
       <div class="pr" aria-hidden="true">
@@ -565,7 +565,7 @@
         <div class="viz" aria-hidden="true"><div class="sizes" id="sizes"></div></div>
         <div class="n">01</div>
         <h3>Searches the palette</h3>
-        <p>pngdeer tries palette sizes from 2 to 256 colors, with and without dithering, and keeps the smallest file that still reaches the quality.</p>
+        <p>slimdeer tries palette sizes from 2 to 256 colors, with and without dithering, and keeps the smallest file that still reaches the quality.</p>
       </div>
       <div class="step reveal">
         <div class="viz" aria-hidden="true"><div class="gauge"><div class="flag">indistinguishable</div><div class="line"><div class="tick"></div></div><div class="row"><span style="left:0">0</span><span style="left:50%">50</span><span style="left:90%">90</span></div></div></div>
@@ -590,8 +590,8 @@
         <p>The browser and the command line run the same Rust code, down to the math library, so a file compressed here and in your pipeline comes out identical.</p>
         <p>Pass <span class="mono">--target 85</span> for a fixed quality instead of the automatic one.</p>
       </div>
-      <div class="term reveal" role="img" aria-label="Terminal: installing pngdeer with Homebrew and compressing a photo"><div class="dots"><i></i><i></i><i></i></div><span class="p">$</span> <span class="k">brew install heydeer/tap/pngdeer</span>
-<span class="p">$</span> <span class="k">pngdeer kodim01.png -o kodim01.min.png</span>
+      <div class="term reveal" role="img" aria-label="Terminal: installing slimdeer with Homebrew and compressing a photo"><div class="dots"><i></i><i></i><i></i></div><span class="p">$</span> <span class="k">brew install heydeer/tap/slimdeer</span>
+<span class="p">$</span> <span class="k">slimdeer kodim01.png -o kodim01.min.png</span>
 <span class="c">{"target": 86.26, "colors": 212, "variant": "d50",
  "score": 87.271, …, "outcome": "hit", "bytes": 254373}</span></div>
     </div>
@@ -614,17 +614,17 @@
     <div class="cols">
       <div class="about">
         <img src="brand/heydeer-logo.svg" alt="HeyDeer" width="111" height="26">
-        <p>pngdeer is an open-source project by HeyDeer.</p>
+        <p>slimdeer is an open-source project by HeyDeer.</p>
         <a href="mailto:hey@heydeer.ai">hey@heydeer.ai</a>
       </div>
       <div>
-        <h4>pngdeer</h4>
+        <h4>slimdeer</h4>
         <ul>
           <li><a href="#drop">Compress</a></li>
           <li><a href="#research">Research</a></li>
           <li><a href="#how">How it works</a></li>
           <li><a href="#cli">Command line</a></li>
-          <li><a href="https://github.com/heydeer/pngdeer">Source code</a></li>
+          <li><a href="https://github.com/heydeer/slimdeer">Source code</a></li>
           <li><a href="THIRD_PARTY_LICENSES.txt">Third-party licenses</a></li>
           <li><a href="samples/SOURCES.md">Sample image credits</a></li>
         </ul>
@@ -650,14 +650,14 @@
     </div>
     <div class="legal">
       <span>© 2026 ETOILEE PTE. LTD.</span>
-      <span>pngdeer is licensed under MIT.</span>
+      <span>slimdeer is licensed under MIT.</span>
     </div>
   </div>
 </footer>
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
-const SAMPLES = ["sun-poster", "kodim01", "pngdeer@2x", "cup-of-tea", "openmoji-1f431"];
+const SAMPLES = ["sun-poster", "kodim01", "slimdeer@2x", "cup-of-tea", "openmoji-1f431"];
 const CORES = navigator.hardwareConcurrency || 4;
 // {id, name, bytes, size, width, height, url, jpeg, jobs: {png, webp, jpeg, avif}}; a job: {status, error,
 // out, outUrl, report, ms, palette}. A file that is neither a PNG nor a JPEG has `refused`, an error
@@ -667,7 +667,7 @@ let nextId = 0, active = null;
 // The output format: "same" (a PNG stays a PNG, a JPEG a JPEG), "webp" or "avif". Each file is
 // compressed to each once, and its jobs keep them all when switching.
 let format = "same";
-try { if (["webp", "avif"].includes(localStorage.getItem("pngdeer-format"))) format = localStorage.getItem("pngdeer-format"); } catch {}
+try { if (["webp", "avif"].includes(localStorage.getItem("slimdeer-format"))) format = localStorage.getItem("slimdeer-format"); } catch {}
 const output = (f) => (format !== "same" ? format : f.jpeg ? "jpeg" : "png");
 const job = (f) => f.refused ?? f.jobs[output(f)];
 let skipped = ""; // what the last dropped folders held besides PNGs
@@ -801,7 +801,7 @@ async function compress(f, to) {
 /** Switches the output format, compressing to it what isn't yet. */
 function setFormat(to) {
   format = to;
-  try { localStorage.setItem("pngdeer-format", to); } catch {}
+  try { localStorage.setItem("slimdeer-format", to); } catch {}
   for (const x of document.querySelectorAll(".format button")) x.setAttribute("aria-pressed", x.dataset.format === to);
   // every file gets its job before any starts: starting one renders them all
   const todo = files.filter((f) => !f.refused && !f.jobs[output(f)]);
@@ -991,7 +991,7 @@ function render() {
     : `<b>Working…</b>${files.length} file${plural}`;
   $("#all").disabled = !done.length;
   renderNote();
-  window.__pngdeer = files.map((x) => {
+  window.__slimdeer = files.map((x) => {
     const j = job(x);
     return { name: x.name, format: output(x), before: x.size, after: j.out?.byteLength, ms: j.ms, report: j.report, status: j.status, error: j.error };
   });
@@ -1116,77 +1116,77 @@ $("#all").onclick = () => files.filter((x) => job(x).status === "done").forEach(
 
 /* ---------- research ---------- */
 // bench/bench.py, October 2026: each tool's settings pooled into one size–quality curve per image.
-// PNG: pngdeer's pd70–pd95 runs and every other tool's ten settings, as SSIMULACRA2 points at
-// TinyPNG's file size (experiments/palette-feedback/tool_rank.py). WebP: pngdeer's wp40–wp98 and
+// PNG: slimdeer's pd70–pd95 runs and every other tool's ten settings, as SSIMULACRA2 points at
+// TinyPNG's file size (experiments/palette-feedback/tool_rank.py). WebP: slimdeer's wp40–wp98 and
 // automatic runs, cwebp's 27 settings and pngquant + cwebp's ten, as bytes saved at the quality of
 // TinyPNG's WebP, on the 120 images it was fetched for (experiments/webp/leaderboard.py). JPEG:
-// pngdeer's files (its encoder at qualities 50-85, and its runs), mozjpeg's 7 and jpegli's 12
+// slimdeer's files (its encoder at qualities 50-85, and its runs), mozjpeg's 7 and jpegli's 12
 // settings, as bytes saved at the quality of TinyPNG's JPEG on 60 photos (experiments/jpeg). AVIF:
-// pngdeer's runs, avifenc's 33 and rav1e's 11 settings, every file decoded by Chrome, as bytes saved
+// slimdeer's runs, avifenc's 33 and rav1e's 11 settings, every file decoded by Chrome, as bytes saved
 // at the quality of TinyPNG's AVIF on 54 images (experiments/avif/leaderboard.py).
 const RESEARCH = {
   png: {
     title: "The best open-source PNG compressor we've measured.",
-    intro: "We ran pngdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.",
+    intro: "We ran slimdeer, TinyPNG and eight open-source quantizers on 180 PNGs: icons, UI screenshots, illustrations, photos, cut-outs and 3D renders. Every output was scored with SSIMULACRA2, a perceptual metric where 90 means indistinguishable at 1:1.",
     chart: "Quality at TinyPNG's file size",
     sub: "Median SSIMULACRA2 points above or below TinyPNG when each tool's output is as big as TinyPNG's, and how many images each can bring up to TinyPNG's quality.",
     column: "Points vs TinyPNG", unit: "", lo: -20, ticks: [-20, -15, -10, -5, 0], narrow: [-20, -10, 0],
     method: [
       ["Held out", "The parameters were tuned on 109 images. The other 71 were collected afterwards and never used for tuning; both sets agree."],
-      ["Generous to the others", "Each open-source tool gets its best of ten settings per image, picked after the fact. pngdeer's results are searched at compression time, as you get them here."],
-      ["A second opinion", "Scored with butteraugli instead, which the search never looks at, pngdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026."]],
+      ["Generous to the others", "Each open-source tool gets its best of ten settings per image, picked after the fact. slimdeer's results are searched at compression time, as you get them here."],
+      ["A second opinion", "Scored with butteraugli instead, which the search never looks at, slimdeer's files are still 6–9% smaller than TinyPNG's at the same quality. TinyPNG ran through its API in October 2026."]],
     sets: {
       holdout: { label: "Held-out · 71", n: 71, smaller: 12, points: 1.7, reach: 67, tools: [
-        ["pngdeer", 1.7, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
+        ["slimdeer", 1.7, 67], ["pngquant", 0.0, 53], ["quantizr", -0.1, 39], ["exoquant", -3.7, 19], ["NeuQuant", -6.5, 4],
         ["FFmpeg", -7.0, 16], ["quantette", -7.6, 18], ["ImageMagick", -11.3, 3], ["Pillow", -16.8, 4]] },
       main: { label: "Tuning set · 109", n: 109, smaller: 8, points: 2.0, reach: 106, tools: [
-        ["pngdeer", 2.0, 106], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
+        ["slimdeer", 2.0, 106], ["pngquant", 0.3, 87], ["quantizr", -1.0, 53], ["exoquant", -5.1, 24], ["FFmpeg", -8.8, 15],
         ["quantette", -9.6, 21], ["NeuQuant", -9.8, 5], ["ImageMagick", -14.5, 8], ["Pillow", -19.5, 4]] },
     },
   },
   webp: {
     title: "The best open-source WebP compressor we've measured.",
-    intro: "We turned 120 of the same PNGs into WebP with pngdeer, TinyPNG and cwebp, libwebp's own encoder (the library Squoosh, sharp and Pillow encode with), alone and after pngquant. Every output was scored with SSIMULACRA2, as browsers decode it.",
+    intro: "We turned 120 of the same PNGs into WebP with slimdeer, TinyPNG and cwebp, libwebp's own encoder (the library Squoosh, sharp and Pillow encode with), alone and after pngquant. Every output was scored with SSIMULACRA2, as browsers decode it.",
     chart: "Bytes saved at TinyPNG's quality",
     sub: "Median size against TinyPNG's WebP when each tool's output matches its quality, and how many images each can bring up to TinyPNG's quality.",
     column: "Saved vs TinyPNG", unit: "%", lo: -40, ticks: [-40, -30, -20, -10, 0], narrow: [-40, 0],
     method: [
-      ["Generous to cwebp", "It gets its best of 27 settings per image, picked after the fact: 13 qualities with and without the auto filter, and lossless. pngdeer's results are searched at compression time, as you get them here."],
-      ["Out of the box", "At its default quality, cwebp's files are 6% bigger than TinyPNG's on the median image, and slightly worse. pngdeer's automatic quality makes them 5% smaller, as good."],
-      ["Beyond these 120", "WebP's settings were chosen on these images. On 60 others, against a stand-in that matches TinyPNG's WebP here (same size and score, median), pngdeer is 4% smaller. TinyPNG ran through its API in October 2026."]],
+      ["Generous to cwebp", "It gets its best of 27 settings per image, picked after the fact: 13 qualities with and without the auto filter, and lossless. slimdeer's results are searched at compression time, as you get them here."],
+      ["Out of the box", "At its default quality, cwebp's files are 6% bigger than TinyPNG's on the median image, and slightly worse. slimdeer's automatic quality makes them 5% smaller, as good."],
+      ["Beyond these 120", "WebP's settings were chosen on these images. On 60 others, against a stand-in that matches TinyPNG's WebP here (same size and score, median), slimdeer is 4% smaller. TinyPNG ran through its API in October 2026."]],
     sets: {
       tiny: { label: "TinyPNG's WebP · 120", n: 120, smaller: 5, points: 1.6, reach: 118, tools: [
-        ["pngdeer", 5.0, 118], ["cwebp", 2.1, 120], ["pngquant + cwebp", -35.0, 115]] },
+        ["slimdeer", 5.0, 118], ["cwebp", 2.1, 120], ["pngquant + cwebp", -35.0, 115]] },
     },
   },
   jpeg: {
     title: "The best open-source JPEG compressor we've measured.",
-    intro: "We recompressed 60 JPEG photos from Wikimedia Commons, 30 web-size copies and 30 camera originals, with pngdeer, TinyPNG, mozjpeg (Mozilla's encoder, which Squoosh uses) and jpegli (Google's, from the JPEG XL project). Every output was scored with SSIMULACRA2 against the photo.",
+    intro: "We recompressed 60 JPEG photos from Wikimedia Commons, 30 web-size copies and 30 camera originals, with slimdeer, TinyPNG, mozjpeg (Mozilla's encoder, which Squoosh uses) and jpegli (Google's, from the JPEG XL project). Every output was scored with SSIMULACRA2 against the photo.",
     chart: "Bytes saved at TinyPNG's quality",
     sub: "Median size against TinyPNG's JPEG when each tool's output matches its quality, and how many photos each can bring up to TinyPNG's quality.",
     column: "Saved vs TinyPNG", unit: "%", lo: -5, ticks: [-5, 0, 5, 10], narrow: [0, 10],
     method: [
-      ["Generous to the others", "mozjpeg and jpegli each get their best setting per photo, picked after the fact: qualities 40–90, jpegli at 4:4:4 and 4:2:0. pngdeer's files are pooled the same way; the one it writes for TinyPNG's quality is 10.5% smaller on the median photo."],
-      ["Out of the box", "pngdeer's automatic quality makes files 18% smaller than TinyPNG's on the median photo, as good. mozjpeg's default quality makes them 7% bigger, 5 points better."],
-      ["Colors kept", "TinyPNG drops every bit of metadata, the color profile too, so a photo in Display P3 loses its colors. pngdeer keeps a profile that isn't sRGB, and the orientation. TinyPNG ran through its API in October 2026."]],
+      ["Generous to the others", "mozjpeg and jpegli each get their best setting per photo, picked after the fact: qualities 40–90, jpegli at 4:4:4 and 4:2:0. slimdeer's files are pooled the same way; the one it writes for TinyPNG's quality is 10.5% smaller on the median photo."],
+      ["Out of the box", "slimdeer's automatic quality makes files 18% smaller than TinyPNG's on the median photo, as good. mozjpeg's default quality makes them 7% bigger, 5 points better."],
+      ["Colors kept", "TinyPNG drops every bit of metadata, the color profile too, so a photo in Display P3 loses its colors. slimdeer keeps a profile that isn't sRGB, and the orientation. TinyPNG ran through its API in October 2026."]],
     sets: {
       photos: { label: "Photos · 60", n: 60, smaller: 12, points: 3.3, reach: 60, tools: [
-        ["pngdeer", 12.2, 60], ["jpegli", 10.8, 60], ["mozjpeg", 5.8, 59]] },
+        ["slimdeer", 12.2, 60], ["jpegli", 10.8, 60], ["mozjpeg", 5.8, 59]] },
     },
   },
   avif: {
     title: "The best open-source AVIF compressor we've measured.",
-    intro: "We turned 54 images, 30 JPEG photos and 24 PNGs of every kind, into AVIF with pngdeer, TinyPNG, avifenc (libavif with libaom, what Squoosh and sharp encode with) and rav1e (the Rust encoder, through ravif). Every output was decoded by Chrome and scored with SSIMULACRA2.",
+    intro: "We turned 54 images, 30 JPEG photos and 24 PNGs of every kind, into AVIF with slimdeer, TinyPNG, avifenc (libavif with libaom, what Squoosh and sharp encode with) and rav1e (the Rust encoder, through ravif). Every output was decoded by Chrome and scored with SSIMULACRA2.",
     chart: "Bytes saved at TinyPNG's quality",
     sub: "Median size against TinyPNG's AVIF when each tool's output matches its quality, and how many images each can bring up to TinyPNG's quality.",
     column: "Saved vs TinyPNG", unit: "%", lo: -5, ticks: [-5, 0, 5, 10, 15, 20], narrow: [0, 10, 20],
     method: [
-      ["Generous to the others", "avifenc gets its best of 33 settings per image, picked after the fact: qualities 30–90 at its default speed, 4:4:4 at 8 and 10 bits and 4:2:0. rav1e its best of 11 qualities. pngdeer's files are its own runs, at five targets around TinyPNG's quality and its automatic one."],
-      ["Out of the box", "pngdeer's automatic quality makes files 20% smaller than TinyPNG's on the median image, and 0.5 points better. avifenc's default quality makes them 32% bigger, 9 points better."],
-      ["As browsers show them", "pngdeer scores each file as Chrome decodes it, pixel for pixel, and TinyPNG's and the others' files were decoded by Chrome too. TinyPNG ran through its API in October 2026."]],
+      ["Generous to the others", "avifenc gets its best of 33 settings per image, picked after the fact: qualities 30–90 at its default speed, 4:4:4 at 8 and 10 bits and 4:2:0. rav1e its best of 11 qualities. slimdeer's files are its own runs, at five targets around TinyPNG's quality and its automatic one."],
+      ["Out of the box", "slimdeer's automatic quality makes files 20% smaller than TinyPNG's on the median image, and 0.5 points better. avifenc's default quality makes them 32% bigger, 9 points better."],
+      ["As browsers show them", "slimdeer scores each file as Chrome decodes it, pixel for pixel, and TinyPNG's and the others' files were decoded by Chrome too. TinyPNG ran through its API in October 2026."]],
     sets: {
       all: { label: "Photos and PNGs · 54", n: 54, smaller: 23, points: 5.7, reach: 54, tools: [
-        ["pngdeer", 22.6, 54], ["avifenc", 10.7, 54], ["rav1e", -2.0, 54]] },
+        ["slimdeer", 22.6, 54], ["avifenc", 10.7, 54], ["rav1e", -2.0, 54]] },
     },
   },
 };
@@ -1212,7 +1212,7 @@ function researchFormatShown(kind) {
     `<button type="button" data-set="${key}" aria-pressed="${key === researchSet}">${d.label}</button>`).join("");
   rows.innerHTML = `<span class="hd">Tool</span><span class="hd">${f.column}</span><span class="hd" style="text-align:right">Reaches</span>` +
     f.sets[researchSet].tools.map(([name]) => {
-      const us = name === "pngdeer" ? "us" : "";
+      const us = name === "slimdeer" ? "us" : "";
       return `<span class="tool ${us}" data-row="${name}">${name}</span>
         <div class="track" data-row="${name}"><span class="zero"></span><span class="fill ${us}" style="width:0"></span><span class="val ${us}"></span></div>
         <span class="reach ${us}" data-row="${name}"></span>`;
@@ -1308,7 +1308,7 @@ if (document.querySelector("base")) {
 }
 
 // The star count, once GitHub shows one (a private repository answers 404, and none stays hidden).
-fetch("https://api.github.com/repos/heydeer/pngdeer")
+fetch("https://api.github.com/repos/heydeer/slimdeer")
   .then((r) => (r.ok ? r.json() : null))
   .then((repo) => {
     const n = repo?.stargazers_count;
@@ -1323,7 +1323,7 @@ try {
   startPool();
 } catch (error) {
   poolError = location.protocol === "file:"
-    ? "Compression needs a web server. Open pngdeer over HTTP or HTTPS."
+    ? "Compression needs a web server. Open slimdeer over HTTP or HTTPS."
     : `Couldn't start compression: ${String(error)}`;
 }
 </script>

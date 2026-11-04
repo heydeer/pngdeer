@@ -1,4 +1,4 @@
-// pngdeer: wasm32 has no C library; the vendored libraries only need the fixed-width integer types,
+// slimdeer: wasm32 has no C library; the vendored libraries only need the fixed-width integer types,
 // and libaom the format macros for the messages and files it never writes here.
 #include <stdint.h>
 #define PRId32 "d"

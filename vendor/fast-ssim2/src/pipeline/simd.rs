@@ -21,7 +21,7 @@
 
 #![allow(non_camel_case_types)]
 #[allow(unused_imports)]
-use super::Fma; // pngdeer patch
+use super::Fma; // slimdeer patch
 use archmage::incant;
 use archmage::magetypes;
 #[cfg(target_arch = "x86_64")]
@@ -1201,7 +1201,7 @@ pub(crate) fn maps_fused_simd_stop(
     Ok((so, eo))
 }
 
-/// One channel of [`maps_fused_simd_stop`]. pngdeer patch: split out so the low-memory comparison,
+/// One channel of [`maps_fused_simd_stop`]. slimdeer patch: split out so the low-memory comparison,
 /// which scores channel by channel, runs this same code.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn maps_channel_simd_stop(

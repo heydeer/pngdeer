@@ -1,11 +1,11 @@
-//! pngdeer on the command line, writing the same files as the browser build (web/):
+//! slimdeer on the command line, writing the same files as the browser build (web/):
 //!
-//!   pngdeer [OPTIONS] FILE...     (HELP below)
+//!   slimdeer [OPTIONS] FILE...     (HELP below)
 //!
 //! Each FILE, a PNG or a JPEG, comes out smaller at a quality picked for it, next to it as
 //! NAME.min.EXT, in a folder with -d, or where -o says. Like cp and pngquant, it says nothing unless
 //! something goes wrong: -v says what each file came to (on stderr), --json prints each file's
-//! report (on stdout, one a line). A file that fails doesn't stop the others; pngdeer then exits 1,
+//! report (on stdout, one a line). A file that fails doesn't stop the others; slimdeer then exits 1,
 //! and 2 on a command it can't run. A name it makes up never replaces an input; -o can.
 //!
 //! A PNG comes out as the smallest palette PNG that keeps its quality as SSIMULACRA2 measures it: a
@@ -15,7 +15,7 @@
 //! "frames", and its score is the worst frame's).
 //!
 //! A JPEG comes out as a JPEG: re-encoded at the lowest quality that keeps the target, never bigger
-//! than the input (pngdeer::jpeg). Automatic quality there is about TinyPNG's JPEG's, which goes by
+//! than the input (slimdeer::jpeg). Automatic quality there is about TinyPNG's JPEG's, which goes by
 //! the photo's size (see jpeg.rs). Its report gives the quality, score and searches; the ICC profile
 //! (unless sRGB's) and the EXIF orientation stay, the rest of EXIF goes. As WebP it comes out as
 //! lossy WebP, turned as its orientation says (webp.rs).
@@ -34,19 +34,19 @@
 //!   --webp-large-alpha-effort N: the lossy candidates' settings;
 //!   --webp-lossless-level N: also a slower lossless level where lossless may win;
 //!   --webp-reference Q|none: automatic quality's reference lossy quality (see webp.rs)
-//!   (pngdeer::WebpOptions).
+//!   (slimdeer::WebpOptions).
 //! --preview-pixels N: images over N pixels are searched on a downscaled preview, then checked at
-//!   full size (default pngdeer::PREVIEW_PIXELS, as in the browser). 0 searches at full size: about
+//!   full size (default slimdeer::PREVIEW_PIXELS, as in the browser). 0 searches at full size: about
 //!   1% smaller files, several times slower on large images.
 //! --variants SPEC: the remapping variants tried at each palette size, e.g. 50,0,0r2,w0 (the
 //!   default; see search::parse_variants).
 //!
 //! Two helpers for bench/bench.py:
-//!   pngdeer IN.png --score OTHER            SSIMULACRA2 of OTHER (PNG, WebP or JPEG) against IN, as the
+//!   slimdeer IN.png --score OTHER            SSIMULACRA2 of OTHER (PNG, WebP or JPEG) against IN, as the
 //!                                           search scores; for an animated IN, the worst frame's,
 //!                                           each against the frame OTHER shows at that time (in the
 //!                                           help too)
-//!   pngdeer IN.png -o OUT.png --upscale K   nearest-neighbour K× enlargement, written as RGBA
+//!   slimdeer IN.png -o OUT.png --upscale K   nearest-neighbour K× enlargement, written as RGBA
 
 use std::{
     env, fs,
@@ -57,22 +57,22 @@ use std::{
     time::Instant,
 };
 
-use pngdeer::{codec, search};
+use slimdeer::{codec, search};
 
-const HELP: &str = "pngdeer: smaller PNG and JPEG files, or WebP and AVIF, that look the same
+const HELP: &str = "slimdeer: smaller PNG and JPEG files, or WebP and AVIF, that look the same
 
-Usage: pngdeer [OPTIONS] FILE...
+Usage: slimdeer [OPTIONS] FILE...
 
 Writes each FILE, a PNG or a JPEG, smaller, at a quality picked for it, next to it
 as NAME.min.EXT. Says nothing unless something goes wrong.
 
 Examples:
-  pngdeer photo.jpg                 writes photo.min.jpg
-  pngdeer *.png -d dist             writes dist/NAME.png for each
-  pngdeer logo.png --format webp    writes logo.min.webp
-  pngdeer in.png -o out.avif        writes out.avif, the format as its name says
-  pngdeer shot.png --target 90      keeps a score of at least 90
-  pngdeer - < in.png > out.png      from stdin to stdout
+  slimdeer photo.jpg                 writes photo.min.jpg
+  slimdeer *.png -d dist             writes dist/NAME.png for each
+  slimdeer logo.png --format webp    writes logo.min.webp
+  slimdeer in.png -o out.avif        writes out.avif, the format as its name says
+  slimdeer shot.png --target 90      keeps a score of at least 90
+  slimdeer - < in.png > out.png      from stdin to stdout
 
 Options:
   -o, --output FILE    Write the one FILE's output here (- for stdout)
@@ -87,7 +87,7 @@ Options:
   -V, --version        Print the version
 
 Also:
-  pngdeer ORIGINAL --score OTHER    Print OTHER's SSIMULACRA2 score against ORIGINAL";
+  slimdeer ORIGINAL --score OTHER    Print OTHER's SSIMULACRA2 score against ORIGINAL";
 
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 
@@ -96,7 +96,7 @@ fn main() {
         Ok(Some(command)) => command.run(),
         Ok(None) => 0,
         Err(message) => {
-            eprintln!("pngdeer: {message}\nTry 'pngdeer --help' for more.");
+            eprintln!("slimdeer: {message}\nTry 'slimdeer --help' for more.");
             2
         }
     };
@@ -142,7 +142,7 @@ fn named_by(output: Option<&str>) -> Option<Format> {
 /// Where a file's output goes.
 enum Destination {
     Stdout,
-    /// A path, and whether pngdeer made it up (one that mustn't replace the input).
+    /// A path, and whether slimdeer made it up (one that mustn't replace the input).
     File(PathBuf, bool),
 }
 
@@ -164,7 +164,7 @@ struct Command {
     json: bool,
     score_against: Option<String>,
     upscale: Option<usize>,
-    settings: pngdeer::Settings,
+    settings: slimdeer::Settings,
 }
 
 /// The command line, or None where it asked for the help or the version (printed), or what's wrong
@@ -179,7 +179,7 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Command>, String> 
         json: false,
         score_against: None,
         upscale: None,
-        settings: pngdeer::Settings { clock: Some(now_ms), ..Default::default() },
+        settings: slimdeer::Settings { clock: Some(now_ms), ..Default::default() },
     };
     let settings = &mut command.settings;
     let mut args = args.peekable();
@@ -220,7 +220,7 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Command>, String> 
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("pngdeer {}", env!("CARGO_PKG_VERSION"));
+                println!("slimdeer {}", env!("CARGO_PKG_VERSION"));
                 return Ok(None);
             }
             "--score" => command.score_against = Some(value()?),
@@ -292,21 +292,21 @@ impl Command {
             return match result {
                 Ok(()) => 0,
                 Err(e) => {
-                    eprintln!("pngdeer: {e}");
+                    eprintln!("slimdeer: {e}");
                     1
                 }
             };
         }
         if let Some(dir) = &self.dir {
             if let Err(e) = fs::create_dir_all(dir) {
-                eprintln!("pngdeer: {}: {}", dir.display(), plain(e));
+                eprintln!("slimdeer: {}: {}", dir.display(), plain(e));
                 return 1;
             }
         }
         let mut failed = false;
         for file in &self.files {
             if let Err(e) = self.compress(file) {
-                eprintln!("pngdeer: {}: {e}", if file == "-" { "stdin" } else { file });
+                eprintln!("slimdeer: {}: {e}", if file == "-" { "stdin" } else { file });
                 failed = true;
             }
         }
@@ -396,13 +396,13 @@ impl Command {
 
 /// The file in `format`, its JSON report, and whether it is the input unchanged (nothing smaller
 /// kept the quality).
-fn encode(input: &[u8], jpeg: bool, format: Format, settings: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+fn encode(input: &[u8], jpeg: bool, format: Format, settings: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
     match (format, jpeg) {
         (Format::Webp, _) => encode_webp(input, settings),
         (Format::Avif, _) => encode_avif(input, settings),
         (Format::Jpeg, true) => encode_jpeg(input, settings),
         (Format::Png, false) => {
-            let result = pngdeer::compress(input, settings)?;
+            let result = slimdeer::compress(input, settings)?;
             let json = result.json();
             Ok((result.png, json, result.outcome == "original"))
         }
@@ -412,32 +412,32 @@ fn encode(input: &[u8], jpeg: bool, format: Format, settings: &pngdeer::Settings
 }
 
 #[cfg(feature = "webp")]
-fn encode_webp(input: &[u8], settings: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
-    let result = pngdeer::compress_webp(input, settings)?;
+fn encode_webp(input: &[u8], settings: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+    let result = slimdeer::compress_webp(input, settings)?;
     let json = result.json();
     Ok((result.webp, json, false))
 }
 
 #[cfg(not(feature = "webp"))]
-fn encode_webp(_: &[u8], _: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
-    Err("this pngdeer was built without the webp feature".into())
+fn encode_webp(_: &[u8], _: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+    Err("this slimdeer was built without the webp feature".into())
 }
 
 #[cfg(feature = "avif")]
-fn encode_avif(input: &[u8], settings: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
-    let result = pngdeer::compress_avif(input, settings)?;
+fn encode_avif(input: &[u8], settings: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+    let result = slimdeer::compress_avif(input, settings)?;
     let json = result.json();
     Ok((result.avif, json, false))
 }
 
 #[cfg(not(feature = "avif"))]
-fn encode_avif(_: &[u8], _: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
-    Err("this pngdeer was built without the avif feature".into())
+fn encode_avif(_: &[u8], _: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+    Err("this slimdeer was built without the avif feature".into())
 }
 
 #[cfg(feature = "jpeg")]
 fn is_jpeg(input: &[u8]) -> bool {
-    pngdeer::jpeg::is_jpeg(input)
+    slimdeer::jpeg::is_jpeg(input)
 }
 
 #[cfg(not(feature = "jpeg"))]
@@ -446,15 +446,15 @@ fn is_jpeg(_: &[u8]) -> bool {
 }
 
 #[cfg(feature = "jpeg")]
-fn encode_jpeg(input: &[u8], settings: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
-    let result = pngdeer::compress_jpeg(input, settings)?;
+fn encode_jpeg(input: &[u8], settings: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+    let result = slimdeer::compress_jpeg(input, settings)?;
     let json = result.json();
     Ok((result.jpeg, json, result.outcome == "original"))
 }
 
 #[cfg(not(feature = "jpeg"))]
-fn encode_jpeg(_: &[u8], _: &pngdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
-    Err("this pngdeer was built without the jpeg feature".into())
+fn encode_jpeg(_: &[u8], _: &slimdeer::Settings) -> Result<(Vec<u8>, String, bool), Error> {
+    Err("this slimdeer was built without the jpeg feature".into())
 }
 
 /// An I/O error as people say it, without the OS's error number.
@@ -497,7 +497,7 @@ fn json_string(text: &str) -> String {
 /// --score: SSIMULACRA2 of `other` against `file`, printed.
 fn score(file: &str, other: &str) -> Result<(), Error> {
     let input = fs::read(file)?;
-    if pngdeer::apng::is_animated(&input) {
+    if slimdeer::apng::is_animated(&input) {
         println!("{:.4}", frame_scores(&input, &fs::read(other)?)?.into_iter().fold(f64::INFINITY, f64::min));
         return Ok(());
     }
@@ -521,16 +521,16 @@ fn upscale(file: &str, output: &str, k: usize) -> Result<(), Error> {
 /// SSIMULACRA2 of each frame of animation `a` against the frame animation `b` shows at the same
 /// time (b may have merged frames that repeat into longer ones), default images aside.
 fn frame_scores(a: &[u8], b: &[u8]) -> Result<Vec<f64>, Error> {
-    let (a, b) = (pngdeer::apng::decode(a)?, pngdeer::apng::decode(b)?);
+    let (a, b) = (slimdeer::apng::decode(a)?, slimdeer::apng::decode(b)?);
     if (a.width, a.height) != (b.width, b.height) {
         return Err("animations differ in size".into());
     }
-    let starts = |timing: &pngdeer::apng::Timing| {
+    let starts = |timing: &slimdeer::apng::Timing| {
         let seconds = |&(num, den): &(u16, u16)| num as f64 / if den == 0 { 100.0 } else { den as f64 };
         timing.delays.iter().scan(0.0, |t, d| Some(std::mem::replace(t, *t + seconds(d)))).collect::<Vec<f64>>()
     };
     let (sa, sb) = (starts(&a.timing), starts(&b.timing));
-    fn frame(anim: &pngdeer::apng::Animation, i: usize) -> &[pngdeer::RGBA] {
+    fn frame(anim: &slimdeer::apng::Animation, i: usize) -> &[slimdeer::RGBA] {
         let (n, f) = (anim.width * anim.height, i + anim.timing.default_image as usize);
         &anim.pixels[f * n..(f + 1) * n]
     }
@@ -547,14 +547,14 @@ fn frame_scores(a: &[u8], b: &[u8]) -> Result<Vec<f64>, Error> {
 /// orientation says, as viewers show it), as RGBA.
 fn decode_any(bytes: &[u8]) -> Result<codec::Bitmap, Error> {
     #[cfg(feature = "jpeg")]
-    if pngdeer::jpeg::is_jpeg(bytes) {
-        let photo = pngdeer::jpeg::decode(bytes)?;
-        let (pixels, width, height) = pngdeer::jpeg::oriented(photo.pixels, photo.width, photo.height, photo.orientation);
+    if slimdeer::jpeg::is_jpeg(bytes) {
+        let photo = slimdeer::jpeg::decode(bytes)?;
+        let (pixels, width, height) = slimdeer::jpeg::oriented(photo.pixels, photo.width, photo.height, photo.orientation);
         return Ok(codec::Bitmap { pixels, width, height });
     }
     #[cfg(feature = "webp")]
     if bytes.starts_with(b"RIFF") {
-        return pngdeer::webp::decode(bytes);
+        return slimdeer::webp::decode(bytes);
     }
     codec::decode(bytes)
 }
