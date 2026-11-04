@@ -227,3 +227,37 @@ fn folder_links_arent_followed_and_unreadable_folders_dont_stop_the_rest() {
     }
     fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn an_output_never_replaces_another_input() {
+    // -d above the tree: icons/icons/b.png's output would be icons/b.png, the other input
+    let dir = folder("ancestor", &[]);
+    fs::create_dir_all(dir.join("assets/icons/icons")).unwrap();
+    fs::write(dir.join("assets/icons/b.png"), sample()).unwrap();
+    fs::write(dir.join("assets/icons/icons/b.png"), sample()).unwrap();
+    let run = slimdeer(&dir, &["-r", "assets/icons", "-d", "assets"]);
+    assert_eq!(run.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&run.stderr).contains("assets/icons/b.png is another input"));
+    assert_eq!(fs::read(dir.join("assets/icons/b.png")).unwrap(), sample());
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn outputs_differing_in_case_dont_overwrite_each_other() {
+    let dir = folder("case", &[]);
+    for name in ["a/X.png", "b/x.png"] {
+        fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
+        fs::write(dir.join(name), sample()).unwrap();
+    }
+    // a volume that ignores case (macOS's and Windows' by default) has one dist/x.png for both
+    let ignores_case = dir.join("A/X.PNG").exists();
+    let run = slimdeer(&dir, &["-r", "a", "b", "-d", "dist"]);
+    if ignores_case {
+        assert_eq!(run.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&run.stderr).contains("is already a/X.png's output"));
+    } else {
+        assert_eq!(run.status.code(), Some(0));
+        assert!(is_png(&dir.join("dist/X.png")) && is_png(&dir.join("dist/x.png")));
+    }
+    fs::remove_dir_all(&dir).unwrap();
+}

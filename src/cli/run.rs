@@ -11,7 +11,7 @@ use std::{
 use super::{
     args::Command,
     encode::{encode, is_jpeg, named_by, Format, PNG_SIGNATURE},
-    files::{destination, images_under, Destination, Input},
+    files::{destination, file_id, images_under, Destination, FileId, Input},
     report::{json_line, plain, verbose_line},
     tools::{score, upscale},
     usage_error, Error,
@@ -46,9 +46,12 @@ impl Command {
             }
         }
         let (inputs, mut failed) = self.inputs();
-        let mut written = HashMap::new();
+        let mut files = Files {
+            inputs: inputs.iter().filter(|input| !input.is_stdin()).filter_map(|input| Some((file_id(&input.path)?, input.name()))).collect(),
+            outputs: HashMap::new(),
+        };
         for input in &inputs {
-            if let Err(e) = self.compress(input, &mut written) {
+            if let Err(e) = self.compress(input, &mut files) {
                 eprintln!("slimdeer: {}: {e}", input.name());
                 failed = true;
             }
@@ -61,7 +64,7 @@ impl Command {
     fn inputs(&self) -> (Vec<Input>, bool) {
         let (mut inputs, mut failed) = (Vec::new(), false);
         // -d's folder inside a tree holds outputs under the inputs' own names: not inputs again
-        let skip = self.dir.as_deref().and_then(|dir| fs::canonicalize(dir).ok());
+        let skip = self.dir.as_deref().and_then(file_id);
         for file in &self.files {
             let path = PathBuf::from(file);
             if file == "-" || !path.is_dir() {
@@ -73,7 +76,7 @@ impl Command {
                 failed = true;
                 continue;
             }
-            let (found, unread) = images_under(&path, skip.as_deref());
+            let (found, unread) = images_under(&path, skip.as_ref());
             for (folder, e) in unread {
                 eprintln!("slimdeer: {}: {}", folder.display(), plain(e));
                 failed = true;
@@ -83,10 +86,8 @@ impl Command {
         (inputs, failed)
     }
 
-    /// One file: compressed, written, and reported as asked. `written` holds the outputs written so
-    /// far, and whose they are, as two inputs can come to one name (x.png in two folders -r reads
-    /// into one -d, or logo.png and logo.jpg as WebP).
-    fn compress(&self, input: &Input, written: &mut HashMap<PathBuf, String>) -> Result<(), Error> {
+    /// One file: compressed, written, and reported as asked.
+    fn compress(&self, input: &Input, files: &mut Files) -> Result<(), Error> {
         let start = Instant::now();
         let bytes = if input.is_stdin() {
             let mut bytes = Vec::new();
@@ -106,11 +107,19 @@ impl Command {
             Destination::Stdout if io::stdout().is_terminal() => {
                 return Err("an image can't go to the terminal: redirect stdout, or use -o".into());
             }
-            Destination::File(path, true) if path.exists() && fs::canonicalize(path)? == fs::canonicalize(&input.path)? => {
-                return Err(format!("{} would replace the input; name another with -o", path.display()).into());
-            }
-            Destination::File(path, _) if written.contains_key(path) => {
-                return Err(format!("{} is already {}'s output; give one of them another name or folder", path.display(), written[path]).into());
+            Destination::File(path, checked) => {
+                if let Some(id) = file_id(path) {
+                    if let Some(owner) = files.outputs.get(&id) {
+                        return Err(format!("{} is already {owner}'s output; give one of them another name or folder", path.display()).into());
+                    }
+                    match files.inputs.get(&id) {
+                        Some(owner) if *checked && *owner == input.name() => {
+                            return Err(format!("{} would replace the input; name another with -o", path.display()).into());
+                        }
+                        Some(_) if *checked => return Err(format!("{} is another input, which this would replace", path.display()).into()),
+                        _ => {}
+                    }
+                }
             }
             _ => {}
         }
@@ -124,7 +133,9 @@ impl Command {
                     }
                 }
                 fs::write(path, &output).map_err(|e| format!("{}: {}", path.display(), plain(e)))?;
-                written.insert(path.clone(), input.name());
+                if let Some(id) = file_id(path) {
+                    files.outputs.insert(id, input.name());
+                }
             }
         }
         if self.verbose {
@@ -139,8 +150,15 @@ impl Command {
     }
 }
 
-/// Whether `a` and `b` are the same folder, however each is spelt (relative or absolute, with `.`
-/// or `..`, or through a link); not if either doesn't exist.
+/// The files a run reads and writes, and whose they are: a name slimdeer makes up mustn't replace an
+/// input, nor any output another input's (x.png from two folders -r reads into one -d, X.png and
+/// x.png where a volume ignores case, logo.png and logo.jpg as WebP).
+struct Files {
+    inputs: HashMap<FileId, String>,
+    outputs: HashMap<FileId, String>,
+}
+
+/// Whether `a` and `b` are the same folder, however each is spelt; not if either doesn't exist.
 fn same_folder(a: &Path, b: &Path) -> bool {
-    matches!((fs::canonicalize(a), fs::canonicalize(b)), (Ok(a), Ok(b)) if a == b)
+    file_id(a).is_some_and(|a| file_id(b) == Some(a))
 }
