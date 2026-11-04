@@ -154,6 +154,19 @@ static inline void vst1q_u16_x4(uint16_t *ptr, uint16x8x4_t a) {
   vst1q_u16(ptr + 3 * 8, a.val[3]);
 }
 #endif  // ((__GNUC__ << 8) | __GNUC_MINOR__) < 0x805
+
+// slimdeer: GCC 11 (11.3, and 11.4 on GitHub's Ubuntu 22.04 runners) stores the wrong bytes with
+// vst1_u8_x4, which cfl_neon.c's 32-wide 8-bit prediction uses; GCC 12 and clang store the right
+// ones, and older GCC wasn't checked
+#if ((__GNUC__ << 8) | __GNUC_MINOR__) >= 0x805 && __GNUC__ < 12
+static inline void aom_vst1_u8_x4(uint8_t *ptr, uint8x8x4_t a) {
+  vst1_u8(ptr + 0 * 8, a.val[0]);
+  vst1_u8(ptr + 1 * 8, a.val[1]);
+  vst1_u8(ptr + 2 * 8, a.val[2]);
+  vst1_u8(ptr + 3 * 8, a.val[3]);
+}
+#define vst1_u8_x4 aom_vst1_u8_x4
+#endif
 #endif  // defined(__GNUC__) && !defined(__clang__)
 
 static inline void store_u8_8x2(uint8_t *s, ptrdiff_t p, const uint8x8_t s0,

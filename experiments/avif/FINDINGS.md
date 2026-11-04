@@ -548,6 +548,14 @@ doesn't have it yet.
   second speed-4 encode waited to be needed. The single-threaded browser build takes about as long
   as before (a 256 × 256 icon: 9.7 s of CPU against 9.5 s).
 
+- **GCC 11 miscompiles a NEON store.** The v0.3.0 release build on GitHub's Linux ARM64 runner
+  (Ubuntu 22.04, GCC 11.4) wrote a pinned icon 2 bytes smaller. Built with GCC 11.3 the same way, the
+  file differed; with GCC 12, clang or plain C it didn't. Compiling one file at a time with GCC 11
+  found cfl_neon.c, and putting each of its functions back in C found the 8-bit chroma-from-luma
+  prediction: only 32-wide blocks differ, and GCC 11 compiles its `vst1_u8_x4` into a store of the
+  wrong bytes (the other multi-register stores libaom uses are right; GCC 12's is too).
+  slimdeer.patch now writes it as four stores under GCC before 12, and CI tests on that runner.
+
 ## What it would take (after round 8)
 
 Round 9 did the scoring, the automatic target and the search, on the command line; not the way out

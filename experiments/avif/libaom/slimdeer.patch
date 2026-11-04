@@ -6,6 +6,8 @@ slimdeer's changes to libaom 3.15.2 (apply with patch -p1 in its source; FINDING
 - SLIMDEER_STILL=1 leaves the sub-pixel, compound, masked and OBMC functions, which only inter frames use, and the 8- and
   12-bit high bit depth sets out of the encoder's function tables, so a still-image build links less code. Without the
   define nothing changes.
+- vst1_u8_x4 as four stores with GCC before 12: GCC 11 compiles it into a store of the wrong bytes (FINDINGS.md round
+  11), which cfl_neon.c's 32-wide 8-bit chroma-from-luma prediction uses.
 
 --- a/aom_dsp/aom_dsp_rtcd_defs.pl
 +++ b/aom_dsp/aom_dsp_rtcd_defs.pl
@@ -185,3 +187,25 @@ slimdeer's changes to libaom 3.15.2 (apply with patch -p1 in its source; FINDING
          break;
  
        default:
+--- a/aom_dsp/arm/mem_neon.h
++++ b/aom_dsp/arm/mem_neon.h
+@@ -154,6 +154,19 @@
+   vst1q_u16(ptr + 3 * 8, a.val[3]);
+ }
+ #endif  // ((__GNUC__ << 8) | __GNUC_MINOR__) < 0x805
++
++// slimdeer: GCC 11 (11.3, and 11.4 on GitHub's Ubuntu 22.04 runners) stores the wrong bytes with
++// vst1_u8_x4, which cfl_neon.c's 32-wide 8-bit prediction uses; GCC 12 and clang store the right
++// ones, and older GCC wasn't checked
++#if ((__GNUC__ << 8) | __GNUC_MINOR__) >= 0x805 && __GNUC__ < 12
++static inline void aom_vst1_u8_x4(uint8_t *ptr, uint8x8x4_t a) {
++  vst1_u8(ptr + 0 * 8, a.val[0]);
++  vst1_u8(ptr + 1 * 8, a.val[1]);
++  vst1_u8(ptr + 2 * 8, a.val[2]);
++  vst1_u8(ptr + 3 * 8, a.val[3]);
++}
++#define vst1_u8_x4 aom_vst1_u8_x4
++#endif
+ #endif  // defined(__GNUC__) && !defined(__clang__)
+ 
+ static inline void store_u8_8x2(uint8_t *s, ptrdiff_t p, const uint8x8_t s0,

@@ -58,7 +58,8 @@ The same bytes on every target:
    The compiler matters there: Amazon Linux's clang 15 builds SIMDe's NEON into code that writes
    other files (its plain C writes the right ones), LLVM 23 doesn't; the site is built with
    wasi-sdk 34's (web/vercel-build.sh), and web/check-avif.mjs, which web/build.sh runs last,
-   refuses a build whose file differs from the command line's.
+   refuses a build whose file differs from the command line's. GCC 11 compiles NEON's `vst1_u8_x4`
+   into a store of the wrong bytes; slimdeer.patch writes it as four stores under GCC before 12.
 2. **No fused multiply-add.** `-ffp-contract=off`: compilers fuse `a * b + c` on targets with FMA,
    such as arm64, and libaom's rate control and neural networks work in floating point.
 3. **One libm and one qsort.** `vendor/clib/include/slimdeer_clib.h`, included ahead of every file,

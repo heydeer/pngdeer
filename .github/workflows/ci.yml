@@ -15,3 +15,12 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --release --all-targets -- -D warnings
       - run: cargo test --release
+
+  # 64-bit ARM Linux: libaom's NEON built with the runner's GCC, as the release builds it there.
+  # Its pinned files caught GCC 11 miscompiling a NEON store.
+  arm:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --release
